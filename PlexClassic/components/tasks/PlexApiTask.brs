@@ -70,6 +70,23 @@ sub run()
         response = url.GetToString()
     end if
 
+    ' Capture response code
+    responseCode = url.GetResponseCode()
+    m.top.responseCode = responseCode
+
+    ' Check for 401 Unauthorized (token expired/invalid)
+    if responseCode = 401
+        LogError("401 Unauthorized - authentication required")
+        ' Clear the stored token since it's invalid
+        SetAuthToken("")
+        ' Signal auth required via global
+        m.global.addFields({ authRequired: true })
+        m.global.authRequired = true
+        m.top.error = "Authentication required"
+        m.top.state = "authRequired"
+        return
+    end if
+
     if response = ""
         errorMsg = "Request failed: " + url.GetFailureReason()
         LogError("API error: " + errorMsg)

@@ -11,6 +11,7 @@
         <field id="requestId" type="string" />
         <field id="isPlexTvRequest" type="boolean" value="false" />
         <field id="isConnectionTest" type="boolean" value="false" />
+        <field id="responseCode" type="integer" value="0" />
     </interface>
     <script type="text/brightscript" uri="pkg:/source/utils.brs" />
     <script type="text/brightscript" uri="pkg:/source/constants.brs" />
