@@ -12,7 +12,7 @@ PlexClassic ships in 10 phases, starting with architectural foundation and Task 
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Foundation & Architecture** - Project scaffolding, Task patterns, API abstraction layer
+- [x] **Phase 1: Foundation & Architecture** - Project scaffolding, Task patterns, API abstraction layer
 - [ ] **Phase 2: Authentication** - PIN-based OAuth, server discovery, token persistence
 - [ ] **Phase 3: Navigation Framework** - MainScene screen stack, sidebar, back button handling
 - [ ] **Phase 4: Library Browsing** - Poster grid, library sections, pagination, On Deck, Recently Added
@@ -38,8 +38,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans:** 2 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — Enhanced PlexApiTask with POST support, logger, SafeGet utilities
-- [ ] 01-02-PLAN.md — ContentNode normalizers and server capability detection
+- [x] 01-01-PLAN.md — Enhanced PlexApiTask with POST support, logger, SafeGet utilities
+- [x] 01-02-PLAN.md — ContentNode normalizers and server capability detection
 
 ### Phase 2: Authentication
 **Goal**: Users can authenticate via plex.tv PIN code and connect to their Plex server.
@@ -185,7 +185,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation & Architecture | 0/2 | Planned | - |
+| 1. Foundation & Architecture | 2/2 | Complete | 2026-02-09 |
 | 2. Authentication | 0/0 | Not started | - |
 | 3. Navigation Framework | 0/0 | Not started | - |
 | 4. Library Browsing | 0/0 | Not started | - |
