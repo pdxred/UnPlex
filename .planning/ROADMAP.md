@@ -51,10 +51,12 @@ Plans:
   3. Auth token and selected server URI persist across app restarts
   4. App detects server version and adapts to available capabilities
   5. App redirects to re-authentication when token expires (401 responses handled)
-**Plans**: TBD
+**Plans:** 3 plans
 
 Plans:
-- [ ] TBD during plan-phase
+- [ ] 02-01-PLAN.md — PINScreen component and enhanced PlexAuthTask with server discovery
+- [ ] 02-02-PLAN.md — ServerConnectionTask and ServerListScreen for connection testing
+- [ ] 02-03-PLAN.md — 401 detection and MainScene auth-aware routing
 
 ### Phase 3: Navigation Framework
 **Goal**: MainScene screen stack enables navigation between views with back button support and focus restoration.
@@ -186,7 +188,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation & Architecture | 2/2 | Complete | 2026-02-09 |
-| 2. Authentication | 0/0 | Not started | - |
+| 2. Authentication | 0/3 | Planned | - |
 | 3. Navigation Framework | 0/0 | Not started | - |
 | 4. Library Browsing | 0/0 | Not started | - |
 | 5. Media Detail Views | 0/0 | Not started | - |
