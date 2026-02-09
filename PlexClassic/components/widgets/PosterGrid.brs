@@ -1,0 +1,50 @@
+sub init()
+    c = GetConstants()
+    m.grid = m.top.findNode("grid")
+
+    ' Configure grid dimensions
+    m.grid.numColumns = c.GRID_COLUMNS
+    m.grid.itemSize = [c.POSTER_WIDTH + 20, c.POSTER_HEIGHT + 50]
+    m.grid.itemSpacing = [c.GRID_H_SPACING, c.GRID_V_SPACING]
+
+    ' Observe grid selection
+    m.grid.observeField("itemSelected", "onItemSelected")
+    m.grid.observeField("itemFocused", "onItemFocused")
+
+    m.lastFocusedIndex = 0
+    m.totalItems = 0
+end sub
+
+sub onContentChange(event as Object)
+    content = event.getData()
+    m.grid.content = content
+    if content <> invalid
+        m.totalItems = content.getChildCount()
+    else
+        m.totalItems = 0
+    end if
+end sub
+
+sub onItemSelected(event as Object)
+    index = event.getData()
+    m.top.itemSelected = index
+end sub
+
+sub onItemFocused(event as Object)
+    index = event.getData()
+    m.lastFocusedIndex = index
+
+    ' Check if we need to load more (within 2 rows of the end)
+    c = GetConstants()
+    itemsPerRow = c.GRID_COLUMNS
+    threshold = m.totalItems - (itemsPerRow * 2)
+
+    if index >= threshold and m.totalItems > 0
+        m.top.loadMore = true
+    end if
+end sub
+
+function onKeyEvent(key as String, press as Boolean) as Boolean
+    ' Let the grid handle its own navigation
+    return false
+end function

@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component name="Sidebar" extends="Rectangle">
+    <interface>
+        <field id="selectedLibrary" type="assocarray" alwaysNotify="true" />
+        <field id="specialAction" type="string" alwaysNotify="true" />
+    </interface>
+
+    <script type="text/brightscript" uri="pkg:/source/utils.brs" />
+    <script type="text/brightscript" uri="pkg:/source/constants.brs" />
+    <script type="text/brightscript" uri="Sidebar.brs" />
+
+    <children>
+        <Label
+            id="titleLabel"
+            translation="[20, 30]"
+            text="PlexClassic"
+            font="font:LargeBoldSystemFont"
+            color="0xE5A00DFF"
+        />
+        <LabelList
+            id="libraryList"
+            translation="[0, 100]"
+            itemSize="[280, 50]"
+            focusedColor="0xE5A00DFF"
+            color="0xFFFFFFFF"
+        />
+        <Rectangle
+            id="separator1"
+            translation="[20, 0]"
+            width="240"
+            height="2"
+            color="0x2A2A4AFF"
+        />
+        <LabelList
+            id="hubList"
+            translation="[0, 0]"
+            itemSize="[280, 50]"
+            focusedColor="0xE5A00DFF"
+            color="0xFFFFFFFF"
+        />
+        <Rectangle
+            id="separator2"
+            translation="[20, 0]"
+            width="240"
+            height="2"
+            color="0x2A2A4AFF"
+        />
+        <LabelList
+            id="bottomList"
+            translation="[0, 0]"
+            itemSize="[280, 50]"
+            focusedColor="0xE5A00DFF"
+            color="0xFFFFFFFF"
+        />
+    </children>
+</component>

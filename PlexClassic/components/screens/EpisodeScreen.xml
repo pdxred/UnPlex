@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component name="EpisodeScreen" extends="Group">
+    <interface>
+        <field id="ratingKey" type="string" onChange="onRatingKeyChange" />
+        <field id="showTitle" type="string" />
+        <field id="itemSelected" type="assocarray" alwaysNotify="true" />
+        <field id="navigateBack" type="boolean" alwaysNotify="true" />
+    </interface>
+
+    <script type="text/brightscript" uri="pkg:/source/utils.brs" />
+    <script type="text/brightscript" uri="pkg:/source/constants.brs" />
+    <script type="text/brightscript" uri="EpisodeScreen.brs" />
+
+    <children>
+        <Rectangle
+            id="background"
+            width="1920"
+            height="1080"
+            color="0x1A1A2EFF"
+        />
+        <Label
+            id="showTitleLabel"
+            translation="[80, 40]"
+            font="font:LargeBoldSystemFont"
+            color="0xFFFFFFFF"
+        />
+        <LabelList
+            id="seasonList"
+            translation="[80, 120]"
+            itemSize="[200, 50]"
+            numRows="1"
+            focusedColor="0xE5A00DFF"
+            color="0xFFFFFFFF"
+        />
+        <MarkupList
+            id="episodeList"
+            translation="[80, 200]"
+            itemSize="[1760, 120]"
+            itemSpacing="[0, 10]"
+            drawFocusFeedback="true"
+            focusBitmapBlendColor="0xE5A00D80"
+        />
+        <LoadingSpinner
+            id="loadingSpinner"
+            translation="[960, 540]"
+            visible="true"
+        />
+    </children>
+</component>

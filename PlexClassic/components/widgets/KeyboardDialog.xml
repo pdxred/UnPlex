@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component name="KeyboardDialog" extends="Group">
+    <interface>
+        <field id="text" type="string" />
+        <field id="title" type="string" onChange="onTitleChange" />
+        <field id="textSubmitted" type="string" alwaysNotify="true" />
+        <field id="cancelled" type="boolean" alwaysNotify="true" />
+    </interface>
+
+    <script type="text/brightscript" uri="KeyboardDialog.brs" />
+
+    <children>
+        <Rectangle
+            id="overlay"
+            width="1920"
+            height="1080"
+            color="0x000000AA"
+        />
+        <Rectangle
+            id="dialogBox"
+            translation="[460, 240]"
+            width="1000"
+            height="600"
+            color="0x232342FF"
+        />
+        <Label
+            id="titleLabel"
+            translation="[960, 280]"
+            horizAlign="center"
+            font="font:LargeBoldSystemFont"
+            color="0xFFFFFFFF"
+        />
+        <Keyboard
+            id="keyboard"
+            translation="[510, 350]"
+        />
+        <ButtonGroup
+            id="buttonGroup"
+            translation="[510, 750]"
+            buttons="[&quot;OK&quot;, &quot;Cancel&quot;]"
+        />
+    </children>
+</component>

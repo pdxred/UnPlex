@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component name="PlexAuthTask" extends="Task">
+    <interface>
+        <field id="action" type="string" />
+        <!-- "requestPin" or "checkPin" -->
+        <field id="pinId" type="string" />
+        <field id="pinCode" type="string" />
+        <field id="authToken" type="string" />
+        <field id="error" type="string" />
+        <field id="state" type="string" value="idle" />
+        <!-- "idle", "loading", "pinReady", "authenticated", "waiting", "error" -->
+    </interface>
+    <script type="text/brightscript" uri="pkg:/source/utils.brs" />
+    <script type="text/brightscript" uri="pkg:/source/constants.brs" />
+    <script type="text/brightscript" uri="PlexAuthTask.brs" />
+</component>

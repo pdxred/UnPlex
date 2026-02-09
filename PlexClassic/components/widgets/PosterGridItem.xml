@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component name="PosterGridItem" extends="Group">
+    <interface>
+        <field id="itemContent" type="node" onChange="onItemContentChange" />
+    </interface>
+
+    <script type="text/brightscript" uri="PosterGridItem.brs" />
+
+    <children>
+        <Poster
+            id="poster"
+            width="240"
+            height="360"
+            loadingBitmapUri="pkg:/images/placeholder_poster.png"
+        />
+        <Label
+            id="titleLabel"
+            translation="[0, 365]"
+            width="240"
+            font="font:SmallSystemFont"
+            color="0xFFFFFFFF"
+            horizAlign="center"
+            maxLines="2"
+            wrap="true"
+        />
+        <Rectangle
+            id="unwatchedIndicator"
+            translation="[220, 10]"
+            width="12"
+            height="12"
+            color="0xE5A00DFF"
+            visible="false"
+        />
+    </children>
+</component>

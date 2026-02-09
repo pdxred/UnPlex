@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component name="HomeScreen" extends="Group">
+    <interface>
+        <field id="itemSelected" type="assocarray" alwaysNotify="true" />
+        <field id="navigateBack" type="boolean" alwaysNotify="true" />
+    </interface>
+
+    <script type="text/brightscript" uri="pkg:/source/utils.brs" />
+    <script type="text/brightscript" uri="pkg:/source/constants.brs" />
+    <script type="text/brightscript" uri="HomeScreen.brs" />
+
+    <children>
+        <Sidebar
+            id="sidebar"
+            translation="[0, 0]"
+        />
+        <Group id="contentArea" translation="[280, 0]">
+            <FilterBar
+                id="filterBar"
+                translation="[20, 20]"
+            />
+            <PosterGrid
+                id="posterGrid"
+                translation="[20, 100]"
+            />
+        </Group>
+        <LoadingSpinner
+            id="loadingSpinner"
+            translation="[960, 540]"
+            visible="false"
+        />
+    </children>
+</component>

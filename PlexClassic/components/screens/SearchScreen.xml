@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component name="SearchScreen" extends="Group">
+    <interface>
+        <field id="itemSelected" type="assocarray" alwaysNotify="true" />
+        <field id="navigateBack" type="boolean" alwaysNotify="true" />
+    </interface>
+
+    <script type="text/brightscript" uri="pkg:/source/utils.brs" />
+    <script type="text/brightscript" uri="pkg:/source/constants.brs" />
+    <script type="text/brightscript" uri="SearchScreen.brs" />
+
+    <children>
+        <Rectangle
+            id="background"
+            width="1920"
+            height="1080"
+            color="0x1A1A2EFF"
+        />
+        <Label
+            id="titleLabel"
+            translation="[80, 40]"
+            text="Search"
+            font="font:LargeBoldSystemFont"
+            color="0xFFFFFFFF"
+        />
+        <Keyboard
+            id="keyboard"
+            translation="[80, 120]"
+        />
+        <Label
+            id="searchQueryLabel"
+            translation="[700, 120]"
+            font="font:MediumBoldSystemFont"
+            color="0xFFFFFFFF"
+            width="1140"
+        />
+        <PosterGrid
+            id="resultsGrid"
+            translation="[700, 200]"
+            gridWidth="1140"
+        />
+        <Label
+            id="noResultsLabel"
+            translation="[700, 400]"
+            text="No results found"
+            font="font:MediumSystemFont"
+            color="0xA0A0B0FF"
+            visible="false"
+        />
+        <LoadingSpinner
+            id="loadingSpinner"
+            translation="[1200, 500]"
+            visible="false"
+        />
+    </children>
+</component>

@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component name="DetailScreen" extends="Group">
+    <interface>
+        <field id="ratingKey" type="string" onChange="onRatingKeyChange" />
+        <field id="itemType" type="string" />
+        <field id="itemSelected" type="assocarray" alwaysNotify="true" />
+        <field id="navigateBack" type="boolean" alwaysNotify="true" />
+    </interface>
+
+    <script type="text/brightscript" uri="pkg:/source/utils.brs" />
+    <script type="text/brightscript" uri="pkg:/source/constants.brs" />
+    <script type="text/brightscript" uri="DetailScreen.brs" />
+
+    <children>
+        <Rectangle
+            id="background"
+            width="1920"
+            height="1080"
+            color="0x1A1A2EFF"
+        />
+        <Poster
+            id="poster"
+            translation="[80, 100]"
+            width="400"
+            height="600"
+        />
+        <Group id="metadataGroup" translation="[540, 100]">
+            <Label
+                id="titleLabel"
+                font="font:LargeBoldSystemFont"
+                color="0xFFFFFFFF"
+                width="1300"
+            />
+            <Label
+                id="yearRuntimeLabel"
+                translation="[0, 60]"
+                font="font:MediumSystemFont"
+                color="0xA0A0B0FF"
+            />
+            <Label
+                id="ratingLabel"
+                translation="[0, 100]"
+                font="font:MediumSystemFont"
+                color="0xE5A00DFF"
+            />
+            <Label
+                id="genreLabel"
+                translation="[0, 140]"
+                font="font:SmallSystemFont"
+                color="0xA0A0B0FF"
+                width="1300"
+            />
+            <Label
+                id="summaryLabel"
+                translation="[0, 200]"
+                font="font:SmallSystemFont"
+                color="0xFFFFFFFF"
+                width="1300"
+                wrap="true"
+                maxLines="8"
+            />
+        </Group>
+        <ButtonGroup
+            id="buttonGroup"
+            translation="[540, 750]"
+            buttons="[]"
+        />
+        <LoadingSpinner
+            id="loadingSpinner"
+            translation="[960, 540]"
+            visible="true"
+        />
+    </children>
+</component>

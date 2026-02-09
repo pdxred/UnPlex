@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component name="MediaRow" extends="Group">
+    <interface>
+        <field id="rowTitle" type="string" onChange="onRowTitleChange" />
+        <field id="content" type="node" onChange="onContentChange" />
+        <field id="itemSelected" type="integer" alwaysNotify="true" />
+    </interface>
+
+    <script type="text/brightscript" uri="pkg:/source/utils.brs" />
+    <script type="text/brightscript" uri="pkg:/source/constants.brs" />
+    <script type="text/brightscript" uri="MediaRow.brs" />
+
+    <children>
+        <Label
+            id="titleLabel"
+            translation="[0, 0]"
+            font="font:MediumBoldSystemFont"
+            color="0xFFFFFFFF"
+        />
+        <RowList
+            id="rowList"
+            translation="[0, 40]"
+            itemSize="[1620, 360]"
+            numRows="1"
+            itemComponentName="PosterGridItem"
+            showRowLabel="false"
+            focusXOffset="[0]"
+        />
+    </children>
+</component>

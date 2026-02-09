@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component name="ImageCacheTask" extends="Task">
+    <interface>
+        <field id="imageUrls" type="array" />
+        <field id="completed" type="integer" value="0" />
+        <field id="error" type="string" />
+        <field id="state" type="string" value="idle" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/source/utils.brs" />
+    <script type="text/brightscript" uri="pkg:/source/constants.brs" />
+    <script type="text/brightscript" uri="ImageCacheTask.brs" />
+</component>

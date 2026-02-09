@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component name="LoadingSpinner" extends="Group">
+    <interface>
+        <field id="visible" type="boolean" value="false" onChange="onVisibleChange" />
+    </interface>
+
+    <script type="text/brightscript" uri="LoadingSpinner.brs" />
+
+    <children>
+        <BusySpinner
+            id="spinner"
+            poster="pkg:/images/spinner.png"
+            clockwise="true"
+            translation="[-40, -40]"
+            visible="false"
+        />
+        <Label
+            id="loadingLabel"
+            translation="[0, 50]"
+            horizAlign="center"
+            text="Loading..."
+            font="font:SmallSystemFont"
+            color="0xA0A0B0FF"
+            visible="false"
+        />
+    </children>
+</component>

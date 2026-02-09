@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component name="VideoPlayer" extends="Group">
+    <interface>
+        <field id="ratingKey" type="string" />
+        <field id="mediaKey" type="string" />
+        <field id="startOffset" type="integer" value="0" />
+        <field id="itemTitle" type="string" />
+        <field id="control" type="string" onChange="onControlChange" />
+        <field id="playbackComplete" type="boolean" alwaysNotify="true" />
+    </interface>
+
+    <script type="text/brightscript" uri="pkg:/source/utils.brs" />
+    <script type="text/brightscript" uri="pkg:/source/constants.brs" />
+    <script type="text/brightscript" uri="VideoPlayer.brs" />
+
+    <children>
+        <Video
+            id="video"
+            width="1920"
+            height="1080"
+            enableUI="true"
+        />
+    </children>
+</component>
