@@ -3,6 +3,7 @@
     <interface>
         <field id="itemSelected" type="assocarray" alwaysNotify="true" />
         <field id="navigateBack" type="boolean" alwaysNotify="true" />
+        <function name="cleanup" />
     </interface>
 
     <script type="text/brightscript" uri="pkg:/source/utils.brs" />
