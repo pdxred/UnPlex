@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component name="ServerListScreen" extends="Group">
+  <script type="text/brightscript" uri="pkg:/source/utils.brs" />
+  <script type="text/brightscript" uri="pkg:/source/constants.brs" />
+  <script type="text/brightscript" uri="pkg:/source/logger.brs" />
+  <script type="text/brightscript" uri="pkg:/components/screens/ServerListScreen.brs" />
+
+  <interface>
+    <field id="servers" type="assocarray" />
+    <field id="authToken" type="string" />
+    <field id="selectedServer" type="assocarray" />
+    <field id="serverUri" type="string" />
+    <field id="state" type="string" value="idle" />
+  </interface>
+
+  <children>
+    <!-- Background -->
+    <Rectangle
+      id="background"
+      width="1920"
+      height="1080"
+      color="0x1A1A2EFF" />
+
+    <!-- Title -->
+    <Label
+      id="titleLabel"
+      text="Select a Server"
+      width="1920"
+      height="60"
+      translation="[0, 100]"
+      horizAlign="center"
+      vertAlign="center"
+      font="font:LargeBoldSystemFont"
+      color="0xFFFFFFFF" />
+
+    <!-- Server List -->
+    <LabelList
+      id="serverList"
+      translation="[660, 300]"
+      itemSize="[600, 60]"
+      itemSpacing="[0, 10]"
+      numRows="8"
+      color="0xFFFFFFFF"
+      focusedColor="0xE5A00DFF"
+      focusBitmapBlendColor="0xE5A00DFF" />
+
+    <!-- Loading Spinner -->
+    <BusySpinner
+      id="spinner"
+      translation="[1300, 500]"
+      visible="false"
+      clockwise="true"
+      poster="pkg:/images/spinner.png" />
+
+    <!-- Status Label -->
+    <Label
+      id="statusLabel"
+      text="Testing connection..."
+      width="1920"
+      height="40"
+      translation="[0, 800]"
+      horizAlign="center"
+      vertAlign="center"
+      font="font:MediumSystemFont"
+      color="0xA0A0B0FF"
+      visible="false" />
+
+    <!-- Error Label -->
+    <Label
+      id="errorLabel"
+      text=""
+      width="1920"
+      height="40"
+      translation="[0, 850]"
+      horizAlign="center"
+      vertAlign="center"
+      font="font:MediumSystemFont"
+      color="0xFF0000FF"
+      visible="false" />
+  </children>
+</component>
