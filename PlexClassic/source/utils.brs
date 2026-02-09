@@ -36,6 +36,16 @@ sub SetServerUri(uri as String)
     sec.Flush()
 end sub
 
+' Clear all stored authentication data (sign out)
+sub ClearAuthData()
+    sec = CreateObject("roRegistrySection", "PlexClassic")
+    sec.Delete("authToken")
+    sec.Delete("serverUri")
+    sec.Delete("serverClientId")
+    sec.Flush()
+    LogEvent("Auth data cleared")
+end sub
+
 ' Build standard Plex headers as associative array
 function GetPlexHeaders() as Object
     di = CreateObject("roDeviceInfo")

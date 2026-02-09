@@ -3,18 +3,152 @@ sub init()
     m.screenStack = []
     m.focusStack = []
 
-    ' Set up global node for shared state
-    m.global.addFields({
-        authToken: GetAuthToken()
-        serverUri: GetServerUri()
-    })
+    ' Initialize global auth fields
+    m.global.addFields({ authRequired: false })
+    m.global.observeField("authRequired", "onAuthRequired")
 
-    ' Check auth state and show appropriate screen
-    if m.global.authToken <> "" and m.global.serverUri <> ""
-        showHomeScreen()
+    ' Observe showSignOut field
+    m.top.observeField("showSignOut", "onShowSignOut")
+
+    ' Check authentication status on launch
+    checkAuthAndRoute()
+end sub
+
+sub checkAuthAndRoute()
+    token = GetAuthToken()
+    serverUri = GetServerUri()
+
+    if token = "" or serverUri = ""
+        ' No credentials - show PIN screen
+        LogEvent("No stored credentials, showing PIN screen")
+        showPINScreen()
     else
-        showSettingsScreen()
+        ' Have credentials - verify server is reachable
+        LogEvent("Found stored credentials, attempting connection")
+        ' For now, trust stored credentials and show home
+        ' Server reachability will be validated on first API call
+        ' If 401, onAuthRequired will trigger
+        showHomeScreen()
     end if
+end sub
+
+sub showPINScreen()
+    ' Clear any existing screens
+    clearScreenStack()
+
+    ' Create and show PIN screen
+    pinScreen = CreateObject("roSGNode", "PINScreen")
+    pinScreen.observeField("state", "onPINScreenState")
+    pushScreen(pinScreen)
+end sub
+
+sub onPINScreenState(event as Object)
+    state = event.getData()
+
+    if state = "authenticated"
+        ' PIN auth complete, get servers from PIN screen
+        pinScreen = getCurrentScreen()
+        servers = pinScreen.servers
+        authToken = pinScreen.authToken
+
+        if servers <> invalid and servers.count() > 1
+            ' Multiple servers - show selection
+            showServerListScreen(servers, authToken)
+        else if servers <> invalid and servers.count() = 1
+            ' Single server - auto-connect
+            autoConnectToServer(servers[0], authToken)
+        else
+            ' No servers found (unusual)
+            LogError("No servers found after authentication")
+            ' Stay on PIN screen with error? Or show error screen?
+        end if
+
+    else if state = "cancelled"
+        ' User cancelled - if we have credentials, go home; otherwise stay
+        if GetAuthToken() <> "" and GetServerUri() <> ""
+            popScreen()
+            showHomeScreen()
+        end if
+    end if
+end sub
+
+sub showServerListScreen(servers as Object, authToken as String)
+    clearScreenStack()
+
+    serverScreen = CreateObject("roSGNode", "ServerListScreen")
+    serverScreen.servers = servers
+    serverScreen.authToken = authToken
+    serverScreen.observeField("state", "onServerListState")
+    pushScreen(serverScreen)
+end sub
+
+sub onServerListState(event as Object)
+    state = event.getData()
+
+    if state = "connected"
+        LogEvent("Server connected, showing home")
+        clearScreenStack()
+        showHomeScreen()
+    else if state = "cancelled"
+        ' Go back to PIN screen
+        showPINScreen()
+    end if
+end sub
+
+sub autoConnectToServer(server as Object, authToken as String)
+    ' For single server, test connection then proceed
+    m.connectionTask = CreateObject("roSGNode", "ServerConnectionTask")
+    m.connectionTask.connections = server.connections
+    m.connectionTask.authToken = authToken
+    m.connectionTask.observeField("state", "onAutoConnectState")
+    m.connectionTask.control = "run"
+
+    ' Save server clientId while testing
+    sec = CreateObject("roRegistrySection", "PlexClassic")
+    sec.Write("serverClientId", server.clientId)
+    sec.Flush()
+end sub
+
+sub onAutoConnectState(event as Object)
+    state = event.getData()
+
+    if state = "connected"
+        SetServerUri(m.connectionTask.successfulUri)
+        LogEvent("Auto-connected to server")
+        clearScreenStack()
+        showHomeScreen()
+    else if state = "error"
+        LogError("Auto-connect failed: " + m.connectionTask.error)
+        ' Show error - server unreachable
+        ' Could show a "Can't reach server" screen with retry
+        ' For now, show PIN screen again (user can retry auth)
+        showPINScreen()
+    end if
+end sub
+
+sub onAuthRequired(event as Object)
+    required = event.getData()
+
+    if required = true
+        LogEvent("Auth required signal received, showing PIN screen")
+        ' Reset the flag
+        m.global.authRequired = false
+        ' Show PIN screen
+        showPINScreen()
+    end if
+end sub
+
+sub onShowSignOut(event as Object)
+    if event.getData() = true
+        m.top.showSignOut = false  ' Reset
+        signOut()
+    end if
+end sub
+
+sub signOut()
+    LogEvent("User signed out")
+    ClearAuthData()
+    showPINScreen()
 end sub
 
 sub showHomeScreen()
@@ -50,6 +184,15 @@ sub showSearchScreen()
     screen = CreateObject("roSGNode", "SearchScreen")
     pushScreen(screen)
     m.top.currentScreen = "search"
+end sub
+
+sub clearScreenStack()
+    ' Remove all screens
+    while m.screenStack.count() > 0
+        screen = m.screenStack.pop()
+        m.screenContainer.removeChild(screen)
+    end while
+    m.focusStack.clear()
 end sub
 
 sub pushScreen(screen as Object)
@@ -112,8 +255,17 @@ sub popScreen()
         m.top.currentScreen = "search"
     else if previousScreen.subtype() = "SettingsScreen"
         m.top.currentScreen = "settings"
+    else if previousScreen.subtype() = "PINScreen"
+        m.top.currentScreen = "pin"
     end if
 end sub
+
+function getCurrentScreen() as Object
+    if m.screenStack.count() > 0
+        return m.screenStack.peek()
+    end if
+    return invalid
+end function
 
 sub showExitDialog()
     dialog = CreateObject("roSGNode", "StandardMessageDialog")
@@ -139,12 +291,7 @@ sub onAuthComplete(event as Object)
     m.global.serverUri = GetServerUri()
 
     ' Remove settings screen and show home
-    while m.screenStack.count() > 0
-        screen = m.screenStack.pop()
-        m.screenContainer.removeChild(screen)
-    end while
-    m.focusStack.clear()
-
+    clearScreenStack()
     showHomeScreen()
 end sub
 

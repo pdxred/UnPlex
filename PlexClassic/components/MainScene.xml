@@ -3,10 +3,12 @@
     <interface>
         <field id="launchArgs" type="assocarray" />
         <field id="currentScreen" type="string" value="" />
+        <field id="showSignOut" type="boolean" value="false" />
     </interface>
 
     <script type="text/brightscript" uri="pkg:/source/utils.brs" />
     <script type="text/brightscript" uri="pkg:/source/constants.brs" />
+    <script type="text/brightscript" uri="pkg:/source/logger.brs" />
     <script type="text/brightscript" uri="MainScene.brs" />
 
     <children>
