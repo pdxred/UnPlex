@@ -186,10 +186,23 @@ sub showSearchScreen()
     m.top.currentScreen = "search"
 end sub
 
+sub cleanupScreen(screen as Object)
+    ' Unobserve all standard screen fields
+    screen.unobserveField("itemSelected")
+    screen.unobserveField("navigateBack")
+    screen.unobserveField("state")
+
+    ' Optional: Call screen's own cleanup if it exists
+    if screen.hasField("cleanup")
+        screen.callFunc("cleanup")
+    end if
+end sub
+
 sub clearScreenStack()
     ' Remove all screens
     while m.screenStack.count() > 0
         screen = m.screenStack.pop()
+        cleanupScreen(screen)
         m.screenContainer.removeChild(screen)
     end while
     m.focusStack.clear()
@@ -226,6 +239,7 @@ sub popScreen()
 
     ' Remove current screen
     currentScreen = m.screenStack.pop()
+    cleanupScreen(currentScreen)
     m.screenContainer.removeChild(currentScreen)
 
     ' Restore previous screen
@@ -235,7 +249,7 @@ sub popScreen()
     ' Restore focus
     if m.focusStack.count() > 0
         savedFocus = m.focusStack.pop()
-        if savedFocus <> invalid
+        if savedFocus <> invalid and savedFocus.isValid()
             savedFocus.setFocus(true)
         else
             previousScreen.setFocus(true)
