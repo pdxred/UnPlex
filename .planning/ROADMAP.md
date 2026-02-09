@@ -13,7 +13,7 @@ PlexClassic ships in 10 phases, starting with architectural foundation and Task 
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Foundation & Architecture** - Project scaffolding, Task patterns, API abstraction layer
-- [ ] **Phase 2: Authentication** - PIN-based OAuth, server discovery, token persistence
+- [x] **Phase 2: Authentication** - PIN-based OAuth, server discovery, token persistence
 - [ ] **Phase 3: Navigation Framework** - MainScene screen stack, sidebar, back button handling
 - [ ] **Phase 4: Library Browsing** - Poster grid, library sections, pagination, On Deck, Recently Added
 - [ ] **Phase 5: Media Detail Views** - Detail screen, TV show seasons, episode browser
@@ -54,9 +54,9 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — PINScreen component and enhanced PlexAuthTask with server discovery
-- [ ] 02-02-PLAN.md — ServerConnectionTask and ServerListScreen for connection testing
-- [ ] 02-03-PLAN.md — 401 detection and MainScene auth-aware routing
+- [x] 02-01-PLAN.md — PINScreen component and enhanced PlexAuthTask with server discovery
+- [x] 02-02-PLAN.md — ServerConnectionTask and ServerListScreen for connection testing
+- [x] 02-03-PLAN.md — 401 detection and MainScene auth-aware routing
 
 ### Phase 3: Navigation Framework
 **Goal**: MainScene screen stack enables navigation between views with back button support and focus restoration.
@@ -188,7 +188,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation & Architecture | 2/2 | Complete | 2026-02-09 |
-| 2. Authentication | 0/3 | Planned | - |
+| 2. Authentication | 3/3 | Complete | 2026-02-09 |
 | 3. Navigation Framework | 0/0 | Not started | - |
 | 4. Library Browsing | 0/0 | Not started | - |
 | 5. Media Detail Views | 0/0 | Not started | - |
