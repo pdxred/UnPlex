@@ -35,10 +35,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. PlexApiTask can make authenticated requests with proper headers and SSL certificates
   4. API responses are normalized to ContentNode trees before reaching UI components
   5. App gracefully handles missing Plex server features (version detection works)
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] TBD during plan-phase
+- [ ] 01-01-PLAN.md — Enhanced PlexApiTask with POST support, logger, SafeGet utilities
+- [ ] 01-02-PLAN.md — ContentNode normalizers and server capability detection
 
 ### Phase 2: Authentication
 **Goal**: Users can authenticate via plex.tv PIN code and connect to their Plex server.
@@ -184,7 +185,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation & Architecture | 0/0 | Not started | - |
+| 1. Foundation & Architecture | 0/2 | Planned | - |
 | 2. Authentication | 0/0 | Not started | - |
 | 3. Navigation Framework | 0/0 | Not started | - |
 | 4. Library Browsing | 0/0 | Not started | - |
