@@ -10,17 +10,17 @@ See: .planning/PROJECT.md (updated 2025-02-09)
 ## Current Position
 
 Phase: 2 of 10 (Authentication)
-Plan: 1 of 3 in current phase
-Status: Executing
-Last activity: 2026-02-09 — Completed 02-01 (PIN authentication UI and server discovery)
+Plan: 3 of 3 in current phase
+Status: Completed
+Last activity: 2026-02-09 — Completed 02-03 (Authentication lifecycle integration)
 
-Progress: [██░░░░░░░░] 15%
+Progress: [███░░░░░░░] 20%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3
-- Average duration: 2.7 min
+- Total plans completed: 4
+- Average duration: 2.8 min
 - Total execution time: 0.2 hours
 
 **By Phase:**
@@ -28,10 +28,10 @@ Progress: [██░░░░░░░░] 15%
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01    | 2     | 4 min | 2 min    |
-| 02    | 1     | 4 min | 4 min    |
+| 02    | 2     | 7 min | 3.5 min  |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (2 min), 01-02 (2 min), 02-01 (4 min)
+- Last 5 plans: 01-01 (2 min), 01-02 (2 min), 02-01 (4 min), 02-03 (3 min)
 - Trend: Consistent
 
 *Updated after each plan completion*
@@ -56,6 +56,11 @@ Recent decisions affecting current work:
 - Plan 01-02: Standard itemType values (movie, show, season, episode, unknown)
 - Plan 01-02: Capability detection based on version parsing (major.minor.patch)
 - Plan 01-02: Intro/Credits markers require PMS 1.30+
+- Plan 02-03: ClearAuthData removes authToken, serverUri, and serverClientId from registry
+- Plan 02-03: 401 detection clears token immediately via SetAuthToken("") before signaling
+- Plan 02-03: checkAuthAndRoute trusts stored credentials on launch (validates via first API call)
+- Plan 02-03: Single server auto-connects without user selection
+- Plan 02-03: Auth failures in autoConnect fall back to PIN screen
 
 ### Pending Todos
 
@@ -68,9 +73,9 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-09 (phase execution)
-Stopped at: Completed 02-01-PLAN.md
+Stopped at: Completed 02-03-PLAN.md
 Resume file: None
-Next step: Execute plan 02-02 for server selection and connection testing
+Next step: Phase 2 (Authentication) complete. Ready for Phase 3.
 
 ---
 *Created: 2026-02-09*
