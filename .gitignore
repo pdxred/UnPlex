@@ -1,0 +1,15 @@
+# Build artifacts
+*.zip
+
+# Windows artifacts
+nul
+
+# IDE/Editor
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db

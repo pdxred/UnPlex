@@ -1,4 +1,4 @@
-# PlexClassic
+# SimPlex
 
 ## What This Is
 

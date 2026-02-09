@@ -1,8 +1,8 @@
-# Roadmap: PlexClassic
+# Roadmap: SimPlex
 
 ## Overview
 
-PlexClassic ships in 10 phases, starting with architectural foundation and Task node patterns, progressing through authentication and navigation framework, building library browsing and detail views, implementing playback (basic then advanced), adding search, enhancing content organization, and finishing with auto-play polish. Each phase delivers working, verifiable functionality that builds on previous work. The roadmap derives directly from 27 v1 requirements, with 100% coverage and no orphaned features.
+SimPlex ships in 10 phases, starting with architectural foundation and Task node patterns, progressing through authentication and navigation framework, building library browsing and detail views, implementing playback (basic then advanced), adding search, enhancing content organization, and finishing with auto-play polish. Each phase delivers working, verifiable functionality that builds on previous work. The roadmap derives directly from 27 v1 requirements, with 100% coverage and no orphaned features.
 
 ## Phases
 

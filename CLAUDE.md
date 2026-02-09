@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**PlexClassic** is a side-loadable Roku channel that serves as a custom Plex Media Server client. It replaces the official Plex Roku app with a clean, fast, grid-based UI inspired by the old "Plex Classic" Roku client.
+**SimPlex** is a side-loadable Roku channel that serves as a custom Plex Media Server client. It replaces the official Plex Roku app with a clean, fast, grid-based UI inspired by the old "Plex Classic" Roku client.
 
 ## Technology Stack
 
@@ -18,7 +18,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Structure
 
 ```
-PlexClassic/
+SimPlex/
 ├── manifest                 # Roku app manifest (version, icons, settings)
 ├── source/                  # Main BrightScript source files
 │   ├── main.brs            # Entry point - creates screen and message loop
@@ -70,7 +70,7 @@ MainScene maintains an array of screen nodes. Back button pops the stack. Focus 
 4. **Paginate library fetches** - use `X-Plex-Container-Start` and `X-Plex-Container-Size=50`
 5. **Use built-in grid/list components** (`MarkupGrid`, `PosterGrid`, `RowList`, `LabelList`) - don't build custom scrolling
 6. **Request resized poster images** via `/photo/:/transcode?width=240&height=360`
-7. **Store persistent data in `roRegistrySection("PlexClassic")`** - always call `.Flush()` after writes
+7. **Store persistent data in `roRegistrySection("SimPlex")`** - always call `.Flush()` after writes
 8. **Use ContentNode trees** to populate all lists and grids
 
 ## Key Constants
@@ -119,7 +119,7 @@ ACCENT: "0xE5A00DFF"  ' Plex gold - used for focus rings
 
 To side-load to a Roku in developer mode:
 1. Enable developer mode on Roku (Home 3x, Up 2x, Right, Left, Right, Left, Right)
-2. Zip the project: `zip -r PlexClassic.zip manifest source components images`
+2. Zip the project: `cd SimPlex && zip -r ../SimPlex.zip manifest source components images`
 3. Upload via browser to `http://{roku-ip}:8060`
 
 Or use Roku's `make` tooling if available.

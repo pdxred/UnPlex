@@ -12,7 +12,10 @@
       "WebFetch(domain:github.com)",
       "WebFetch(domain:medium.com)",
       "WebFetch(domain:support.plex.tv)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(unzip:*)",
+      "Bash(zip -r:*)",
+      "Bash(powershell:*)"
     ]
   }
 }

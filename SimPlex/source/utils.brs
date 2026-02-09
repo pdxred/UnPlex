@@ -1,6 +1,6 @@
 ' Generate or retrieve persistent device UUID
 function GetDeviceId() as String
-    sec = CreateObject("roRegistrySection", "PlexClassic")
+    sec = CreateObject("roRegistrySection", "SimPlex")
     deviceId = sec.Read("deviceId")
     if deviceId = ""
         deviceId = CreateObject("roDeviceInfo").GetRandomUUID()
@@ -12,33 +12,33 @@ end function
 
 ' Get stored auth token
 function GetAuthToken() as String
-    sec = CreateObject("roRegistrySection", "PlexClassic")
+    sec = CreateObject("roRegistrySection", "SimPlex")
     return sec.Read("authToken")
 end function
 
 ' Store auth token
 sub SetAuthToken(token as String)
-    sec = CreateObject("roRegistrySection", "PlexClassic")
+    sec = CreateObject("roRegistrySection", "SimPlex")
     sec.Write("authToken", token)
     sec.Flush()
 end sub
 
 ' Get stored server URI
 function GetServerUri() as String
-    sec = CreateObject("roRegistrySection", "PlexClassic")
+    sec = CreateObject("roRegistrySection", "SimPlex")
     return sec.Read("serverUri")
 end function
 
 ' Store server URI
 sub SetServerUri(uri as String)
-    sec = CreateObject("roRegistrySection", "PlexClassic")
+    sec = CreateObject("roRegistrySection", "SimPlex")
     sec.Write("serverUri", uri)
     sec.Flush()
 end sub
 
 ' Clear all stored authentication data (sign out)
 sub ClearAuthData()
-    sec = CreateObject("roRegistrySection", "PlexClassic")
+    sec = CreateObject("roRegistrySection", "SimPlex")
     sec.Delete("authToken")
     sec.Delete("serverUri")
     sec.Delete("serverClientId")
