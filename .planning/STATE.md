@@ -12,15 +12,15 @@ See: .planning/PROJECT.md (updated 2025-02-09)
 Phase: 2 of 10 (Authentication)
 Plan: 3 of 3 in current phase
 Status: Completed
-Last activity: 2026-02-09 — Completed 02-03 (Authentication lifecycle integration)
+Last activity: 2026-02-09 — Completed 02-02 (Server connection and selection)
 
 Progress: [███░░░░░░░] 20%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 4
-- Average duration: 2.8 min
+- Total plans completed: 5
+- Average duration: 2.6 min
 - Total execution time: 0.2 hours
 
 **By Phase:**
@@ -28,10 +28,10 @@ Progress: [███░░░░░░░] 20%
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01    | 2     | 4 min | 2 min    |
-| 02    | 2     | 7 min | 3.5 min  |
+| 02    | 3     | 9 min | 3 min    |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (2 min), 01-02 (2 min), 02-01 (4 min), 02-03 (3 min)
+- Last 5 plans: 01-02 (2 min), 02-01 (4 min), 02-02 (2 min), 02-03 (3 min)
 - Trend: Consistent
 
 *Updated after each plan completion*
@@ -61,6 +61,11 @@ Recent decisions affecting current work:
 - Plan 02-03: checkAuthAndRoute trusts stored credentials on launch (validates via first API call)
 - Plan 02-03: Single server auto-connects without user selection
 - Plan 02-03: Auth failures in autoConnect fall back to PIN screen
+- [Phase 02-02]: Local connections use 3-second timeout (faster for LAN)
+- [Phase 02-02]: Remote/relay connections use 5-second timeout (account for latency)
+- [Phase 02-02]: 401 responses count as reachable (server responds, auth handled separately)
+- [Phase 02-02]: Single server auto-selects without showing list UI
+- [Phase 02-02]: Failed servers marked (unreachable) in list for user feedback
 
 ### Pending Todos
 
@@ -73,9 +78,9 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-09 (phase execution)
-Stopped at: Completed 02-03-PLAN.md
+Stopped at: Completed 02-02-PLAN.md
 Resume file: None
-Next step: Phase 2 (Authentication) complete. Ready for Phase 3.
+Next step: Phase 2 (Authentication) complete. All 3 plans executed. Ready for Phase 3.
 
 ---
 *Created: 2026-02-09*
