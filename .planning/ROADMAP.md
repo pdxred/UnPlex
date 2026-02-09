@@ -68,10 +68,10 @@ Plans:
   3. Back button returns to previous screen without losing focus position
   4. Screen cleanup prevents memory leaks (proper unobserveField and removeChild)
   5. Focus automatically moves to appropriate elements when screens change
-**Plans**: TBD
+**Plans:** 1 plan
 
 Plans:
-- [ ] TBD during plan-phase
+- [ ] 03-01-PLAN.md — Enhanced screen stack cleanup and focus restoration
 
 ### Phase 4: Library Browsing
 **Goal**: Users can browse Movies and TV Shows libraries in paginated poster grids with Continue Watching and Recently Added sections.
@@ -183,13 +183,13 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation & Architecture | 2/2 | Complete | 2026-02-09 |
 | 2. Authentication | 3/3 | Complete | 2026-02-09 |
-| 3. Navigation Framework | 0/0 | Not started | - |
+| 3. Navigation Framework | 0/1 | In Progress | - |
 | 4. Library Browsing | 0/0 | Not started | - |
 | 5. Media Detail Views | 0/0 | Not started | - |
 | 6. Basic Playback | 0/0 | Not started | - |
