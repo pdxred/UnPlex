@@ -201,6 +201,21 @@ sub showError(message as String)
     m.top.getScene().dialog = dialog
 end sub
 
+sub cleanup()
+    ' Stop running task
+    if m.apiTask <> invalid
+        m.apiTask.control = "stop"
+        m.apiTask.unobserveField("state")
+    end if
+
+    ' Unobserve child widgets
+    m.sidebar.unobserveField("selectedLibrary")
+    m.sidebar.unobserveField("specialAction")
+    m.posterGrid.unobserveField("itemSelected")
+    m.posterGrid.unobserveField("loadMore")
+    m.filterBar.unobserveField("filterChanged")
+end sub
+
 function onKeyEvent(key as String, press as Boolean) as Boolean
     if not press then return false
 

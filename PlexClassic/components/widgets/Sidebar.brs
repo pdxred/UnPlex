@@ -147,6 +147,17 @@ sub onBottomSelected(event as Object)
     end if
 end sub
 
+sub cleanup()
+    if m.apiTask <> invalid
+        m.apiTask.control = "stop"
+        m.apiTask.unobserveField("state")
+    end if
+
+    m.libraryList.unobserveField("itemSelected")
+    m.hubList.unobserveField("itemSelected")
+    m.bottomList.unobserveField("itemSelected")
+end sub
+
 function onKeyEvent(key as String, press as Boolean) as Boolean
     if not press then return false
 
