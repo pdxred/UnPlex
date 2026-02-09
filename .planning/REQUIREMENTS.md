@@ -100,13 +100,49 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (Populated during roadmap creation) | | |
+| ARCH-01 | Phase 1 | Pending |
+| ARCH-02 | Phase 1 | Pending |
+| ARCH-03 | Phase 1 | Pending |
+| AUTH-01 | Phase 2 | Pending |
+| AUTH-02 | Phase 2 | Pending |
+| AUTH-03 | Phase 2 | Pending |
+| AUTH-04 | Phase 2 | Pending |
+| AUTH-05 | Phase 2 | Pending |
+| NAV-10 | Phase 3 | Pending |
+| NAV-01 | Phase 4 | Pending |
+| NAV-02 | Phase 4 | Pending |
+| NAV-03 | Phase 4 | Pending |
+| NAV-04 | Phase 4 | Pending |
+| NAV-09 | Phase 4 | Pending |
+| MEDIA-01 | Phase 5 | Pending |
+| MEDIA-02 | Phase 5 | Pending |
+| MEDIA-03 | Phase 5 | Pending |
+| PLAY-01 | Phase 6 | Pending |
+| PLAY-02 | Phase 6 | Pending |
+| PLAY-03 | Phase 6 | Pending |
+| PLAY-04 | Phase 6 | Pending |
+| PLAY-05 | Phase 6 | Pending |
+| PLAY-06 | Phase 7 | Pending |
+| PLAY-07 | Phase 7 | Pending |
+| PLAY-08 | Phase 7 | Pending |
+| PLAY-09 | Phase 7 | Pending |
+| PLAY-10 | Phase 7 | Pending |
+| PLAY-11 | Phase 7 | Pending |
+| SRCH-01 | Phase 8 | Pending |
+| SRCH-02 | Phase 8 | Pending |
+| NAV-05 | Phase 9 | Pending |
+| NAV-06 | Phase 9 | Pending |
+| NAV-07 | Phase 9 | Pending |
+| NAV-08 | Phase 9 | Pending |
+| MEDIA-04 | Phase 10 | Pending |
 
 **Coverage:**
 - v1 requirements: 27 total
-- Mapped to phases: 0
-- Unmapped: 27 (pending roadmap)
+- Mapped to phases: 27
+- Unmapped: 0
+
+**Coverage: 100% (all v1 requirements mapped)**
 
 ---
 *Requirements defined: 2025-02-09*
-*Last updated: 2025-02-09 after initial definition*
+*Last updated: 2026-02-09 after roadmap creation*
