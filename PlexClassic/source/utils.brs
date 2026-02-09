@@ -98,12 +98,20 @@ function PadZero(num as Integer) as String
     end if
 end function
 
-' Safe field access with default value
-' Returns defaultValue if obj is invalid or field doesn't exist
-function SafeGet(obj as Object, field as String, defaultValue as Dynamic) as Dynamic
-    if obj = invalid then return defaultValue
-    if not obj.DoesExist(field) then return defaultValue
-    value = obj[field]
-    if value = invalid then return defaultValue
-    return value
+' Safe field access - returns default if field missing or obj invalid
+' Prevents crashes on malformed/partial API responses
+function SafeGet(obj as Dynamic, field as String, default as Dynamic) as Dynamic
+    if obj = invalid then return default
+    if type(obj) <> "roAssociativeArray" then return default
+    if not obj.DoesExist(field) then return default
+    return obj[field]
+end function
+
+' Safe nested access for Plex MediaContainer pattern
+' Usage: items = SafeGetMetadata(response) ' returns [] if path invalid
+function SafeGetMetadata(response as Dynamic) as Object
+    container = SafeGet(response, "MediaContainer", invalid)
+    if container = invalid then return []
+    metadata = SafeGet(container, "Metadata", [])
+    return metadata
 end function
