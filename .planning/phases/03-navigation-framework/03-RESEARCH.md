@@ -1,552 +1,506 @@
-# Phase 3: Navigation Framework - Research
+# Phase 3: Hub Rows - Research
 
-**Researched:** 2026-02-09
-**Domain:** Roku SceneGraph navigation, screen stack management, focus preservation
+**Researched:** 2026-03-09
+**Domain:** Roku SceneGraph hub row layout + Plex hubs API
 **Confidence:** HIGH
 
 ## Summary
 
-The navigation framework implementation centers on a screen stack pattern using BrightScript arrays and SceneGraph component lifecycle management. The existing MainScene.brs already implements the core pattern correctly: array-based stack (push/pop/peek), focus preservation via focusedChild tracking, and visible field management for hiding background screens. The implementation follows established Roku community patterns for back button navigation and screen transitions.
+Phase 3 adds three hub rows (Continue Watching, On Deck, Recently Added) to the home screen above the existing library grid. The Plex Media Server provides a `/hubs` API endpoint that returns all hub content in a single request, with each hub identified by a `hubIdentifier` field (e.g., `home.continue`, `home.ondeck`). Roku SceneGraph's `RowList` component is purpose-built for horizontally-scrollable rows within a vertically-scrollable list, making it the correct component for hub rows.
 
-The primary challenge is ensuring proper cleanup to prevent memory leaks. BrightScript's reference counting means observers must be explicitly removed (unobserveField) and child nodes removed (removeChild) before setting references to invalid. The existing code has the foundation but needs enhancement for observer cleanup and consistent screen lifecycle management.
+The main architectural challenge is combining hub rows (variable count, horizontally scrollable) with the existing `MarkupGrid` library grid into a single scrollable view. The recommended approach is to place a `RowList` for hub rows above the existing `PosterGrid`/`MarkupGrid`, with manual focus management at the boundary between them. The existing `MediaRow` widget already wraps a `RowList` with a title label and uses `PosterGridItem` as its item component -- this can be reused or extended. The `PosterGridItem` component needs a progress bar Rectangle added for Continue Watching items.
 
-**Primary recommendation:** Audit existing MainScene stack implementation for observer cleanup, add cleanup helper for common unobserve patterns, ensure all screens follow consistent lifecycle (observe on push, unobserve on pop), and verify focus restoration works across all screen types including grids with scroll positions.
+**Primary recommendation:** Use the Plex `/hubs` API (single call) to fetch all hub data, render hub rows via a `RowList` positioned above the existing grid in the HomeScreen content area, add a progress bar to `PosterGridItem`, and use a Timer node for periodic auto-refresh plus refresh-on-return-from-playback.
 
-## Summary
+<user_constraints>
+## User Constraints (from CONTEXT.md)
 
-Navigation in Roku SceneGraph applications uses an array-based screen stack pattern where the MainScene component manages an array of screen nodes. When navigating forward, new screens are pushed onto the stack; the back button pops screens off. Focus preservation requires storing the focusedChild reference before hiding a screen, then restoring it when returning. Proper cleanup (unobserveField + removeChild + setting references to invalid) is critical to prevent memory leaks in BrightScript's reference-counting environment.
+### Locked Decisions
+- Reuse existing 240x360 portrait poster style -- consistent with library grid
+- Rows scroll horizontally to reveal more items beyond the visible set
+- Default home screen: hub rows at top, library grid below -- one scrollable view
+- Sidebar allows switching between hub+grid landing view and full library grid view
+- Selecting a Continue Watching item starts playback/resumes immediately
+- Selecting a Recently Added or On Deck item opens the detail screen
+- Pressing left on the first item in a hub row opens the sidebar (consistent with existing nav)
+- Hub rows remember horizontal scroll position when navigating away and returning
+- Row order: Continue Watching -> On Deck -> Recently Added
+- Recently Added pulls from libraries configured to appear on the home screen (respects Plex server hub config)
+- Item count per row matches Plex API defaults (typically 10-20)
+- Empty hub rows are hidden entirely -- no placeholder messages
+- Hub rows refresh periodically via auto-refresh while on the home screen
+- Hub rows also reload when navigating back to home (e.g., after playback)
 
-The existing codebase already implements this pattern correctly in MainScene.brs lines 198-261. The main enhancement needed is systematic observer cleanup and verification that focus restoration works for complex widgets (grids with scroll positions).
+### Claude's Discretion
+- Row label styling (bold headers vs subtle inline text)
+- Focus behavior when navigating down from last hub row into library grid
+- What to show when ALL hub rows are empty (fresh user experience)
+- Error handling for failed hub row loads (silent hide vs inline error)
+
+### Deferred Ideas (OUT OF SCOPE)
+None -- discussion stayed within phase scope
+</user_constraints>
 
 ## Standard Stack
 
-### Core (Built-in Roku SceneGraph)
-| Component | Version | Purpose | Why Standard |
-|-----------|---------|---------|--------------|
-| Scene | SceneGraph 1.3 | Root container | Only valid root for Roku SceneGraph apps |
-| Group | Built-in | Screen container | Standard container for child components |
-| Array | BrightScript | Screen stack storage | Native data structure with push/pop/peek |
-| focusedChild | Built-in field | Focus tracking | Official mechanism for querying focus chain |
-| visible | Built-in field | Screen show/hide | Standard field for toggling node rendering |
-| onKeyEvent() | Built-in function | Key capture | Required for back button handling |
+### Core
+| Library/Component | Version | Purpose | Why Standard |
+|-------------------|---------|---------|--------------|
+| RowList (SceneGraph) | Roku OS 8+ | Hub row container with horizontal scroll per row, vertical scroll between rows | Built-in component designed for this exact use case; handles focus, scrolling, dimming natively |
+| PosterGridItem (existing) | N/A | Poster tile rendering for hub row items | Already built; reuse with progress bar addition via `itemComponentName` |
+| PlexApiTask (existing) | N/A | HTTP request to `/hubs` endpoint | Already handles auth headers, JSON parsing, error states |
+| MarkupGrid (existing) | N/A | Library grid below hub rows | Already working in PosterGrid widget; no changes needed |
+| Timer (SceneGraph) | Roku OS 8+ | Periodic auto-refresh of hub rows | Built-in node, supports `duration`, `repeat`, and `fire` observer |
 
-### Supporting Patterns
-| Pattern | Purpose | When to Use |
-|---------|---------|-------------|
-| observeField("state") | Screen lifecycle signals | All screen-to-MainScene communication |
-| setFocus(true) | Focus assignment | After push, after pop (restoration) |
-| removeChild() | Node cleanup | Before popping from stack |
-| unobserveField() | Observer cleanup | Before removing child nodes |
-| m.screenStack = [] | Stack initialization | MainScene init() |
+### Supporting
+| Component | Purpose | When to Use |
+|-----------|---------|-------------|
+| Rectangle (SceneGraph) | Progress bar overlay on posters | Added to PosterGridItem for viewOffset/duration display |
+| ContentNode tree | RowList data binding | Standard Roku pattern: root > row nodes > item nodes |
+| MediaRow (existing) | Single hub row with title label | Already wraps RowList with PosterGridItem; may reuse or replace with multi-row RowList |
 
-### Already Implemented
-The existing MainScene.brs (lines 1-327) includes:
-- Screen stack array (`m.screenStack`, `m.focusStack`)
-- Push/pop operations with focus tracking
-- Back button handler via onKeyEvent
-- Observer pattern for screen signals (itemSelected, navigateBack)
-- Exit dialog for last screen on stack
-
-**Gaps to address:**
-- Systematic observer cleanup (unobserveField before removeChild)
-- Screen cleanup helper function for consistency
-- Verification of focus restoration for PosterGrid scroll positions
+### Alternatives Considered
+| Instead of | Could Use | Tradeoff |
+|------------|-----------|----------|
+| Single RowList for all hub rows | Multiple stacked MediaRow widgets | MediaRow approach needs manual vertical scroll management; single RowList handles it natively but requires dynamic numRows |
+| Single `/hubs` API call | Separate `/library/onDeck` + `/library/recentlyAdded` calls | Separate calls still work but create 3 task instances + timing complexity; single call is simpler and returns server-configured hub ordering |
+| RowList for everything (hubs + library) | RowList hubs + separate MarkupGrid for library | All-RowList approach loses the existing 6-column paginated grid layout; keeping MarkupGrid preserves existing Phase 1 work |
 
 ## Architecture Patterns
 
-### Pattern 1: Screen Stack Management (Already Implemented)
+### Recommended HomeScreen Structure
+```
+HomeScreen (existing, modified)
++-- Sidebar (existing, unchanged)
++-- contentArea (Group, existing)
+|   +-- hubRowList (RowList, NEW)
+|   |   +-- Row 0: Continue Watching
+|   |   +-- Row 1: On Deck
+|   |   +-- Row 2: Recently Added
+|   +-- FilterBar (existing, repositioned dynamically)
+|   +-- PosterGrid (existing, repositioned dynamically)
++-- LoadingSpinner (existing)
+```
 
-**What:** Array-based stack with push/pop operations, visible field management
-**When to use:** All screen navigation in MainScene
-**Source:** Existing MainScene.brs lines 198-261
-
+### Pattern 1: Single `/hubs` API Call with Client-Side Filtering
+**What:** Fetch all hubs in one request, then filter by `hubIdentifier` to extract the three rows.
+**When to use:** Always -- the `/hubs` endpoint returns all configured hubs in one response.
+**Example:**
 ```brightscript
-' Source: Existing MainScene.brs with cleanup enhancements
-sub pushScreen(screen as Object)
-    ' Store current focus position before pushing
-    if m.screenStack.count() > 0
-        currentScreen = m.screenStack.peek()
-        focusedNode = currentScreen.focusedChild
-        if focusedNode <> invalid
-            m.focusStack.push(focusedNode)
-        else
-            m.focusStack.push(invalid)
+' Source: Plex API docs (plexapi.dev/api-reference/hubs/get-global-hubs)
+sub loadHubs()
+    if m.isLoadingHubs then return
+    m.isLoadingHubs = true
+
+    task = CreateObject("roSGNode", "PlexApiTask")
+    task.endpoint = "/hubs"
+    task.params = {}
+    task.observeField("status", "onHubsLoaded")
+    task.control = "run"
+    m.hubsTask = task
+end sub
+
+sub onHubsLoaded(event as Object)
+    m.isLoadingHubs = false
+    if event.getData() <> "completed" then return
+
+    response = m.hubsTask.response
+    if response = invalid or response.MediaContainer = invalid then return
+
+    hubs = response.MediaContainer.Hub
+    if hubs = invalid then return
+
+    ' Filter for the three hub types we display
+    m.continueWatching = invalid
+    m.onDeck = invalid
+    m.recentlyAdded = invalid
+
+    for each hub in hubs
+        id = LCase(hub.hubIdentifier)
+        if id = "home.continue" or Instr(1, id, "continue") > 0
+            m.continueWatching = hub
+        else if id = "home.ondeck" or Instr(1, id, "ondeck") > 0
+            m.onDeck = hub
+        else if Instr(1, id, "recentlyadded") > 0 or Instr(1, id, "recent") > 0
+            if m.recentlyAdded = invalid  ' Take first match only
+                m.recentlyAdded = hub
+            end if
         end if
-        currentScreen.visible = false  ' Hide previous screen (performance)
-    end if
+    end for
 
-    ' Add new screen
-    m.screenContainer.appendChild(screen)
-    m.screenStack.push(screen)
-    screen.setFocus(true)
-
-    ' Observe standard screen events
-    screen.observeField("itemSelected", "onItemSelected")
-    screen.observeField("navigateBack", "onNavigateBack")
+    buildHubRowContent()
 end sub
+```
 
-sub popScreen()
-    if m.screenStack.count() <= 1
-        showExitDialog()
-        return
-    end if
+### Pattern 2: RowList ContentNode Tree Structure
+**What:** Build the correct ContentNode hierarchy for RowList. Root node contains row nodes (one per hub), each row node contains item nodes (one per poster).
+**When to use:** Every time hub data is loaded or refreshed.
+**Example:**
+```brightscript
+' Source: Roku RowList docs (sdkdocs-archive.roku.com/RowList_1611919.html)
+sub buildHubRowContent()
+    rootContent = CreateObject("roSGNode", "ContentNode")
+    m.hubRowMap = {}  ' Maps row index to hub type string
+    rowIndex = 0
+    c = m.global.constants
 
-    ' Cleanup current screen
-    currentScreen = m.screenStack.pop()
-
-    ' CRITICAL: Unobserve before removing
-    currentScreen.unobserveField("itemSelected")
-    currentScreen.unobserveField("navigateBack")
-
-    m.screenContainer.removeChild(currentScreen)
-    ' Note: No need to set currentScreen = invalid here (local scope)
-
-    ' Restore previous screen
-    previousScreen = m.screenStack.peek()
-    previousScreen.visible = true
-
-    ' Restore focus
-    if m.focusStack.count() > 0
-        savedFocus = m.focusStack.pop()
-        if savedFocus <> invalid
-            savedFocus.setFocus(true)
-        else
-            previousScreen.setFocus(true)
+    ' Add rows in locked order: Continue Watching, On Deck, Recently Added
+    ' Only add rows that have data (empty rows hidden per user decision)
+    if m.continueWatching <> invalid
+        metadata = m.continueWatching.Metadata
+        if metadata <> invalid and metadata.count() > 0
+            addHubRow(rootContent, "Continue Watching", metadata, c)
+            m.hubRowMap[rowIndex.ToStr()] = "continueWatching"
+            rowIndex++
         end if
+    end if
+
+    if m.onDeck <> invalid
+        metadata = m.onDeck.Metadata
+        if metadata <> invalid and metadata.count() > 0
+            addHubRow(rootContent, "On Deck", metadata, c)
+            m.hubRowMap[rowIndex.ToStr()] = "onDeck"
+            rowIndex++
+        end if
+    end if
+
+    if m.recentlyAdded <> invalid
+        metadata = m.recentlyAdded.Metadata
+        if metadata <> invalid and metadata.count() > 0
+            addHubRow(rootContent, "Recently Added", metadata, c)
+            m.hubRowMap[rowIndex.ToStr()] = "recentlyAdded"
+            rowIndex++
+        end if
+    end if
+
+    ' Update RowList dimensions before setting content (CRITICAL ordering)
+    m.hubRowList.numRows = rowIndex
+    m.hubRowList.content = rootContent
+    m.hubRowList.visible = (rowIndex > 0)
+    m.hubRowCount = rowIndex
+
+    ' Reposition grid below hub rows
+    repositionContentBelowHubs(rowIndex)
+end sub
+
+sub addHubRow(rootContent as Object, title as String, metadata as Object, c as Object)
+    rowNode = rootContent.createChild("ContentNode")
+    rowNode.title = title  ' RowList uses TITLE field for row labels
+
+    for each item in metadata
+        itemNode = rowNode.createChild("ContentNode")
+
+        ratingKeyStr = ""
+        if item.ratingKey <> invalid
+            if type(item.ratingKey) = "roString" or type(item.ratingKey) = "String"
+                ratingKeyStr = item.ratingKey
+            else
+                ratingKeyStr = item.ratingKey.ToStr()
+            end if
+        end if
+
+        itemNode.addFields({
+            title: item.title
+            ratingKey: ratingKeyStr
+            itemType: item.type
+            viewOffset: 0
+            duration: 0
+        })
+
+        if item.viewOffset <> invalid then itemNode.viewOffset = item.viewOffset
+        if item.duration <> invalid then itemNode.duration = item.duration
+
+        if item.thumb <> invalid and item.thumb <> ""
+            itemNode.HDPosterUrl = BuildPosterUrl(item.thumb, c.POSTER_WIDTH, c.POSTER_HEIGHT)
+        end if
+    end for
+end sub
+```
+
+### Pattern 3: Progress Bar in PosterGridItem
+**What:** Add a thin Rectangle at the bottom of the poster that shows watch progress as a fraction of poster width.
+**When to use:** For Continue Watching items that have both `viewOffset` and `duration` fields.
+**Example:**
+```xml
+<!-- Add to PosterGridItem.xml children, after the poster -->
+<Rectangle
+    id="progressBg"
+    translation="[0, 350]"
+    width="240"
+    height="6"
+    color="0x00000080"
+    visible="false"
+/>
+<Rectangle
+    id="progressBar"
+    translation="[0, 350]"
+    width="0"
+    height="6"
+    color="0xE5A00DFF"
+    visible="false"
+/>
+```
+
+```brightscript
+' Add to PosterGridItem.brs onItemContentChange:
+sub updateProgressBar(content as Object)
+    viewOffset = 0
+    duration = 0
+    if content.viewOffset <> invalid then viewOffset = content.viewOffset
+    if content.duration <> invalid then duration = content.duration
+
+    if viewOffset > 0 and duration > 0
+        progress = viewOffset / duration
+        if progress > 1.0 then progress = 1.0
+        m.progressBg.visible = true
+        m.progressBar.visible = true
+        m.progressBar.width = Int(240 * progress)  ' 240 = POSTER_WIDTH
     else
-        previousScreen.setFocus(true)
+        m.progressBg.visible = false
+        m.progressBar.visible = false
     end if
 end sub
 ```
 
-**Key principles:**
-- Array.peek() returns last item without removing (safe for count check)
-- visible=false hides background screens (saves rendering cycles)
-- focusedChild stores immediate child in focus chain (may be invalid)
-- Always unobserve before removeChild (prevents lapsed listener problem)
-
-### Pattern 2: Back Button Handling (Already Implemented)
-
-**What:** Component-level onKeyEvent intercepts back button, returns true to consume
-**When to use:** MainScene and any screen that needs custom back behavior
-**Source:** Existing MainScene.brs lines 317-326, Roku official docs
-
+### Pattern 4: Auto-Refresh with Timer + Refresh on Return
+**What:** Use a SceneGraph Timer node for periodic refresh, plus reload when home screen regains focus after playback.
+**When to use:** Per user decisions -- hub rows refresh periodically and on return from playback.
+**Example:**
 ```brightscript
-' Source: MainScene.brs (existing implementation)
-function onKeyEvent(key as String, press as Boolean) as Boolean
-    if not press then return false
+' In HomeScreen init():
+m.hubRefreshTimer = CreateObject("roSGNode", "Timer")
+m.hubRefreshTimer.duration = 120  ' 2 minutes
+m.hubRefreshTimer.repeat = true
+m.hubRefreshTimer.observeField("fire", "onHubRefreshTimer")
+m.hubRefreshTimer.control = "start"
 
-    if key = "back"
-        popScreen()
-        return true  ' Consume event (stop propagation)
+sub onHubRefreshTimer(event as Object)
+    if not m.isLoadingHubs
+        loadHubs()
     end if
-
-    return false  ' Allow event to bubble up
-end function
-```
-
-**Return value semantics:**
-- `return true` = event consumed, stop bubbling up focus chain
-- `return false` = event not handled, continue to parent/firmware
-- Only process on `press = true` (ignore key release)
-
-**Sources:**
-- [Roku onKeyEvent Documentation](https://developer.roku.com/docs/references/scenegraph/component-functions/onkeyevent.md)
-- [Roku Community: Back Button Navigation](https://community.roku.com/discussions/developer/please-help-me-with-back-button-navigation/359679)
-
-### Pattern 3: Focus Preservation via focusedChild (Existing with Caveats)
-
-**What:** Save focusedChild reference on push, restore via setFocus() on pop
-**When to use:** All navigation that should preserve scroll/selection position
-**Source:** Existing MainScene.brs lines 199-207, 236-245
-
-```brightscript
-' On push: save current focus
-if m.screenStack.count() > 0
-    currentScreen = m.screenStack.peek()
-    focusedNode = currentScreen.focusedChild
-    m.focusStack.push(focusedNode)  ' May be invalid if no focus
-end if
-
-' On pop: restore saved focus
-if m.focusStack.count() > 0
-    savedFocus = m.focusStack.pop()
-    if savedFocus <> invalid
-        savedFocus.setFocus(true)
-    else
-        previousScreen.setFocus(true)  ' Fallback to screen root
-    end if
-end if
-```
-
-**Known limitation:** focusedChild returns the immediate child in the focus chain, not the deeply nested node. For complex components like PosterGrid, focusedChild may reference the grid itself rather than the specific item. Roku's built-in grid components (PosterGrid, RowList) handle internal focus restoration automatically when setFocus(true) is called, but custom scroll positions may not restore perfectly.
-
-**Workaround for advanced cases:** Screens can expose custom fields for deep focus state (e.g., gridScrollIndex, selectedItemIndex) which MainScene can save/restore explicitly.
-
-**Sources:**
-- [Roku ifSGNodeFocus Interface](https://developer.roku.com/docs/references/brightscript/interfaces/ifsgnodefocus.md)
-- [Roku Community: Is there a way to get the currently focused node?](https://community.roku.com/t5/Roku-Developer-Program/Is-there-a-way-to-get-the-currently-focused-node/td-p/452512)
-
-### Pattern 4: Observer Cleanup (Enhancement Needed)
-
-**What:** Call unobserveField before removeChild to prevent lapsed listener problem
-**When to use:** Always before removing a node from SceneGraph
-**Source:** Roku community best practices, BrightScript memory management
-
-```brightscript
-' WRONG: Missing cleanup
-sub popScreen()
-    screen = m.screenStack.pop()
-    m.screenContainer.removeChild(screen)  ' Observers still attached!
 end sub
 
-' CORRECT: Cleanup observers first
-sub popScreen()
-    screen = m.screenStack.pop()
-
-    ' Remove ALL observers for this screen
-    screen.unobserveField("itemSelected")
-    screen.unobserveField("navigateBack")
-    screen.unobserveField("state")  ' If observing
-    ' ... any other observed fields
-
-    m.screenContainer.removeChild(screen)
-    ' Reference goes out of scope (local var), garbage collected
+' Refresh on return from playback (detect via focusedChild change)
+sub onFocusChange(event as Object)
+    if m.top.isInFocusChain() and m.top.focusedChild = invalid
+        ' Screen just regained focus -- reload hubs
+        loadHubs()
+        ' ... existing focus delegation logic
+    end if
 end sub
 ```
 
-**Critical insight:** Each observeField call adds a callback to the field's callback queue. If not removed, the observer function remains in memory even after removeChild. This creates a "lapsed listener" memory leak where the observer closure holds references to the removed node.
-
-**Sources:**
-- [Medium: Memory Leak in Observer Pattern](https://medium.com/@devcorner/what-is-a-memory-leak-how-memory-leaks-are-associated-with-the-observer-pattern-dbd12898f2b9)
-- [Roku Community: ObserveField](https://community.roku.com/discussions/developer/observefield/474377)
-- [Lapsed Listener Problem (Wikipedia)](https://en.wikipedia.org/wiki/Lapsed_listener_problem)
-
-### Pattern 5: Screen Lifecycle Interface
-
-**What:** Standardized fields for screen-to-MainScene communication
-**When to use:** All screen components
-**Source:** Existing implementation (HomeScreen, DetailScreen, etc.)
-
+### Pattern 5: Transient Hub Refresh
+**What:** Use `onlyTransient=1` parameter to efficiently refresh only hubs that change after playback (Continue Watching, On Deck).
+**When to use:** On return from playback -- avoids re-fetching static hubs like Recently Added.
+**Example:**
 ```brightscript
-' Standard screen interface (in screen XML)
-<interface>
-    <field id="itemSelected" type="assocarray" alwaysNotify="true" />
-    <field id="navigateBack" type="boolean" alwaysNotify="true" />
-    <field id="state" type="string" alwaysNotify="true" />  ' Optional
-</interface>
-```
-
-**Field semantics:**
-- `itemSelected` - Screen signals navigation action (e.g., show detail, open search)
-- `navigateBack` - Screen requests pop (alternative to onKeyEvent consumption)
-- `state` - Optional lifecycle state (loading, ready, error)
-- `alwaysNotify="true"` - Fire observer even if value unchanged (critical for repeated actions)
-
-**MainScene observes these on pushScreen() and unobserves on popScreen().**
-
-**Example screen implementation:**
-```brightscript
-' In HomeScreen.brs
-sub onGridItemSelected(event as Object)
-    index = event.getData()
-    item = m.posterGrid.content.getChild(index)
-
-    ' Signal to MainScene via itemSelected field
-    m.top.itemSelected = {
-        action: "detail"
-        ratingKey: item.ratingKey
-        itemType: item.itemType
-    }
+sub refreshTransientHubs()
+    task = CreateObject("roSGNode", "PlexApiTask")
+    task.endpoint = "/hubs"
+    task.params = { "onlyTransient": "1" }
+    task.observeField("status", "onHubsRefreshed")
+    task.control = "run"
+    m.hubsRefreshTask = task
 end sub
-
-function onKeyEvent(key as String, press as Boolean) as Boolean
-    if not press then return false
-
-    if key = "back"
-        ' Signal back navigation (MainScene will pop)
-        m.top.navigateBack = true
-        return true
-    end if
-
-    return false
-end function
 ```
 
-### Pattern 6: Sidebar Focus Management (Existing Implementation)
-
-**What:** Sidebar component handles its own focus via onKeyEvent, doesn't auto-focus when visible
-**When to use:** Persistent navigation widgets (Sidebar on HomeScreen)
-**Source:** Existing HomeScreen.brs lines 204-221, Sidebar.brs lines 150-184
-
+### Pattern 6: Focus Management Between Hub Rows and Library Grid
+**What:** Intercept up/down key events to manually transfer focus between the RowList and the MarkupGrid/PosterGrid.
+**When to use:** At the boundary between hub rows and library grid -- RowList and MarkupGrid are separate components.
+**Example:**
 ```brightscript
-' HomeScreen manages focus between sidebar and content
-function onKeyEvent(key as String, press as Boolean) as Boolean
-    if not press then return false
-
-    if key = "left" and not m.focusOnSidebar
-        m.focusOnSidebar = true
-        m.sidebar.setFocus(true)
-        return true
-    else if key = "right" and m.focusOnSidebar
-        m.focusOnSidebar = false
-        m.posterGrid.setFocus(true)
-        return true
-    else if key = "back"
-        m.top.navigateBack = true
-        return true
-    end if
-
-    return false
-end function
-```
-
-**Sidebar internal focus management:**
-```brightscript
-' Sidebar.brs handles up/down between its three LabelLists
+' In HomeScreen onKeyEvent:
 function onKeyEvent(key as String, press as Boolean) as Boolean
     if not press then return false
 
     if key = "down"
-        if m.activeList = "library"
-            if m.libraryList.itemFocused >= m.libraries.count() - 1
-                m.activeList = "hub"
-                m.hubList.setFocus(true)
+        ' If focused on hub rows and on last row, move to grid
+        if m.focusArea = "hubs"
+            focusedRow = m.hubRowList.rowItemFocused
+            if focusedRow <> invalid and focusedRow[0] >= m.hubRowCount - 1
+                m.focusArea = "grid"
+                m.posterGrid.setFocus(true)
                 return true
             end if
-        ' ... transitions to bottom list
+        end if
     else if key = "up"
-        ' ... reverse transitions
+        ' If focused on grid first row, move to hub rows
+        if m.focusArea = "grid"
+            ' Check if grid is at top (first row focused)
+            if m.posterGrid.isAtTop()  ' Custom helper or check itemFocused < numColumns
+                if m.hubRowCount > 0
+                    m.focusArea = "hubs"
+                    m.hubRowList.setFocus(true)
+                    return true
+                end if
+            end if
+        end if
+    else if key = "left"
+        ' From first item in hub row, open sidebar
+        if m.focusArea = "hubs"
+            focusedItem = m.hubRowList.rowItemFocused
+            if focusedItem <> invalid and focusedItem[1] = 0
+                m.focusArea = "sidebar"
+                m.sidebar.setFocus(true)
+                return true
+            end if
+        end if
     end if
 
+    ' ... existing left/right/back handling
     return false
 end function
 ```
 
-**Key principle:** Parent screen (HomeScreen) handles horizontal focus (left/right), child widget (Sidebar) handles vertical focus (up/down within lists). Both return true when consuming events to prevent bubbling.
-
 ### Anti-Patterns to Avoid
-
-- **Missing unobserveField before removeChild:** Creates lapsed listener memory leaks
-- **Saving focusedChild without invalid check:** Crashes if screen has no focus
-- **Not hiding previous screen (visible=false):** Wastes rendering cycles on off-screen content
-- **Returning false from onKeyEvent when handling back:** Allows event to bubble, may trigger unwanted firmware behavior
-- **Using m.global for screen references:** Increases reference count, harder to garbage collect
-- **Reusing screen instances:** State pollution from previous use, always create fresh
-- **Not handling exit dialog on last screen:** User expects back button to show "Exit?" confirmation
+- **Using roUrlTransfer on render thread for hub calls:** All HTTP requests must go through Task nodes. Roku platform rule; causes rendezvous crashes.
+- **Creating one PlexApiTask per hub row:** The `/hubs` endpoint returns all hubs in one call. Three separate tasks waste resources and create timing/ordering complexity.
+- **Setting RowList content before sizing fields:** RowList calculates layout when content is set. Setting content before itemSize/rowItemSize/numRows causes invisible or overlapping items.
+- **Building custom vertical scroll for hub rows:** RowList handles vertical scrolling between rows natively with focus dimming. Custom scroll management is fragile and unnecessary.
+- **Polling hubs too frequently:** Timer-based refresh every 2 minutes is sufficient. More frequent polling wastes network/CPU on constrained Roku hardware.
+- **Hard-coding hub identifier strings:** Plex hub identifiers may vary by PMS version. Use case-insensitive partial matching.
 
 ## Don't Hand-Roll
 
 | Problem | Don't Build | Use Instead | Why |
 |---------|-------------|-------------|-----|
-| Focus tracking | Custom focus state system | focusedChild built-in field | Roku maintains focus chain automatically |
-| Screen transitions | Custom animation system | visible field toggle | SceneGraph optimized for show/hide |
-| Back button handling | Custom event system | onKeyEvent() function | Official API, handles bubbling correctly |
-| Stack data structure | Custom linked list | BrightScript Array with push/pop/peek | Native implementation is fast and tested |
-| Screen lifecycle signals | Custom event bus | observeField on standard fields | SceneGraph observer pattern is built-in |
-| Exit confirmation | Custom dialog component | StandardMessageDialog | Roku's official dialog matches OS style |
+| Horizontally scrollable row of posters | Custom scroll with translation animation | RowList component | RowList handles focus, scroll position memory, dimming, accessibility natively |
+| Vertical scrolling between hub rows | Manual key handling to shift Group translations | RowList with numRows | RowList manages vertical navigation and focus transitions between rows |
+| Progress bar percentage calculation | Complex math with edge case handling | Simple `viewOffset / duration` clamped to 0-1 | Plex provides both values in hub metadata; straightforward division |
+| Hub data caching | Custom cache with timestamps and invalidation | Fresh `/hubs` call + `onlyTransient=1` for refresh | Plex server handles caching; transient parameter avoids redundant data transfer |
+| Row visibility toggling | Custom show/hide logic per row | Dynamic ContentNode tree with only populated rows | Build tree with only non-empty rows; RowList renders what it gets |
+| Periodic refresh timer | Custom timestamp tracking with roDateTime | SceneGraph Timer node with repeat=true | Built-in, handles repeat, observable fire field |
 
-**Key insight:** Roku's SceneGraph provides all primitives needed for navigation. The challenge is orchestrating them correctly (lifecycle management, cleanup discipline) rather than building custom abstractions. Existing MainScene implementation follows these patterns well.
+**Key insight:** RowList is the single most important "don't hand-roll" item. It handles horizontal scroll per row, vertical navigation between rows, focus dimming of non-active rows, row labels, and scroll position memory. Building any of this manually would be fragile, slow, and significantly more code.
 
 ## Common Pitfalls
 
-### Pitfall 1: Observer Accumulation (Lapsed Listener)
-**What goes wrong:** Memory leaks, callbacks fire multiple times, stale screen logic executes after screen removed
-**Why it happens:** observeField adds callback to queue without checking for duplicates, removeChild doesn't auto-unobserve
-**How to avoid:**
-- ALWAYS unobserveField before removeChild
-- Create helper function for consistent cleanup pattern
-- Use observeFieldScoped where appropriate (safer scoping)
-**Warning signs:** Memory usage grows over navigation cycles, callback logs show duplicate execution, crashes referencing deallocated screens
-**Source:** [Roku Community: ObserveField](https://community.roku.com/discussions/developer/observefield/474377)
+### Pitfall 1: RowList Content Set Before Dimensions
+**What goes wrong:** Items render with wrong sizes, overlap, or don't appear at all.
+**Why it happens:** RowList calculates layout on content assignment. If itemSize/rowItemSize/numRows aren't set yet, it uses defaults (often 0x0).
+**How to avoid:** Always set itemSize, rowItemSize, rowItemSpacing, and numRows BEFORE setting content. When dynamically changing numRows (e.g., hub row count changes), update numRows first, then content.
+**Warning signs:** Empty rows, items overlapping, items not visible despite valid content.
 
-### Pitfall 2: focusedChild Returns Invalid
-**What goes wrong:** Attempt to call setFocus(true) on invalid reference causes crash
-**Why it happens:** Screen may have no focused child (e.g., screen just created, all children disabled)
-**How to avoid:**
-- Always check `if savedFocus <> invalid` before calling setFocus
-- Provide fallback: `screen.setFocus(true)` (focus screen root)
-**Warning signs:** Crashes on popScreen with "Method 'setFocus' not found in roInvalid"
-**Source:** Existing MainScene.brs lines 238-244 (correct implementation)
+### Pitfall 2: Hub Identifier Case Sensitivity and Variation
+**What goes wrong:** Hub filtering fails; rows appear empty even though API returned data.
+**Why it happens:** Plex hub identifiers may vary in casing across PMS versions (e.g., `home.continue` vs `home.Continue`). Some servers may split recently added by type (`home.movies.recent`, `home.tv.recent`).
+**How to avoid:** Use `LCase()` when comparing hubIdentifier values. Use `Instr()` for partial matching as fallback. Log all received hubIdentifier values during development for debugging.
+**Warning signs:** Hub data loads successfully (API returns 200 with data) but rows don't populate.
 
-### Pitfall 3: Deep Focus Not Preserved
-**What goes wrong:** PosterGrid scroll position resets to top after back navigation, user loses place
-**Why it happens:** focusedChild only captures immediate child (the grid itself), not the selected item index or scroll offset
-**How to avoid:**
-- Rely on Roku's built-in grid focus restoration (works for most cases)
-- For custom behavior: expose screen fields like `lastScrollIndex` that MainScene can save/restore explicitly
-- Alternatives: some developers save full scroll state in screen's m.top before hiding
-**Warning signs:** User reports "lost my place" when navigating back to library grid
-**Source:** [Roku Community: RowList Node loses focus](https://community.roku.com/discussions/developer/rowlist-node-loses-focus/423105)
+### Pitfall 3: RowList numRows Mismatch with Actual Row Count
+**What goes wrong:** Extra blank rows appear below populated rows, or populated rows get clipped.
+**Why it happens:** numRows controls how many rows are visible. If set to 3 but only 2 hubs have data, a blank third row appears. If set to 2 but 3 hubs have data, the third row is hidden.
+**How to avoid:** Dynamically set numRows to match the actual number of ContentNode children in the root content node. Count populated hubs first, then set numRows, then set content.
+**Warning signs:** Blank space below populated rows, focus going to invisible area, missing hub row.
 
-### Pitfall 4: Screen Stack Underflow
-**What goes wrong:** popScreen called on empty stack, array.pop() returns invalid, crash attempting to restore screen
-**Why it happens:** Multiple back button handlers (screen + MainScene) both pop, or logic error in navigation flow
-**How to avoid:**
-- Check `if m.screenStack.count() <= 1` before popping (show exit dialog instead)
-- Screens should signal navigateBack rather than calling popScreen directly
-- Only MainScene manipulates stack
-**Warning signs:** Crashes on back button with "roInvalid" errors accessing m.screenStack.peek()
-**Source:** Existing MainScene.brs lines 221-225 (correct guard)
+### Pitfall 4: Focus Transition Between RowList and MarkupGrid
+**What goes wrong:** Focus gets stuck at the boundary, or jumps unexpectedly when navigating down from last hub row to library grid (or up from grid to hub rows).
+**Why it happens:** RowList and MarkupGrid are separate SceneGraph components with independent focus chains. Neither knows the other exists.
+**How to avoid:** Handle `onKeyEvent` in HomeScreen to detect "down" key when on last hub row and manually `setFocus` to grid. Similarly detect "up" on first grid row and transfer to hub rows. Track current focus area with a state variable (e.g., `m.focusArea`).
+**Warning signs:** Users can reach the grid but can't get back to hub rows, or vice versa.
 
-### Pitfall 5: Exit Dialog Doesn't Show
-**What goes wrong:** App exits immediately on back button from home screen, no confirmation
-**Why it happens:** onKeyEvent returns true for back button, consuming event, but no exit dialog logic
-**How to avoid:**
-- In popScreen(), check `if m.screenStack.count() <= 1` then call showExitDialog()
-- StandardMessageDialog with buttons=["Exit", "Cancel"]
-- On "Exit" button: set m.top.close = true (signals channel exit to firmware)
-**Warning signs:** User accidentally exits app frequently, no "Are you sure?" prompt
-**Source:** Existing MainScene.brs lines 270-286 (correct implementation)
+### Pitfall 5: API Task Collision on Refresh
+**What goes wrong:** Old hub data overwrites new data, or callbacks fire in wrong order after timer-triggered reload.
+**Why it happens:** Timer fires while previous hub load is still in progress; both tasks call the same callback. Old task completes after new task, overwriting newer data.
+**How to avoid:** Track `m.isLoadingHubs` flag; skip refresh if already loading. In callback, verify the task reference matches the current `m.hubsTask` before processing response.
+**Warning signs:** Hub rows flicker or show stale data intermittently, especially after returning from playback near a timer tick.
 
-### Pitfall 6: Task Nodes Not Cleaned Up
-**What goes wrong:** Background tasks continue running after screen removed, memory leak, duplicate API calls
-**Why it happens:** Screen creates task in init(), observes it, but doesn't stop/unobserve when removed
-**How to avoid:**
-- In screen cleanup: set `task.control = "stop"`, unobserveField, set task = invalid
-- Alternatively: use Task timeout or check task.state in observer and cleanup on completion
-- MainScene could provide cleanup hook: `screen.callFunc("cleanup")` before removeChild
-**Warning signs:** Network traffic continues after navigating away, debug logs show task state changes for removed screens
-**Source:** [Roku SDK: SceneGraph Threads](https://sdkdocs-archive.roku.com/SceneGraph-Threads_4262152.html)
+### Pitfall 6: Missing Duration Field for Progress Bars
+**What goes wrong:** Progress bars show 0% or 100% incorrectly, or don't appear when they should.
+**Why it happens:** Plex hub metadata includes `viewOffset` (ms) but `duration` may come from different fields depending on content type. Some hub responses may omit full media details.
+**How to avoid:** Check for `duration` directly on the item first. If not present, check `Media[0].Part[0].duration`. If neither exists, hide the progress bar entirely rather than showing a broken bar. Always verify both values are non-zero before calculating.
+**Warning signs:** Progress bars all show as empty or full, or appear on items that shouldn't have them.
+
+### Pitfall 7: Sidebar View Toggle Complexity
+**What goes wrong:** Switching between "hub+grid" and "full library grid" views creates state management bugs.
+**Why it happens:** User decision requires sidebar to toggle views. Need to track current view mode, show/hide hub rows, and adjust grid positioning accordingly.
+**How to avoid:** Use a simple `m.viewMode` string ("hubGrid" vs "libraryOnly"). When toggling, set RowList visible=true/false and reposition the grid. Don't destroy/recreate content -- just toggle visibility.
+**Warning signs:** Hub rows appear in library-only mode, grid position wrong after toggle, focus lost on toggle.
 
 ## Code Examples
 
-Verified patterns from existing codebase and Roku documentation.
+### RowList XML Configuration for Hub Rows
+```xml
+<!-- In HomeScreen.xml, inside contentArea Group -->
+<RowList
+    id="hubRowList"
+    translation="[0, 0]"
+    itemSize="[1620, 430]"
+    numRows="3"
+    rowItemSize="[[260, 390]]"
+    rowItemSpacing="[[20, 0]]"
+    itemSpacing="[0, 10]"
+    showRowLabel="[true, true, true]"
+    rowLabelOffset="[[0, 0]]"
+    drawFocusFeedback="true"
+    focusBitmapBlendColor="0xE5A00DFF"
+    vertFocusAnimationStyle="floatingFocus"
+    rowFocusAnimationStyle="floatingFocus"
+    itemComponentName="PosterGridItem"
+    visible="false"
+/>
+```
 
-### Complete Screen Stack Implementation (Enhanced)
+### Hub Row Item Selection Handler
 ```brightscript
-' MainScene.brs - Enhanced with systematic cleanup
-sub init()
-    m.screenContainer = m.top.findNode("screenContainer")
-    m.screenStack = []
-    m.focusStack = []
+sub onHubItemSelected(event as Object)
+    selectedInfo = event.getData()  ' [rowIndex, itemIndex]
+    rowIndex = selectedInfo[0]
+    itemIndex = selectedInfo[1]
 
-    ' Standard observer fields
-    m.observedFields = ["itemSelected", "navigateBack", "state"]
-end sub
+    ' Determine which hub type this row represents
+    hubType = m.hubRowMap[rowIndex.ToStr()]
 
-sub pushScreen(screen as Object)
-    ' Save current screen's focus
-    if m.screenStack.count() > 0
-        currentScreen = m.screenStack.peek()
-        focusedNode = currentScreen.focusedChild
-        m.focusStack.push(focusedNode)  ' May be invalid
-        currentScreen.visible = false
+    ' Get the content node for this item
+    rowContent = m.hubRowList.content.getChild(rowIndex)
+    itemContent = rowContent.getChild(itemIndex)
+
+    if hubType = "continueWatching"
+        ' Per user decision: resume playback immediately
+        m.top.itemSelected = {
+            action: "play"
+            ratingKey: itemContent.ratingKey
+            itemType: itemContent.itemType
+            viewOffset: itemContent.viewOffset
+        }
+    else
+        ' On Deck and Recently Added: open detail screen
+        m.top.itemSelected = {
+            action: "detail"
+            ratingKey: itemContent.ratingKey
+            itemType: itemContent.itemType
+        }
     end if
-
-    ' Add and focus new screen
-    m.screenContainer.appendChild(screen)
-    m.screenStack.push(screen)
-    screen.setFocus(true)
-
-    ' Observe standard events
-    for each field in m.observedFields
-        screen.observeField(field, "on" + field.left(1).toUpper() + field.mid(1))
-    end for
-end sub
-
-sub popScreen()
-    ' Guard against underflow
-    if m.screenStack.count() <= 1
-        showExitDialog()
-        return
-    end if
-
-    ' Remove and cleanup current screen
-    currentScreen = m.screenStack.pop()
-    cleanupScreen(currentScreen)
-    m.screenContainer.removeChild(currentScreen)
-
-    ' Restore previous screen
-    previousScreen = m.screenStack.peek()
-    previousScreen.visible = true
-
-    ' Restore focus
-    restoreFocus(previousScreen)
-end sub
-
-sub cleanupScreen(screen as Object)
-    ' Unobserve all standard fields
-    for each field in m.observedFields
-        screen.unobserveField(field)
-    end for
-
-    ' Optional: Call screen cleanup function if exists
-    if screen.hasField("cleanup")
-        screen.callFunc("cleanup")
-    end if
-end sub
-
-sub restoreFocus(screen as Object)
-    if m.focusStack.count() > 0
-        savedFocus = m.focusStack.pop()
-        if savedFocus <> invalid and savedFocus.isValid()
-            savedFocus.setFocus(true)
-            return
-        end if
-    end if
-
-    ' Fallback: focus screen root
-    screen.setFocus(true)
-end sub
-
-sub clearScreenStack()
-    ' Remove all screens with proper cleanup
-    while m.screenStack.count() > 0
-        screen = m.screenStack.pop()
-        cleanupScreen(screen)
-        m.screenContainer.removeChild(screen)
-    end while
-    m.focusStack.clear()
 end sub
 ```
 
-### Screen Cleanup Function (Optional Pattern)
+### Dynamic Repositioning After Hub Load
 ```brightscript
-' In screen component (e.g., HomeScreen.brs)
-' Optional cleanup function called by MainScene before removal
-sub cleanup()
-    ' Stop any running tasks
-    if m.apiTask <> invalid
-        m.apiTask.control = "stop"
-        m.apiTask.unobserveField("state")
-        m.apiTask = invalid
+sub repositionContentBelowHubs(hubRowCount as Integer)
+    if hubRowCount = 0
+        ' No hub rows -- position as before
+        m.filterBar.translation = [20, 20]
+        m.posterGrid.translation = [20, 100]
+    else
+        ' Each hub row: ~430px item height + ~10px spacing + ~30px label
+        hubHeight = hubRowCount * 470
+        m.filterBar.translation = [20, hubHeight + 20]
+        m.posterGrid.translation = [20, hubHeight + 100]
     end if
-
-    ' Clear large content nodes
-    if m.posterGrid <> invalid
-        m.posterGrid.content = invalid
-    end if
-
-    ' Unobserve child widgets
-    m.sidebar.unobserveField("selectedLibrary")
-    m.sidebar.unobserveField("specialAction")
 end sub
 ```
 
-### Focus-Aware Screen Base Pattern
+### Sidebar View Toggle
 ```brightscript
-' Pattern for screens that need to preserve deep focus state
-' In DetailScreen.brs (example)
-sub init()
-    m.top.addFields({
-        savedFocusIndex: -1  ' Expose for MainScene to save/restore
-    })
-
-    m.buttonGroup = m.top.findNode("buttonGroup")
-    m.buttonGroup.observeField("buttonFocused", "onButtonFocused")
-end sub
-
-sub onButtonFocused(event as Object)
-    ' Track which button has focus
-    m.top.savedFocusIndex = event.getData()
-end sub
-
-' When screen becomes visible again (MainScene can call this)
-sub restoreDeepFocus()
-    if m.top.savedFocusIndex >= 0 and m.top.savedFocusIndex < m.buttonGroup.getChildCount()
-        button = m.buttonGroup.getChild(m.top.savedFocusIndex)
-        button.setFocus(true)
+sub onViewModeChanged(mode as String)
+    if mode = "libraryOnly"
+        m.hubRowList.visible = false
+        m.filterBar.translation = [20, 20]
+        m.posterGrid.translation = [20, 100]
+    else  ' "hubGrid"
+        m.hubRowList.visible = true
+        repositionContentBelowHubs(m.hubRowCount)
     end if
 end sub
 ```
@@ -555,71 +509,59 @@ end sub
 
 | Old Approach | Current Approach | When Changed | Impact |
 |--------------|------------------|--------------|--------|
-| observeField | observeFieldScoped | Roku OS 8.0+ (2018) | Safer cleanup (scoped to observer lifetime) |
-| Manual focus tracking | focusedChild built-in field | SceneGraph 1.0 (2015) | Roku maintains focus chain automatically |
-| Custom screen stack logic | Array push/pop/peek | BrightScript core (2015) | Native stack operations are idiomatic |
-| Global event bus | Field observers per screen | SceneGraph pattern | Cleaner isolation, easier cleanup |
-| Single scene navigation | Multi-scene apps (rare) | SceneGraph 1.3 (2020+) | Most apps still use single Scene with stack |
+| Separate `/library/onDeck` + `/library/recentlyAdded` calls | `/hubs` endpoint returns all hub types in one call | Plex ~2020 | Single API call for all hub content; server controls hub selection/ordering |
+| Full hub reload on every refresh | `onlyTransient=1` parameter for efficient refresh | Plex ~2021 | Only refetches hubs that change after playback (Continue Watching, On Deck) |
+| Multiple stacked custom scroll components | Single RowList with dynamic numRows | Roku OS 8+ | RowList natively handles multi-row horizontal scroll with vertical navigation |
 
-**Current best practices (2026):**
-- Single Scene with screen stack (not multi-Scene architecture)
-- observeFieldScoped for safer observer management (existing code uses observeField - works but scoped is safer)
-- Focus restoration relies on Roku's internal state where possible
-- Exit dialog on last screen is standard UX expectation
-- SGDEX (SceneGraph Developer Extensions) provides ViewStack component for advanced apps, but not required for simple stack navigation
-
-**Sources:**
-- [Medium: Navigating Screen Stacks in Roku](https://medium.com/@amitdogra70512/navigating-screen-stacks-in-roku-a-guide-to-creating-and-managing-multiple-screens-using-arrays-1f9cbb736079)
-- [TVID Services: Back Stack Management](https://roku.home.blog/2019/01/02/back-stack-management-in-roku-using-scenegraph-component/)
-- [GitHub: Roku SceneGraph Developer Extensions - ViewStack](https://github.com/rokudev/SceneGraphDeveloperExtensions)
+**Deprecated/outdated:**
+- `/library/onDeck` and `/library/recentlyAdded` endpoints still work as standalone calls, but the `/hubs` endpoint is the modern approach that returns all hub types with server-configured ordering and visibility. The existing HomeScreen already calls these via sidebar "special actions" -- Phase 3 should migrate to `/hubs` instead.
 
 ## Open Questions
 
-1. **SGDEX ViewStack vs Manual Implementation**
-   - What we know: SGDEX provides ViewStack component with built-in stack management, close field, focus handling
-   - What's unclear: Does it add significant complexity/overhead for simple app? Is it maintained/recommended?
-   - Recommendation: Existing manual implementation is working and clear. SGDEX adds dependency and learning curve. Only consider if adding complex navigation features (modals, overlays, slide animations).
+1. **Exact hubIdentifier strings on target Plex server**
+   - What we know: Common identifiers include `home.continue`, `home.ondeck`, and variations with `recentlyadded`. The API docs show `home.onDeck` as an example context of `hub.home.onDeck`.
+   - What's unclear: Exact identifier strings may vary by PMS version. Some servers may return `home.movies.recent` and `home.tv.recent` as separate hubs rather than a combined recently added.
+   - Recommendation: Log all hubIdentifier values from the first `/hubs` call during development. Use case-insensitive partial matching (e.g., `Instr` for "continue", "ondeck", "recent") as fallback. Accept the first match for recently added.
 
-2. **Focus Restoration for PosterGrid Scroll Position**
-   - What we know: focusedChild captures grid itself, not scroll offset; Roku grids have internal focus memory
-   - What's unclear: Does setFocus(true) on saved focusedChild reliably restore scroll position in all cases?
-   - Recommendation: Test with real navigation flows. Most users report it works "well enough". If issues arise, add explicit itemFocused field save/restore.
+2. **Duration field availability in `/hubs` metadata**
+   - What we know: `viewOffset` (ms) is reliably present for in-progress items. The `duration` field should be on the item for movies and episodes.
+   - What's unclear: Whether all hub response items include `duration` or if it requires a separate metadata fetch for some content types.
+   - Recommendation: Check for `duration` on item first, fall back to `Media[0].duration` if available. If neither exists, hide progress bar. Test with real server data during development.
 
-3. **Task Cleanup Hook Pattern**
-   - What we know: Screens create tasks but MainScene removes screens, need coordination
-   - What's unclear: Should MainScene call cleanup function on screens? Or should screens cleanup on navigateBack signal?
-   - Recommendation: Implement optional cleanup() function pattern. MainScene calls if function exists (screen.hasField("cleanup")). Allows screens to manage their own task lifecycle.
+3. **RowList + MarkupGrid combined vertical scrolling feel**
+   - What we know: These are separate components; the transition between them requires manual focus management via onKeyEvent.
+   - What's unclear: Whether the visual transition feels smooth or if there's a jarring jump when focus moves between the two.
+   - Recommendation: Test on device early. If the transition feels rough, consider adding a brief focus animation or adjusting translation to create visual continuity. The `vertFocusAnimationStyle="floatingFocus"` on RowList may help within the hub rows themselves.
 
-4. **observeField vs observeFieldScoped**
-   - What we know: Existing code uses observeField; observeFieldScoped is safer (auto-cleanup on scope exit)
-   - What's unclear: Does switching provide meaningful benefit? Is it compatible with all SceneGraph components?
-   - Recommendation: Existing observeField + manual cleanup works. Could refactor to observeFieldScoped for safety, but not urgent. Document pattern for consistency.
+4. **Scroll position preservation on hub refresh**
+   - What we know: User decision requires hub rows to remember horizontal scroll position.
+   - What's unclear: Whether RowList preserves scroll position when content is replaced (e.g., on refresh timer tick).
+   - Recommendation: Before refreshing, save `rowItemFocused` value. After setting new content, restore via `jumpToRowItem`. If content structure changed (different row count), reset to beginning.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- Existing codebase: PlexClassic/components/MainScene.brs - Working implementation of screen stack pattern
-- [Roku onKeyEvent Documentation](https://developer.roku.com/docs/references/scenegraph/component-functions/onkeyevent.md) - Key event handling, return value semantics
-- [Roku ifSGNodeFocus Interface](https://developer.roku.com/docs/references/brightscript/interfaces/ifsgnodefocus.md) - Focus management methods
-- [Roku Array (roArray) Documentation](https://developer.roku.com/docs/references/brightscript/components/roarray.md) - push/pop/peek methods
+- Roku RowList documentation (sdkdocs-archive.roku.com/RowList_1611919.html) - Full field reference, content structure, focus behavior
+- Plex API Get Global Hubs (plexapi.dev/api-reference/hubs/get-global-hubs) - Endpoint params, response structure, hub fields, example JSON
+- Existing codebase: HomeScreen.brs, PosterGridItem.brs, PlexApiTask.brs, MediaRow.brs, Sidebar.brs - Current architecture and patterns
 
 ### Secondary (MEDIUM confidence)
-- [Medium: Navigating Screen Stacks in Roku](https://medium.com/@amitdogra70512/navigating-screen-stacks-in-roku-a-guide-to-creating-and-managing-multiple-screens-using-arrays-1f9cbb736079) - Community implementation patterns
-- [TVID Services: Back Stack Management](https://roku.home.blog/2019/01/02/back-stack-management-in-roku-using-scenegraph-component/) - Observer cleanup patterns
-- [Roku Community: ObserveField](https://community.roku.com/discussions/developer/observefield/474377) - Observer accumulation issues
-- [Roku Community: Scene Graph Destroying Nodes](https://forums.roku.com/viewtopic.php?t=96628) - Cleanup best practices
-- [Medium: Memory Leak in Observer Pattern](https://medium.com/@devcorner/what-is-a-memory-leak-how-memory-leaks-are-associated-with-observer-pattern-dbd12898f2b9) - Lapsed listener problem
+- Plex Python PlexAPI docs (python-plexapi.readthedocs.io/en/latest/modules/library.html) - Hub identifier names and metadata field references
+- Roku SDK Development Guide (github.com/rokudev/SDK-Development-Guide) - RowList usage patterns and best practices
+- Roku Community RowList discussions (community.roku.com) - Focus behavior and content structure patterns
 
-### Tertiary (LOW confidence - needs validation)
-- [GitHub: Roku SceneGraph Developer Extensions](https://github.com/rokudev/SceneGraphDeveloperExtensions) - SGDEX ViewStack (blocked, but documented in other sources)
-- Deep focus restoration for complex grids - community reports vary, needs testing
+### Tertiary (LOW confidence)
+- Exact hub identifier strings per PMS version - Based on community references and third-party documentation; needs validation against actual server response during development
+- Duration field availability in hub metadata - Needs validation with real Plex server responses
 
 ## Metadata
 
 **Confidence breakdown:**
-- Standard Stack: HIGH - Built-in Roku primitives, existing code validates patterns
-- Architecture: HIGH - Existing MainScene implementation follows best practices, enhancements are refinements
-- Pitfalls: HIGH - Well-documented across Roku community, verified in existing code
+- Standard stack: HIGH - RowList is the documented Roku component for this exact use case; `/hubs` is the official Plex API endpoint
+- Architecture: HIGH - Patterns follow existing codebase conventions (Task nodes, ContentNode trees, observer pattern); extending proven patterns
+- Pitfalls: HIGH - Based on documented Roku component behavior, existing codebase patterns, and Plex API known behaviors
+- Hub identifiers: MEDIUM - Exact strings may vary; partial matching recommended as safety net
+- Progress bar duration data: MEDIUM - Likely available but needs server-side validation
 
-**Research date:** 2026-02-09
-**Valid until:** 90 days (Roku SceneGraph patterns are stable, navigation is mature API)
+**Research date:** 2026-03-09
+**Valid until:** 2026-04-09 (stable platform APIs, unlikely to change)
