@@ -49,11 +49,11 @@ Plans:
   2. Poster items in grids show a progress bar indicating how much of the item has been watched
   3. Poster items show a watched/unwatched badge based on view count
   4. User can mark an item as watched or unwatched from the detail screen and the badge updates immediately
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 02-01: TBD
-- [ ] 02-02: TBD
+- [ ] 02-01-PLAN.md — Progress bar overlays and triangle unwatched badges on poster and episode items
+- [ ] 02-02-PLAN.md — Resume dialog, detail screen enhancements, options key context menu
 
 ### Phase 3: Hub Rows
 **Goal**: Home screen surfaces personalized "what to watch next" content without requiring library browsing
