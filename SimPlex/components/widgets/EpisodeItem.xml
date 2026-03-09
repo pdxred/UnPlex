@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component name="EpisodeItem" extends="Group">
+    <interface>
+        <field id="itemContent" type="node" onChange="onItemContentChange" />
+    </interface>
+
+    <script type="text/brightscript" uri="EpisodeItem.brs" />
+
+    <children>
+        <Poster
+            id="thumbnail"
+            width="213"
+            height="120"
+        />
+        <Label
+            id="titleLabel"
+            translation="[230, 10]"
+            width="1400"
+            font="font:MediumBoldSystemFont"
+            color="0xFFFFFFFF"
+            maxLines="1"
+        />
+        <Label
+            id="summaryLabel"
+            translation="[230, 45]"
+            width="1400"
+            font="font:SmallSystemFont"
+            color="0xAAAAAA"
+            maxLines="2"
+            wrap="true"
+        />
+        <Label
+            id="durationLabel"
+            translation="[230, 95]"
+            font="font:SmallSystemFont"
+            color="0x888888"
+        />
+        <Rectangle
+            id="progressTrack"
+            translation="[0, 116]"
+            width="213"
+            height="4"
+            color="0xFFFFFF33"
+            visible="false"
+        />
+        <Rectangle
+            id="progressFill"
+            translation="[0, 116]"
+            width="0"
+            height="4"
+            color="0xE5A00DFF"
+            visible="false"
+        />
+        <Poster
+            id="unwatchedBadge"
+            translation="[185, 0]"
+            width="28"
+            height="28"
+            uri="pkg:/images/badge-unwatched.png"
+            visible="false"
+        />
+    </children>
+</component>

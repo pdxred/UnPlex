@@ -23,28 +23,37 @@
             wrap="true"
         />
         <Rectangle
-            id="unwatchedIndicator"
-            translation="[220, 10]"
-            width="12"
-            height="12"
-            color="0xE5A00DFF"
-            visible="false"
-        />
-        <Rectangle
-            id="progressBg"
-            translation="[0, 350]"
+            id="progressTrack"
+            translation="[0, 354]"
             width="240"
             height="6"
-            color="0x00000080"
+            color="0xFFFFFF33"
             visible="false"
         />
         <Rectangle
-            id="progressBar"
-            translation="[0, 350]"
+            id="progressFill"
+            translation="[0, 354]"
             width="0"
             height="6"
             color="0xE5A00DFF"
             visible="false"
+        />
+        <Poster
+            id="unwatchedBadge"
+            translation="[200, 0]"
+            width="40"
+            height="40"
+            uri="pkg:/images/badge-unwatched.png"
+            visible="false"
+        />
+        <Label
+            id="unwatchedCount"
+            translation="[218, 4]"
+            font="font:SmallestSystemFont"
+            color="0xFFFFFFFF"
+            visible="false"
+            horizAlign="right"
+            width="18"
         />
     </children>
 </component>

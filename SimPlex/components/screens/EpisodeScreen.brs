@@ -158,6 +158,7 @@ sub processEpisodes()
             thumb: ""
             viewOffset: 0
             watched: false
+            viewCount: 0
         })
 
         if episode.index <> invalid
@@ -175,8 +176,11 @@ sub processEpisodes()
         if episode.viewOffset <> invalid
             node.viewOffset = episode.viewOffset
         end if
-        if episode.viewCount <> invalid and episode.viewCount > 0
-            node.watched = true
+        if episode.viewCount <> invalid
+            node.viewCount = episode.viewCount
+            if episode.viewCount > 0
+                node.watched = true
+            end if
         end if
 
         ' Format title with episode number

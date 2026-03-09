@@ -180,9 +180,15 @@ sub addHubRow(rootContent as Object, title as String, metadata as Object, c as O
             itemType: item.type
             viewOffset: 0
             duration: 0
+            viewCount: 0
+            leafCount: 0
+            viewedLeafCount: 0
         })
 
         if item.viewOffset <> invalid then itemNode.viewOffset = item.viewOffset
+        if item.viewCount <> invalid then itemNode.viewCount = item.viewCount
+        if item.leafCount <> invalid then itemNode.leafCount = item.leafCount
+        if item.viewedLeafCount <> invalid then itemNode.viewedLeafCount = item.viewedLeafCount
         if item.duration <> invalid
             itemNode.duration = item.duration
         else if item.Media <> invalid and item.Media.count() > 0
@@ -221,7 +227,9 @@ sub onHubItemSelected(event as Object)
 
     ' Get the content node for this item
     rowContent = m.hubRowList.content.getChild(rowIndex)
+    if rowContent = invalid then return
     itemContent = rowContent.getChild(itemIndex)
+    if itemContent = invalid then return
 
     if hubType = "continueWatching"
         ' Per locked decision: resume playback immediately
@@ -383,11 +391,25 @@ sub processApiResponse()
             itemType: item.type
             thumb: item.thumb
             viewOffset: 0
+            duration: 0
+            viewCount: 0
+            leafCount: 0
+            viewedLeafCount: 0
         })
 
         if item.viewOffset <> invalid
             node.viewOffset = item.viewOffset
         end if
+        if item.duration <> invalid
+            node.duration = item.duration
+        else if item.Media <> invalid and item.Media.count() > 0
+            if item.Media[0].duration <> invalid
+                node.duration = item.Media[0].duration
+            end if
+        end if
+        if item.viewCount <> invalid then node.viewCount = item.viewCount
+        if item.leafCount <> invalid then node.leafCount = item.leafCount
+        if item.viewedLeafCount <> invalid then node.viewedLeafCount = item.viewedLeafCount
 
         ' Build poster URL
         if item.thumb <> invalid and item.thumb <> ""
