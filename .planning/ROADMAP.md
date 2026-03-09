@@ -12,9 +12,9 @@ SimPlex transforms a working scaffold (auth, browsing, playback) into a daily-dr
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Infrastructure** - BrighterScript compiler, constants caching, API task fix
-- [ ] **Phase 2: Playback Foundation** - Resume, progress indicators, watched state
-- [ ] **Phase 3: Hub Rows** - Continue Watching, Recently Added, On Deck
+- [x] **Phase 1: Infrastructure** - BrighterScript compiler, constants caching, API task fix *(completed 2026-03-08)*
+- [x] **Phase 2: Playback Foundation** - Resume, progress indicators, watched state *(completed 2026-03-09)*
+- [x] **Phase 3: Hub Rows** - Continue Watching, Recently Added, On Deck *(completed 2026-03-09)*
 - [ ] **Phase 4: Error States** - Loading spinners, empty states, network error handling
 - [ ] **Phase 5: Filter and Sort** - Library sorting and filtering controls
 - [ ] **Phase 6: Audio and Subtitles** - Track selection with PGS burn-in fallback
@@ -52,8 +52,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — Progress bar overlays and triangle unwatched badges on poster and episode items
-- [ ] 02-02-PLAN.md — Resume dialog, detail screen enhancements, options key context menu
+- [x] 02-01-PLAN.md — Progress bar overlays and triangle unwatched badges on poster and episode items
+- [x] 02-02-PLAN.md — Resume dialog, detail screen enhancements, options key context menu
 
 ### Phase 3: Hub Rows
 **Goal**: Home screen surfaces personalized "what to watch next" content without requiring library browsing
