@@ -1,5 +1,5 @@
 sub init()
-    c = GetConstants()
+    c = m.global.constants
     m.top.width = c.SIDEBAR_WIDTH
     m.top.height = 1080
     m.top.color = c.BG_SIDEBAR
@@ -15,12 +15,15 @@ sub init()
 
     ' Set up API task to fetch libraries
     m.apiTask = CreateObject("roSGNode", "PlexApiTask")
-    m.apiTask.observeField("state", "onApiTaskStateChange")
+    m.apiTask.observeField("status", "onApiTaskStateChange")
 
     ' Observe list selections
     m.libraryList.observeField("itemSelected", "onLibrarySelected")
     m.hubList.observeField("itemSelected", "onHubSelected")
     m.bottomList.observeField("itemSelected", "onBottomSelected")
+
+    ' Delegate focus to active list when sidebar receives focus
+    m.top.observeField("focusedChild", "onFocusChange")
 
     ' Set up hub and bottom lists (static items)
     setupStaticLists()
@@ -147,10 +150,23 @@ sub onBottomSelected(event as Object)
     end if
 end sub
 
+sub onFocusChange(event as Object)
+    ' When Sidebar is in focus chain but no child has focus, delegate to active list
+    if m.top.isInFocusChain() and m.top.focusedChild = invalid
+        if m.activeList = "library"
+            m.libraryList.setFocus(true)
+        else if m.activeList = "hub"
+            m.hubList.setFocus(true)
+        else if m.activeList = "bottom"
+            m.bottomList.setFocus(true)
+        end if
+    end if
+end sub
+
 sub cleanup()
     if m.apiTask <> invalid
         m.apiTask.control = "stop"
-        m.apiTask.unobserveField("state")
+        m.apiTask.unobserveField("status")
     end if
 
     m.libraryList.unobserveField("itemSelected")

@@ -49,7 +49,12 @@ end sub
 ' Build standard Plex headers as associative array
 function GetPlexHeaders() as Object
     di = CreateObject("roDeviceInfo")
-    c = GetConstants()
+    ' Use cached constants from m.global, fallback to GetConstants() for edge cases
+    if m.global <> invalid and m.global.constants <> invalid
+        c = m.global.constants
+    else
+        c = GetConstants()
+    end if
     return {
         "X-Plex-Product": c.PLEX_PRODUCT
         "X-Plex-Version": c.PLEX_VERSION

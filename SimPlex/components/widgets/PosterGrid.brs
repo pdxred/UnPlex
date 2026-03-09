@@ -1,5 +1,5 @@
 sub init()
-    c = GetConstants()
+    c = m.global.constants
     m.grid = m.top.findNode("grid")
 
     ' Configure grid dimensions
@@ -11,8 +11,18 @@ sub init()
     m.grid.observeField("itemSelected", "onItemSelected")
     m.grid.observeField("itemFocused", "onItemFocused")
 
+    ' Delegate focus to inner grid when this component receives focus
+    m.top.observeField("focusedChild", "onFocusChange")
+
     m.lastFocusedIndex = 0
     m.totalItems = 0
+end sub
+
+sub onFocusChange(event as Object)
+    ' When PosterGrid is in focus chain but no child has focus, delegate to grid
+    if m.top.isInFocusChain() and m.top.focusedChild = invalid
+        m.grid.setFocus(true)
+    end if
 end sub
 
 sub onContentChange(event as Object)
@@ -35,7 +45,7 @@ sub onItemFocused(event as Object)
     m.lastFocusedIndex = index
 
     ' Check if we need to load more (within 2 rows of the end)
-    c = GetConstants()
+    c = m.global.constants
     itemsPerRow = c.GRID_COLUMNS
     threshold = m.totalItems - (itemsPerRow * 2)
 

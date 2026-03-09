@@ -14,10 +14,20 @@ sub init()
 
     ' Set up API task
     m.apiTask = CreateObject("roSGNode", "PlexApiTask")
-    m.apiTask.observeField("state", "onApiTaskStateChange")
+    m.apiTask.observeField("status", "onApiTaskStateChange")
 
     ' Observe button selection
     m.buttonGroup.observeField("buttonSelected", "onButtonSelected")
+
+    ' Delegate focus when screen receives focus
+    m.top.observeField("focusedChild", "onFocusChange")
+end sub
+
+sub onFocusChange(event as Object)
+    ' When DetailScreen is in focus chain but no child has focus, delegate to buttons
+    if m.top.isInFocusChain() and m.top.focusedChild = invalid
+        m.buttonGroup.setFocus(true)
+    end if
 end sub
 
 sub onRatingKeyChange(event as Object)
@@ -77,13 +87,26 @@ sub processMetadata()
     end if
     m.yearRuntimeLabel.text = yearRuntime
 
-    ' Set rating
-    if item.rating <> invalid
-        m.ratingLabel.text = "Rating: " + item.rating.ToStr()
+    ' Set rating (API returns string, float, or array depending on item)
+    m.ratingLabel.text = ""
+    ratingVal = invalid
+    if item.contentRating <> invalid
+        ' Content rating (PG, R, etc) - always a string
+        m.ratingLabel.text = item.contentRating
     else if item.audienceRating <> invalid
-        m.ratingLabel.text = "Rating: " + item.audienceRating.ToStr()
-    else
-        m.ratingLabel.text = ""
+        ratingVal = item.audienceRating
+    else if item.rating <> invalid
+        ratingVal = item.rating
+    end if
+
+    if ratingVal <> invalid
+        ratingType = type(ratingVal)
+        if ratingType = "roString" or ratingType = "String"
+            m.ratingLabel.text = "Rating: " + ratingVal
+        else if ratingType = "roFloat" or ratingType = "Float" or ratingType = "roDouble" or ratingType = "Double" or ratingType = "roInt" or ratingType = "Integer"
+            m.ratingLabel.text = "Rating: " + ratingVal.ToStr()
+        end if
+        ' Skip arrays - Rating[] is critic review data, not display rating
     end if
 
     ' Set genres
@@ -105,7 +128,7 @@ sub processMetadata()
     end if
 
     ' Set poster
-    c = GetConstants()
+    c = m.global.constants
     if item.thumb <> invalid and item.thumb <> ""
         m.poster.uri = BuildPosterUrl(item.thumb, 400, 600)
     end if
@@ -170,7 +193,7 @@ sub onButtonSelected(event as Object)
     else if action = "browseSeasons"
         m.top.itemSelected = {
             action: "episodes"
-            ratingKey: m.itemData.ratingKey
+            ratingKey: getRatingKeyString(m.itemData.ratingKey)
             title: m.itemData.title
         }
     else if action = "markWatched"
@@ -182,24 +205,25 @@ end sub
 
 sub startPlayback(offset as Integer)
     ' Create video player and start playback
-    player = CreateObject("roSGNode", "VideoPlayer")
-    player.ratingKey = m.itemData.ratingKey
-    player.mediaKey = "/library/metadata/" + m.itemData.ratingKey
-    player.startOffset = offset
-    player.itemTitle = m.itemData.title
-    player.observeField("playbackComplete", "onPlaybackComplete")
+    ratingKeyStr = getRatingKeyString(m.itemData.ratingKey)
+    m.player = CreateObject("roSGNode", "VideoPlayer")
+    m.player.ratingKey = ratingKeyStr
+    m.player.mediaKey = "/library/metadata/" + ratingKeyStr
+    m.player.startOffset = offset
+    m.player.itemTitle = m.itemData.title
+    m.player.observeField("playbackComplete", "onPlaybackComplete")
 
     ' Add player to scene
-    m.top.getScene().appendChild(player)
-    player.setFocus(true)
-    player.control = "play"
+    m.top.getScene().appendChild(m.player)
+    m.player.setFocus(true)
+    m.player.control = "play"
 end sub
 
 sub onPlaybackComplete(event as Object)
     ' Remove video player and refresh metadata
-    players = m.top.getScene().findNode("VideoPlayer")
-    if players <> invalid
-        m.top.getScene().removeChild(players)
+    if m.player <> invalid
+        m.top.getScene().removeChild(m.player)
+        m.player = invalid
     end if
     m.buttonGroup.setFocus(true)
     ' Refresh to update watched status
@@ -211,10 +235,10 @@ sub markAsWatched()
     task.endpoint = "/:/scrobble"
     task.params = {
         "identifier": "com.plexapp.plugins.library"
-        "key": m.itemData.ratingKey
+        "key": getRatingKeyString(m.itemData.ratingKey)
     }
     task.control = "run"
-    task.observeField("state", "onWatchedStateChange")
+    task.observeField("status", "onWatchedStateChange")
 end sub
 
 sub markAsUnwatched()
@@ -222,15 +246,24 @@ sub markAsUnwatched()
     task.endpoint = "/:/unscrobble"
     task.params = {
         "identifier": "com.plexapp.plugins.library"
-        "key": m.itemData.ratingKey
+        "key": getRatingKeyString(m.itemData.ratingKey)
     }
     task.control = "run"
-    task.observeField("state", "onWatchedStateChange")
+    task.observeField("status", "onWatchedStateChange")
 end sub
 
+function getRatingKeyString(ratingKey as Dynamic) as String
+    if ratingKey = invalid then return ""
+    if type(ratingKey) = "roString" or type(ratingKey) = "String"
+        return ratingKey
+    else
+        return ratingKey.ToStr()
+    end if
+end function
+
 sub onWatchedStateChange(event as Object)
-    state = event.getData()
-    if state = "completed"
+    status = event.getData()
+    if status = "completed"
         ' Refresh metadata to update button
         loadMetadata(m.top.ratingKey)
     end if

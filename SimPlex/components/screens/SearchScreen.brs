@@ -11,7 +11,7 @@ sub init()
 
     ' Set up search task
     m.searchTask = CreateObject("roSGNode", "PlexSearchTask")
-    m.searchTask.observeField("state", "onSearchTaskStateChange")
+    m.searchTask.observeField("status", "onSearchTaskStateChange")
 
     ' Set up debounce timer
     m.debounceTimer = CreateObject("roSGNode", "Timer")
@@ -25,7 +25,19 @@ sub init()
     ' Observe grid selection
     m.resultsGrid.observeField("itemSelected", "onGridItemSelected")
 
-    m.keyboard.setFocus(true)
+    ' Delegate focus when screen receives focus
+    m.top.observeField("focusedChild", "onFocusChange")
+end sub
+
+sub onFocusChange(event as Object)
+    ' When SearchScreen is in focus chain but no child has focus, delegate
+    if m.top.isInFocusChain() and m.top.focusedChild = invalid
+        if m.focusOnKeyboard
+            m.keyboard.setFocus(true)
+        else
+            m.resultsGrid.setFocus(true)
+        end if
+    end if
 end sub
 
 sub onTextChange(event as Object)
@@ -81,25 +93,33 @@ sub processSearchResults()
         return
     end if
 
-    c = GetConstants()
+    c = m.global.constants
     content = CreateObject("roSGNode", "ContentNode")
     hasResults = false
 
     for each hub in hubs
         if hub.Metadata <> invalid
             for each item in hub.Metadata
+                ' Ensure ratingKey is stored as string
+                ratingKeyStr = ""
+                if item.ratingKey <> invalid
+                    if type(item.ratingKey) = "roString" or type(item.ratingKey) = "String"
+                        ratingKeyStr = item.ratingKey
+                    else
+                        ratingKeyStr = item.ratingKey.ToStr()
+                    end if
+                end if
+
                 node = content.createChild("ContentNode")
                 node.addFields({
                     title: item.title
-                    ratingKey: item.ratingKey
+                    ratingKey: ratingKeyStr
                     itemType: item.type
                     thumb: ""
                 })
 
                 if item.thumb <> invalid and item.thumb <> ""
                     node.HDPosterUrl = BuildPosterUrl(item.thumb, c.POSTER_WIDTH, c.POSTER_HEIGHT)
-                else
-                    node.HDPosterUrl = "pkg:/images/placeholder_poster.png"
                 end if
 
                 hasResults = true

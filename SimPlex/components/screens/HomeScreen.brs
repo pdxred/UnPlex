@@ -12,7 +12,7 @@ sub init()
 
     ' Set up API task
     m.apiTask = CreateObject("roSGNode", "PlexApiTask")
-    m.apiTask.observeField("state", "onApiTaskStateChange")
+    m.apiTask.observeField("status", "onApiTaskStateChange")
 
     ' Observe sidebar selection
     m.sidebar.observeField("selectedLibrary", "onLibrarySelected")
@@ -25,8 +25,19 @@ sub init()
     ' Observe filter changes
     m.filterBar.observeField("filterChanged", "onFilterChanged")
 
-    ' Initial focus on sidebar
-    m.sidebar.setFocus(true)
+    ' Delegate focus to appropriate child when screen receives focus
+    m.top.observeField("focusedChild", "onFocusChange")
+end sub
+
+sub onFocusChange(event as Object)
+    ' When HomeScreen is in focus chain but no child has focus, delegate
+    if m.top.isInFocusChain() and m.top.focusedChild = invalid
+        if m.focusOnSidebar
+            m.sidebar.setFocus(true)
+        else
+            m.posterGrid.setFocus(true)
+        end if
+    end if
 end sub
 
 sub onLibrarySelected(event as Object)
@@ -58,7 +69,7 @@ sub loadLibrary()
     m.isLoading = true
     m.loadingSpinner.visible = true
 
-    c = GetConstants()
+    c = m.global.constants
     endpoint = "/library/sections/" + m.currentSectionId + "/all"
     params = {
         "sort": "titleSort:asc"
@@ -125,7 +136,7 @@ sub processApiResponse()
     m.totalItems = container.totalSize
 
     ' Build content nodes for the grid
-    c = GetConstants()
+    c = m.global.constants
     metadata = container.Metadata
     if metadata = invalid then metadata = []
 
@@ -142,9 +153,20 @@ sub processApiResponse()
 
     for each item in metadata
         node = content.createChild("ContentNode")
+
+        ' Ensure ratingKey is stored as string
+        ratingKeyStr = ""
+        if item.ratingKey <> invalid
+            if type(item.ratingKey) = "roString" or type(item.ratingKey) = "String"
+                ratingKeyStr = item.ratingKey
+            else
+                ratingKeyStr = item.ratingKey.ToStr()
+            end if
+        end if
+
         node.addFields({
             title: item.title
-            ratingKey: item.ratingKey
+            ratingKey: ratingKeyStr
             itemType: item.type
             thumb: item.thumb
             viewOffset: 0
@@ -157,8 +179,6 @@ sub processApiResponse()
         ' Build poster URL
         if item.thumb <> invalid and item.thumb <> ""
             node.HDPosterUrl = BuildPosterUrl(item.thumb, c.POSTER_WIDTH, c.POSTER_HEIGHT)
-        else
-            node.HDPosterUrl = "pkg:/images/placeholder_poster.png"
         end if
     end for
 
@@ -205,7 +225,7 @@ sub cleanup()
     ' Stop running task
     if m.apiTask <> invalid
         m.apiTask.control = "stop"
-        m.apiTask.unobserveField("state")
+        m.apiTask.unobserveField("status")
     end if
 
     ' Unobserve child widgets

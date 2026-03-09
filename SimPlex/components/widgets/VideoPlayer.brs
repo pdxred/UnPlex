@@ -13,7 +13,7 @@ sub init()
 
     ' Set up API task for fetching media info
     m.apiTask = CreateObject("roSGNode", "PlexApiTask")
-    m.apiTask.observeField("state", "onApiTaskStateChange")
+    m.apiTask.observeField("status", "onApiTaskStateChange")
 
     ' Progress report timer
     m.reportTimer = CreateObject("roSGNode", "Timer")
@@ -176,7 +176,7 @@ end function
 function buildTranscodeUrl() as String
     serverUri = GetServerUri()
     token = GetAuthToken()
-    c = GetConstants()
+    c = m.global.constants
 
     url = serverUri + "/video/:/transcode/universal/start.m3u8"
     url = url + "?path=" + UrlEncode(m.top.mediaKey)
@@ -267,7 +267,7 @@ end sub
 function onKeyEvent(key as String, press as Boolean) as Boolean
     if not press then return false
 
-    c = GetConstants()
+    c = m.global.constants
 
     if key = "back"
         stopPlayback()

@@ -10,13 +10,28 @@ sub init()
 
     ' Set up API task
     m.apiTask = CreateObject("roSGNode", "PlexApiTask")
-    m.apiTask.observeField("state", "onApiTaskStateChange")
+    m.apiTask.observeField("status", "onApiTaskStateChange")
 
     ' Observe season selection
     m.seasonList.observeField("itemFocused", "onSeasonFocused")
+    m.seasonList.observeField("itemSelected", "onSeasonSelected")
 
     ' Observe episode selection
     m.episodeList.observeField("itemSelected", "onEpisodeSelected")
+
+    ' Delegate focus when screen receives focus
+    m.top.observeField("focusedChild", "onFocusChange")
+end sub
+
+sub onFocusChange(event as Object)
+    ' When EpisodeScreen is in focus chain but no child has focus, delegate
+    if m.top.isInFocusChain() and m.top.focusedChild = invalid
+        if m.focusOnSeasons
+            m.seasonList.setFocus(true)
+        else
+            m.episodeList.setFocus(true)
+        end if
+    end if
 end sub
 
 sub onRatingKeyChange(event as Object)
@@ -85,7 +100,17 @@ sub processSeasons()
     ' Load first season's episodes
     if m.seasons.count() > 0
         m.currentSeasonIndex = 0
-        loadEpisodes(m.seasons[0].ratingKey)
+        season = m.seasons[0]
+        ' Ensure ratingKey is string
+        seasonKey = ""
+        if season.ratingKey <> invalid
+            if type(season.ratingKey) = "roString" or type(season.ratingKey) = "String"
+                seasonKey = season.ratingKey
+            else
+                seasonKey = season.ratingKey.ToStr()
+            end if
+        end if
+        loadEpisodes(seasonKey)
     end if
 
     m.seasonList.setFocus(true)
@@ -102,14 +127,24 @@ sub processEpisodes()
         metadata = []
     end if
 
-    c = GetConstants()
+    c = m.global.constants
     content = CreateObject("roSGNode", "ContentNode")
 
     for each episode in metadata
         node = content.createChild("ContentNode")
+        ' Ensure ratingKey is stored as string
+        ratingKeyStr = ""
+        if episode.ratingKey <> invalid
+            if type(episode.ratingKey) = "roString" or type(episode.ratingKey) = "String"
+                ratingKeyStr = episode.ratingKey
+            else
+                ratingKeyStr = episode.ratingKey.ToStr()
+            end if
+        end if
+
         node.addFields({
             title: episode.title
-            ratingKey: episode.ratingKey
+            ratingKey: ratingKeyStr
             episodeNumber: 0
             summary: ""
             duration: 0
@@ -148,8 +183,24 @@ sub onSeasonFocused(event as Object)
     index = event.getData()
     if index >= 0 and index < m.seasons.count() and index <> m.currentSeasonIndex
         m.currentSeasonIndex = index
-        loadEpisodes(m.seasons[index].ratingKey)
+        season = m.seasons[index]
+        ' Ensure ratingKey is string
+        seasonKey = ""
+        if season.ratingKey <> invalid
+            if type(season.ratingKey) = "roString" or type(season.ratingKey) = "String"
+                seasonKey = season.ratingKey
+            else
+                seasonKey = season.ratingKey.ToStr()
+            end if
+        end if
+        loadEpisodes(seasonKey)
     end if
+end sub
+
+sub onSeasonSelected(event as Object)
+    ' When season is selected, move focus to episode list
+    m.focusOnSeasons = false
+    m.episodeList.setFocus(true)
 end sub
 
 sub onEpisodeSelected(event as Object)
@@ -162,23 +213,23 @@ sub onEpisodeSelected(event as Object)
 end sub
 
 sub startPlayback(episode as Object)
-    player = CreateObject("roSGNode", "VideoPlayer")
-    player.ratingKey = episode.ratingKey
-    player.mediaKey = "/library/metadata/" + episode.ratingKey
-    player.startOffset = episode.viewOffset
-    player.itemTitle = episode.title
-    player.observeField("playbackComplete", "onPlaybackComplete")
+    m.player = CreateObject("roSGNode", "VideoPlayer")
+    m.player.ratingKey = episode.ratingKey
+    m.player.mediaKey = "/library/metadata/" + episode.ratingKey
+    m.player.startOffset = episode.viewOffset
+    m.player.itemTitle = episode.title
+    m.player.observeField("playbackComplete", "onPlaybackComplete")
 
-    m.top.getScene().appendChild(player)
-    player.setFocus(true)
-    player.control = "play"
+    m.top.getScene().appendChild(m.player)
+    m.player.setFocus(true)
+    m.player.control = "play"
 end sub
 
 sub onPlaybackComplete(event as Object)
     ' Remove video player
-    player = m.top.getScene().findNode("VideoPlayer")
-    if player <> invalid
-        m.top.getScene().removeChild(player)
+    if m.player <> invalid
+        m.top.getScene().removeChild(m.player)
+        m.player = invalid
     end if
 
     ' TODO: Auto-play next episode with countdown
@@ -186,7 +237,16 @@ sub onPlaybackComplete(event as Object)
 
     ' Refresh episode list to update watched status
     if m.seasons.count() > m.currentSeasonIndex
-        loadEpisodes(m.seasons[m.currentSeasonIndex].ratingKey)
+        season = m.seasons[m.currentSeasonIndex]
+        seasonKey = ""
+        if season.ratingKey <> invalid
+            if type(season.ratingKey) = "roString" or type(season.ratingKey) = "String"
+                seasonKey = season.ratingKey
+            else
+                seasonKey = season.ratingKey.ToStr()
+            end if
+        end if
+        loadEpisodes(seasonKey)
     end if
 end sub
 

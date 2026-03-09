@@ -1,4 +1,7 @@
 sub init()
+    ' Cache constants in m.global for all components to access
+    m.global.addFields({ constants: GetConstants() })
+
     m.screenContainer = m.top.findNode("screenContainer")
     m.screenStack = []
     m.focusStack = []
@@ -100,11 +103,11 @@ sub autoConnectToServer(server as Object, authToken as String)
     m.connectionTask = CreateObject("roSGNode", "ServerConnectionTask")
     m.connectionTask.connections = server.connections
     m.connectionTask.authToken = authToken
-    m.connectionTask.observeField("state", "onAutoConnectState")
+    m.connectionTask.observeField("status", "onAutoConnectState")
     m.connectionTask.control = "run"
 
     ' Save server clientId while testing
-    sec = CreateObject("roRegistrySection", "PlexClassic")
+    sec = CreateObject("roRegistrySection", "SimPlex")
     sec.Write("serverClientId", server.clientId)
     sec.Flush()
 end sub
@@ -209,15 +212,11 @@ sub clearScreenStack()
 end sub
 
 sub pushScreen(screen as Object)
-    ' Store current focus position before pushing
+    ' Store current focus position before pushing (get deepest focused element)
     if m.screenStack.count() > 0
         currentScreen = m.screenStack.peek()
-        focusedNode = currentScreen.focusedChild
-        if focusedNode <> invalid
-            m.focusStack.push(focusedNode)
-        else
-            m.focusStack.push(invalid)
-        end if
+        focusedNode = getDeepFocusedChild(currentScreen)
+        m.focusStack.push(focusedNode)
         currentScreen.visible = false
     end if
 
@@ -229,6 +228,20 @@ sub pushScreen(screen as Object)
     screen.observeField("itemSelected", "onItemSelected")
     screen.observeField("navigateBack", "onNavigateBack")
 end sub
+
+function getDeepFocusedChild(node as Object) as Object
+    ' Recursively find the deepest focused element
+    if node = invalid then return invalid
+
+    child = node.focusedChild
+    if child <> invalid
+        return getDeepFocusedChild(child)
+    else if node.hasFocus()
+        return node
+    else
+        return invalid
+    end if
+end function
 
 sub popScreen()
     if m.screenStack.count() <= 1
@@ -249,7 +262,7 @@ sub popScreen()
     ' Restore focus
     if m.focusStack.count() > 0
         savedFocus = m.focusStack.pop()
-        if savedFocus <> invalid and savedFocus.isValid()
+        if savedFocus <> invalid
             savedFocus.setFocus(true)
         else
             previousScreen.setFocus(true)
