@@ -19,6 +19,14 @@ function GetConstants() as Object
         GRID_V_SPACING: 40
         FILTER_BAR_HEIGHT: 60
 
+        ' Watch State UI
+        PROGRESS_BAR_HEIGHT_POSTER: 6
+        PROGRESS_BAR_HEIGHT_EPISODE: 4
+        PROGRESS_BAR_HEIGHT_DETAIL: 8
+        PROGRESS_MIN_PERCENT: 0.05
+        BADGE_SIZE: 40
+        BADGE_SIZE_EPISODE: 28
+
         ' Plex API
         PLEX_TV_URL: "https://plex.tv"
         PLEX_PRODUCT: "SimPlex"
