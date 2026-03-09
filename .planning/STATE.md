@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: in-progress
-stopped_at: Completed 02-01 watch state indicators
-last_updated: "2026-03-09T21:49:36.000Z"
-last_activity: 2026-03-09 -- Completed 02-01 Watch state indicators
+stopped_at: Completed 02-02 resume dialog and detail enhancements
+last_updated: "2026-03-09T21:55:59.000Z"
+last_activity: 2026-03-09 -- Completed 02-02 Resume dialog and detail enhancements
 progress:
   total_phases: 10
   completed_phases: 3
   total_plans: 9
-  completed_plans: 9
-  percent: 22
+  completed_plans: 10
+  percent: 25
 ---
 
 # Project State
@@ -21,23 +21,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-08)
 
 **Core value:** Fast, intuitive library browsing and playback on a single personal Plex server
-**Current focus:** Phase 2 - Playback Foundation (Watch State Indicators)
+**Current focus:** Phase 2 - Playback Foundation (Resume Dialog & Detail Enhancements)
 
 ## Current Position
 
 Phase: 2 of 10 (Playback Foundation)
-Plan: 1 of 2 in current phase
+Plan: 2 of 2 in current phase (phase complete)
 Status: Executing
-Last activity: 2026-03-09 -- Completed 02-01 Watch state indicators
+Last activity: 2026-03-09 -- Completed 02-02 Resume dialog and detail enhancements
 
-Progress: [██░░░░░░░░] 22%
+Progress: [██░░░░░░░░] 25%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 5
-- Average duration: 3.0 min
-- Total execution time: 0.25 hours
+- Total plans completed: 6
+- Average duration: 3.2 min
+- Total execution time: 0.32 hours
 
 **By Phase:**
 
@@ -45,10 +45,10 @@ Progress: [██░░░░░░░░] 22%
 |-------|-------|-------|----------|
 | 01-infrastructure | 2 | 5 min | 2.5 min |
 | 03-navigation-framework | 2 | 7 min | 3.5 min |
-| 02-playback-foundation | 1 | 3 min | 3.0 min |
+| 02-playback-foundation | 2 | 7 min | 3.5 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-02 (3 min), 03-01 (3 min), 03-02 (4 min), 02-01 (3 min)
+- Last 5 plans: 03-01 (3 min), 03-02 (4 min), 02-01 (3 min), 02-02 (4 min)
 - Trend: Stable
 
 *Updated after each plan completion*
@@ -74,6 +74,9 @@ Recent decisions affecting current work:
 - [02-01] All accent colors reference m.global.constants.ACCENT for future theme support
 - [02-01] 5% minimum threshold for progress bar visibility
 - [02-01] Coexistence rule: progress bar and badge never appear simultaneously
+- [02-02] Resume dialog only on grid/episode list selections, detail screen uses separate buttons
+- [02-02] Optimistic UI updates for watched state (change instantly, API in background)
+- [02-02] StandardMessageDialog as MVP context menu for options key
 
 ### Pending Todos
 
@@ -87,6 +90,6 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-09
-Stopped at: Completed 02-01 Watch state indicators
+Stopped at: Completed 02-02 Resume dialog and detail enhancements
 Resume file: .planning/ROADMAP.md
 Resume command: /gsd:execute-phase 2
