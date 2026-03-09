@@ -1,0 +1,21 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "brightscript",
+      "request": "launch",
+      "name": "SimPlex: Deploy to Roku",
+      "envFile": "${workspaceFolder}/.env",
+      "host": "${env:ROKU_HOST}",
+      "password": "${env:ROKU_PASSWORD}",
+      "rootDir": "${workspaceFolder}/SimPlex",
+      "files": [
+        "manifest",
+        "source/**/*.brs",
+        "components/**/*.brs",
+        "components/**/*.xml",
+        "images/**/*"
+      ]
+    }
+  ]
+}

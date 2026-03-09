@@ -12,7 +12,8 @@ node_modules/
 nul
 
 # IDE/Editor
-.vscode/
+.vscode/*
+!.vscode/launch.json
 *.swp
 *.swo
 *~

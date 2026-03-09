@@ -1,0 +1,20 @@
+{
+  "$schema": "https://raw.githubusercontent.com/rokucommunity/brighterscript/master/bsconfig.schema.json",
+  "rootDir": "SimPlex",
+  "stagingDir": "out/staging",
+  "retainStagingDir": false,
+  "sourceMap": true,
+  "files": [
+    "manifest",
+    "source/**/*.brs",
+    "components/**/*.brs",
+    "components/**/*.xml",
+    "images/**/*"
+  ],
+  "diagnosticFilters": [
+    {
+      "src": "**/*.brs",
+      "codes": [1105, 1045, 1140]
+    }
+  ]
+}
