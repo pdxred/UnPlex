@@ -426,11 +426,175 @@ sub onGridItemSelected(event as Object)
     content = m.posterGrid.content
     if content <> invalid and index >= 0 and index < content.getChildCount()
         item = content.getChild(index)
+        c = m.global.constants
+
+        ' Check if partially watched (viewOffset > 0 and >= 5% progress)
+        if item.viewOffset > 0 and item.duration > 0
+            progress = item.viewOffset / item.duration
+            if progress >= c.PROGRESS_MIN_PERCENT
+                showResumeDialog(item)
+                return
+            end if
+        end if
+
         m.top.itemSelected = {
             action: "detail"
             ratingKey: item.ratingKey
             itemType: item.itemType
         }
+    end if
+end sub
+
+' ========== Resume Dialog ==========
+
+sub showResumeDialog(item as Object)
+    m.pendingPlayItem = item
+    m.pendingFocusTarget = "grid"
+
+    resumeTime = FormatTime(item.viewOffset)
+
+    dialog = CreateObject("roSGNode", "StandardMessageDialog")
+    dialog.title = item.title
+    dialog.message = ["Resume from " + resumeTime + "?"]
+    dialog.buttons = ["Resume from " + resumeTime, "Start from Beginning", "Go to Details"]
+    dialog.observeField("buttonSelected", "onResumeDialogButton")
+    dialog.observeField("wasClosed", "onResumeDialogClosed")
+    m.top.getScene().dialog = dialog
+end sub
+
+sub onResumeDialogButton(event as Object)
+    index = event.getData()
+    m.top.getScene().dialog.close = true
+
+    if index = 0
+        ' Resume from last position
+        startPlaybackFromGrid(m.pendingPlayItem, m.pendingPlayItem.viewOffset)
+    else if index = 1
+        ' Start from beginning
+        startPlaybackFromGrid(m.pendingPlayItem, 0)
+    else if index = 2
+        ' Go to detail screen
+        m.top.itemSelected = {
+            action: "detail"
+            ratingKey: m.pendingPlayItem.ratingKey
+            itemType: m.pendingPlayItem.itemType
+        }
+    end if
+end sub
+
+sub onResumeDialogClosed(event as Object)
+    restoreFocusAfterDialog()
+end sub
+
+sub startPlaybackFromGrid(item as Object, offset as Integer)
+    m.player = CreateObject("roSGNode", "VideoPlayer")
+    m.player.ratingKey = item.ratingKey
+    m.player.mediaKey = "/library/metadata/" + item.ratingKey
+    m.player.startOffset = offset
+    m.player.itemTitle = item.title
+    m.player.observeField("playbackComplete", "onGridPlaybackComplete")
+
+    m.top.getScene().appendChild(m.player)
+    m.player.setFocus(true)
+    m.player.control = "play"
+end sub
+
+sub onGridPlaybackComplete(event as Object)
+    if m.player <> invalid
+        m.top.getScene().removeChild(m.player)
+        m.player = invalid
+    end if
+
+    ' Restore focus to grid
+    m.posterGrid.setFocus(true)
+
+    ' Refresh hub data and library to update watch states
+    loadHubs()
+    if m.currentSectionId <> "" and m.viewMode = "libraryOnly"
+        m.currentOffset = 0
+        loadLibrary()
+    end if
+end sub
+
+' ========== Options Key Context Menu ==========
+
+sub showOptionsMenu(item as Object)
+    m.pendingOptionsItem = item
+
+    dialog = CreateObject("roSGNode", "StandardMessageDialog")
+    dialog.title = item.title
+
+    ' Determine watched label based on item type and state
+    watchedLabel = ""
+    if item.viewCount <> invalid and item.viewCount > 0
+        if item.itemType = "show"
+            watchedLabel = "Mark Show as Unwatched"
+        else
+            watchedLabel = "Mark as Unwatched"
+        end if
+    else
+        if item.itemType = "show"
+            watchedLabel = "Mark Show as Watched"
+        else
+            watchedLabel = "Mark as Watched"
+        end if
+    end if
+
+    dialog.buttons = [watchedLabel, "Cancel"]
+    dialog.observeField("buttonSelected", "onOptionsMenuButton")
+    dialog.observeField("wasClosed", "onOptionsMenuClosed")
+    m.top.getScene().dialog = dialog
+end sub
+
+sub onOptionsMenuButton(event as Object)
+    index = event.getData()
+    m.top.getScene().dialog.close = true
+
+    if index = 0
+        ' Toggle watched state
+        item = m.pendingOptionsItem
+        if item.viewCount <> invalid and item.viewCount > 0
+            ' Mark as unwatched - optimistic update
+            item.viewCount = 0
+            item.viewOffset = 0
+            fireScrobbleApi(item.ratingKey, false)
+        else
+            ' Mark as watched - optimistic update
+            item.viewCount = 1
+            item.viewOffset = 0
+            fireScrobbleApi(item.ratingKey, true)
+        end if
+
+        ' Force grid re-render by re-assigning content
+        m.posterGrid.content = m.posterGrid.content
+    end if
+
+    restoreFocusAfterDialog()
+end sub
+
+sub onOptionsMenuClosed(event as Object)
+    restoreFocusAfterDialog()
+end sub
+
+sub fireScrobbleApi(ratingKey as String, watched as Boolean)
+    task = CreateObject("roSGNode", "PlexApiTask")
+    if watched
+        task.endpoint = "/:/scrobble"
+    else
+        task.endpoint = "/:/unscrobble"
+    end if
+    task.params = {
+        "identifier": "com.plexapp.plugins.library"
+        "key": ratingKey
+    }
+    task.control = "run"
+end sub
+
+sub restoreFocusAfterDialog()
+    if m.focusArea = "hubs"
+        m.hubRowList.setFocus(true)
+    else
+        m.posterGrid.setFocus(true)
     end if
 end sub
 
@@ -534,6 +698,33 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
                 m.focusArea = "grid"
                 m.posterGrid.setFocus(true)
                 return true
+            end if
+        end if
+    else if key = "options"
+        ' Show context menu for focused grid item
+        if m.focusArea = "grid"
+            gridNode = m.posterGrid.findNode("grid")
+            if gridNode <> invalid
+                focusedIndex = gridNode.itemFocused
+                content = m.posterGrid.content
+                if content <> invalid and focusedIndex >= 0 and focusedIndex < content.getChildCount()
+                    item = content.getChild(focusedIndex)
+                    showOptionsMenu(item)
+                    return true
+                end if
+            end if
+        else if m.focusArea = "hubs"
+            ' Get focused hub row item
+            focusedInfo = m.hubRowList.rowItemFocused
+            if focusedInfo <> invalid
+                rowContent = m.hubRowList.content.getChild(focusedInfo[0])
+                if rowContent <> invalid
+                    itemContent = rowContent.getChild(focusedInfo[1])
+                    if itemContent <> invalid
+                        showOptionsMenu(itemContent)
+                        return true
+                    end if
+                end if
             end if
         end if
     else if key = "back"

@@ -219,15 +219,124 @@ sub onEpisodeSelected(event as Object)
     content = m.episodeList.content
     if content <> invalid and index >= 0 and index < content.getChildCount()
         episode = content.getChild(index)
-        startPlayback(episode)
+        c = m.global.constants
+
+        ' Check if partially watched (viewOffset > 0 and >= 5% progress)
+        if episode.viewOffset > 0 and episode.duration > 0
+            progress = episode.viewOffset / episode.duration
+            if progress >= c.PROGRESS_MIN_PERCENT
+                showResumeDialog(episode)
+                return
+            end if
+        end if
+
+        startPlayback(episode, episode.viewOffset)
     end if
 end sub
 
-sub startPlayback(episode as Object)
+' ========== Resume Dialog ==========
+
+sub showResumeDialog(episode as Object)
+    m.pendingPlayItem = episode
+
+    resumeTime = FormatTime(episode.viewOffset)
+
+    dialog = CreateObject("roSGNode", "StandardMessageDialog")
+    dialog.title = episode.title
+    dialog.message = ["Resume from " + resumeTime + "?"]
+    dialog.buttons = ["Resume from " + resumeTime, "Start from Beginning", "Go to Details"]
+    dialog.observeField("buttonSelected", "onResumeDialogButton")
+    dialog.observeField("wasClosed", "onResumeDialogClosed")
+    m.top.getScene().dialog = dialog
+end sub
+
+sub onResumeDialogButton(event as Object)
+    index = event.getData()
+    m.top.getScene().dialog.close = true
+
+    if index = 0
+        ' Resume from last position
+        startPlayback(m.pendingPlayItem, m.pendingPlayItem.viewOffset)
+    else if index = 1
+        ' Start from beginning
+        startPlayback(m.pendingPlayItem, 0)
+    else if index = 2
+        ' Go to detail screen
+        m.top.itemSelected = {
+            action: "detail"
+            ratingKey: m.pendingPlayItem.ratingKey
+            itemType: "episode"
+        }
+    end if
+end sub
+
+sub onResumeDialogClosed(event as Object)
+    m.episodeList.setFocus(true)
+end sub
+
+' ========== Options Key Context Menu ==========
+
+sub showEpisodeOptionsMenu(episode as Object)
+    m.pendingOptionsItem = episode
+
+    dialog = CreateObject("roSGNode", "StandardMessageDialog")
+    dialog.title = episode.title
+
+    if episode.viewCount <> invalid and episode.viewCount > 0
+        watchedLabel = "Mark as Unwatched"
+    else
+        watchedLabel = "Mark as Watched"
+    end if
+
+    dialog.buttons = [watchedLabel, "Cancel"]
+    dialog.observeField("buttonSelected", "onEpisodeOptionsButton")
+    dialog.observeField("wasClosed", "onEpisodeOptionsClosed")
+    m.top.getScene().dialog = dialog
+end sub
+
+sub onEpisodeOptionsButton(event as Object)
+    index = event.getData()
+    m.top.getScene().dialog.close = true
+
+    if index = 0
+        ' Toggle watched state
+        episode = m.pendingOptionsItem
+        task = CreateObject("roSGNode", "PlexApiTask")
+        if episode.viewCount <> invalid and episode.viewCount > 0
+            ' Mark as unwatched - optimistic update
+            episode.viewCount = 0
+            episode.viewOffset = 0
+            episode.watched = false
+            task.endpoint = "/:/unscrobble"
+        else
+            ' Mark as watched - optimistic update
+            episode.viewCount = 1
+            episode.viewOffset = 0
+            episode.watched = true
+            task.endpoint = "/:/scrobble"
+        end if
+        task.params = {
+            "identifier": "com.plexapp.plugins.library"
+            "key": episode.ratingKey
+        }
+        task.control = "run"
+
+        ' Force episode list re-render
+        m.episodeList.content = m.episodeList.content
+    end if
+
+    m.episodeList.setFocus(true)
+end sub
+
+sub onEpisodeOptionsClosed(event as Object)
+    m.episodeList.setFocus(true)
+end sub
+
+sub startPlayback(episode as Object, offset as Integer)
     m.player = CreateObject("roSGNode", "VideoPlayer")
     m.player.ratingKey = episode.ratingKey
     m.player.mediaKey = "/library/metadata/" + episode.ratingKey
-    m.player.startOffset = episode.viewOffset
+    m.player.startOffset = offset
     m.player.itemTitle = episode.title
     m.player.observeField("playbackComplete", "onPlaybackComplete")
 
@@ -283,6 +392,15 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
         m.focusOnSeasons = true
         m.seasonList.setFocus(true)
         return true
+    else if key = "options" and not m.focusOnSeasons
+        ' Show context menu for focused episode
+        focusedIndex = m.episodeList.itemFocused
+        content = m.episodeList.content
+        if content <> invalid and focusedIndex >= 0 and focusedIndex < content.getChildCount()
+            episode = content.getChild(focusedIndex)
+            showEpisodeOptionsMenu(episode)
+            return true
+        end if
     end if
 
     return false
