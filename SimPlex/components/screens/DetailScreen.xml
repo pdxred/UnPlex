@@ -5,6 +5,7 @@
         <field id="itemType" type="string" />
         <field id="itemSelected" type="assocarray" alwaysNotify="true" />
         <field id="navigateBack" type="boolean" alwaysNotify="true" />
+        <field id="watchStateChanged" type="assocarray" alwaysNotify="true" />
     </interface>
 
     <script type="text/brightscript" uri="pkg:/source/utils.brs" />
@@ -60,9 +61,33 @@
                 maxLines="8"
             />
         </Group>
+        <Group id="progressGroup" translation="[540, 700]">
+            <Rectangle
+                id="detailProgressTrack"
+                width="400"
+                height="8"
+                color="0xFFFFFF33"
+                visible="false"
+            />
+            <Rectangle
+                id="detailProgressFill"
+                width="0"
+                height="8"
+                color="0xE5A00DFF"
+                visible="false"
+            />
+            <Label
+                id="remainingLabel"
+                translation="[0, 16]"
+                font="font:SmallSystemFont"
+                color="0xA0A0B0FF"
+                visible="false"
+                width="400"
+            />
+        </Group>
         <ButtonGroup
             id="buttonGroup"
-            translation="[540, 750]"
+            translation="[540, 760]"
             buttons="[]"
         />
         <LoadingSpinner

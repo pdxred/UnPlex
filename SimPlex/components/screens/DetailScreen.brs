@@ -8,6 +8,12 @@ sub init()
     m.buttonGroup = m.top.findNode("buttonGroup")
     m.loadingSpinner = m.top.findNode("loadingSpinner")
 
+    ' Progress bar nodes
+    m.detailProgressTrack = m.top.findNode("detailProgressTrack")
+    m.detailProgressFill = m.top.findNode("detailProgressFill")
+    m.remainingLabel = m.top.findNode("remainingLabel")
+
+    m.constants = m.global.constants
     m.itemData = invalid
     m.viewOffset = 0
     m.buttonActions = []
@@ -127,7 +133,6 @@ sub processMetadata()
     end if
 
     ' Set poster
-    c = m.global.constants
     if item.thumb <> invalid and item.thumb <> ""
         m.poster.uri = BuildPosterUrl(item.thumb, 400, 600)
     end if
@@ -139,9 +144,42 @@ sub processMetadata()
         m.viewOffset = 0
     end if
 
+    ' Update progress bar and remaining time
+    updateDetailProgress()
+
     ' Build buttons based on item type
     buildButtons()
     m.buttonGroup.setFocus(true)
+end sub
+
+sub updateDetailProgress()
+    ' Hide everything by default
+    m.detailProgressTrack.visible = false
+    m.detailProgressFill.visible = false
+    m.remainingLabel.visible = false
+
+    if m.itemData = invalid then return
+    if m.itemData.duration = invalid or m.itemData.duration <= 0 then return
+    if m.viewOffset <= 0 then return
+
+    progress = m.viewOffset / m.itemData.duration
+    if progress < m.constants.PROGRESS_MIN_PERCENT then return
+
+    ' Show progress bar
+    m.detailProgressTrack.visible = true
+    m.detailProgressFill.visible = true
+    m.detailProgressFill.width = Int(400 * progress)
+    m.detailProgressFill.color = m.constants.ACCENT
+
+    ' Calculate remaining time
+    remainingMs = m.itemData.duration - m.viewOffset
+    remainingMin = remainingMs \ 60000
+    if remainingMin < 1
+        m.remainingLabel.text = "Less than 1 min remaining"
+    else
+        m.remainingLabel.text = remainingMin.ToStr() + " min remaining"
+    end if
+    m.remainingLabel.visible = true
 end sub
 
 sub buildButtons()
@@ -155,13 +193,16 @@ sub buildButtons()
         m.buttonActions.push("browseSeasons")
     else
         ' Movie or episode - play buttons
-        buttons.push("Play")
-        m.buttonActions.push("play")
-
+        ' Resume appears FIRST when partially watched
         if m.viewOffset > 0
             resumeTime = FormatTime(m.viewOffset)
             buttons.push("Resume from " + resumeTime)
             m.buttonActions.push("resume")
+            buttons.push("Play from Beginning")
+            m.buttonActions.push("play")
+        else
+            buttons.push("Play")
+            m.buttonActions.push("play")
         end if
     end if
 
@@ -225,11 +266,30 @@ sub onPlaybackComplete(event as Object)
         m.player = invalid
     end if
     m.buttonGroup.setFocus(true)
-    ' Refresh to update watched status
+    ' Refresh to update watched status after playback
     loadMetadata(m.top.ratingKey)
 end sub
 
 sub markAsWatched()
+    ' Optimistic update: change UI immediately
+    m.itemData.viewCount = 1
+    m.viewOffset = 0
+    m.itemData.viewOffset = 0
+
+    ' Hide progress bar and remaining time
+    updateDetailProgress()
+
+    ' Rebuild buttons (will now show "Play" instead of "Resume")
+    buildButtons()
+
+    ' Propagate watch state change to parent screen
+    m.top.watchStateChanged = {
+        ratingKey: getRatingKeyString(m.itemData.ratingKey)
+        viewCount: 1
+        viewOffset: 0
+    }
+
+    ' Fire API call
     task = CreateObject("roSGNode", "PlexApiTask")
     task.endpoint = "/:/scrobble"
     task.params = {
@@ -238,9 +298,24 @@ sub markAsWatched()
     }
     task.control = "run"
     task.observeField("status", "onWatchedStateChange")
+    m.watchedTask = task
 end sub
 
 sub markAsUnwatched()
+    ' Optimistic update: change UI immediately
+    m.itemData.viewCount = 0
+
+    ' Rebuild buttons (will now show "Mark as Watched" instead of "Mark as Unwatched")
+    buildButtons()
+
+    ' Propagate watch state change to parent screen
+    m.top.watchStateChanged = {
+        ratingKey: getRatingKeyString(m.itemData.ratingKey)
+        viewCount: 0
+        viewOffset: m.viewOffset
+    }
+
+    ' Fire API call
     task = CreateObject("roSGNode", "PlexApiTask")
     task.endpoint = "/:/unscrobble"
     task.params = {
@@ -249,6 +324,7 @@ sub markAsUnwatched()
     }
     task.control = "run"
     task.observeField("status", "onWatchedStateChange")
+    m.watchedTask = task
 end sub
 
 function getRatingKeyString(ratingKey as Dynamic) as String
@@ -262,10 +338,11 @@ end function
 
 sub onWatchedStateChange(event as Object)
     status = event.getData()
-    if status = "completed"
-        ' Refresh metadata to update button
-        loadMetadata(m.top.ratingKey)
+    if status = "error"
+        ' Show brief error - optimistic update already applied
+        showError("Failed to update watch state. Changes may not be saved.")
     end if
+    ' On success, do nothing - optimistic update already applied
 end sub
 
 sub showError(message as String)
