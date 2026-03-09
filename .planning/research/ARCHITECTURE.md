@@ -1,669 +1,534 @@
-# Architecture Research: Roku Plex Client
+# Architecture Patterns
 
-**Domain:** Roku SceneGraph Media Browsing/Playback Application
-**Researched:** 2026-02-09
-**Confidence:** HIGH
+**Domain:** Roku Plex Media Client (scaling from ~20 to ~40+ components)
+**Researched:** 2026-03-08
 
-## Standard Architecture
+## Recommended Architecture
 
-### System Overview
+**Stay with enhanced MVC + Observer pattern. Do NOT migrate to Maestro MVVM.**
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         UI Layer (Render Thread)                     │
-├─────────────────────────────────────────────────────────────────────┤
-│  ┌──────────┐                                                        │
-│  │MainScene │  Screen Stack Manager                                 │
-│  └────┬─────┘                                                        │
-│       │                                                              │
-│  ┌────┴──────┬──────────┬──────────┬──────────┬──────────┐         │
-│  │           │          │          │          │          │          │
-│  │HomeScreen │ Detail   │ Episodes │ Search   │ Settings │ ...      │
-│  │           │ Screen   │ Screen   │ Screen   │ Screen   │          │
-│  └─────┬─────┴────┬─────┴────┬─────┴────┬─────┴────┬─────┘         │
-│        │          │          │          │          │                │
-│  ┌─────┴──────────┴──────────┴──────────┴──────────┴─────┐         │
-│  │     Shared Widgets (Sidebar, PosterGrid, etc.)        │         │
-│  └────────────────────────────┬───────────────────────────┘         │
-│                               │ observeField()                      │
-├───────────────────────────────┼─────────────────────────────────────┤
-│         Task Layer (Background Threads - Max 100)                   │
-├───────────────────────────────┴─────────────────────────────────────┤
-│  ┌───────────┐  ┌──────────┐  ┌────────────┐  ┌─────────────┐     │
-│  │ PlexAuth  │  │ PlexAPI  │  │ PlexSearch │  │ PlexSession │     │
-│  │   Task    │  │   Task   │  │    Task    │  │    Task     │     │
-│  └─────┬─────┘  └────┬─────┘  └──────┬─────┘  └──────┬──────┘     │
-│        │             │               │               │             │
-│        └─────────────┴───────────────┴───────────────┘             │
-│                              │                                      │
-│                    roUrlTransfer (HTTPS)                            │
-├──────────────────────────────┴──────────────────────────────────────┤
-│                     External Services                                │
-│              Plex Media Server API + plex.tv                         │
-└──────────────────────────────────────────────────────────────────────┘
-```
+The existing architecture is sound and follows Roku-idiomatic patterns. The codebase already has clean separation: MainScene as controller, screens as views, tasks as I/O layer, normalizers as data transform layer. Maestro MVVM adds BrighterScript compilation, IOC containers, and binding syntax that increase build complexity and learning curve with limited benefit for a single-developer sideloaded channel. The ~20 existing components would need full rewrites. The ROI is negative for this project's scope.
 
-### Component Responsibilities
+Instead, invest in three targeted architectural improvements: (1) a centralized API service layer, (2) media-type-polymorphic screen design, and (3) a task pool for reuse.
 
-| Component | Responsibility | Typical Implementation |
-|-----------|----------------|------------------------|
-| **MainScene** | Root scene, screen stack management, global state initialization | Single SceneGraph Group node with screen array, back button handling |
-| **Screen Components** | Full-screen views (Home, Detail, Episodes, Search, Settings) | SceneGraph Group nodes with focused state, key event handling, screen-specific layouts |
-| **Widget Components** | Reusable UI elements (Sidebar, PosterGrid, VideoPlayer, FilterBar) | SceneGraph components with interface fields for data binding |
-| **Task Nodes** | Background HTTP operations, API communication, data transformation | SceneGraph Task nodes extending Task base class, run in separate threads |
-| **Utility Layer** | Shared helpers (auth tokens, URL building, header generation) | BrightScript .brs files in source/ directory with namespace functions |
-| **Global State** | App-wide shared state (auth token, server URL, user preferences) | m.global node with custom fields, accessed via m.global.fieldName |
-
-## Recommended Project Structure
+### System Diagram
 
 ```
-PlexClassic/
-├── manifest                    # App metadata, SceneGraph version (RSG 1.3 required by Oct 2026)
-├── source/                     # BrightScript utility files (render thread)
-│   ├── main.brs               # Entry point - creates MainScene, message loop
-│   ├── utils.brs              # Shared helpers (GetPlexHeaders, BuildPlexUrl, etc.)
-│   └── constants.brs          # Colors, sizes, API endpoints
-├── components/                 # SceneGraph components (.xml + .brs pairs)
-│   ├── MainScene.xml          # Root scene
-│   ├── MainScene.brs          # Screen stack logic, navigation
-│   ├── screens/               # Full-screen views
-│   │   ├── HomeScreen.xml/.brs
-│   │   ├── DetailScreen.xml/.brs
-│   │   ├── EpisodesScreen.xml/.brs
-│   │   ├── SearchScreen.xml/.brs
-│   │   └── SettingsScreen.xml/.brs
-│   ├── widgets/               # Reusable UI components
-│   │   ├── Sidebar.xml/.brs
-│   │   ├── PosterGrid.xml/.brs
-│   │   ├── VideoPlayer.xml/.brs
-│   │   └── FilterBar.xml/.brs
-│   └── tasks/                 # Background Task nodes
-│       ├── PlexAuthTask.xml/.brs      # PIN auth + server discovery
-│       ├── PlexApiTask.xml/.brs       # General API requests
-│       ├── PlexSearchTask.xml/.brs    # Search with debouncing
-│       ├── PlexSessionTask.xml/.brs   # Playback progress reporting
-│       └── ImageCacheTask.xml/.brs    # Poster prefetching
-└── images/                     # App icons, splash, placeholders
-    ├── splash_hd.jpg
-    ├── mm_icon_focus_hd.png
-    └── poster_placeholder.png
++----------------------------------------------------------+
+|  MainScene (Controller / Router)                          |
+|  - Screen stack management                                |
+|  - Navigation routing (onItemSelected dispatcher)         |
+|  - Auth flow orchestration                                |
+|  - Global state coordination                              |
++--+-------+-------+-------+-------+-------+-------+-------+
+   |       |       |       |       |       |       |
+   v       v       v       v       v       v       v
++------+ +------+ +------+ +------+ +------+ +------+ +------+
+| Home | |Detail| |Episo.| |Search| |Music | |Photo | |LiveTV|
+|Screen| |Screen| |Screen| |Screen| |Screen| |Screen| |Guide |
++--+---+ +--+---+ +--+---+ +--+---+ +--+---+ +--+---+ +--+---+
+   |         |         |         |         |         |       |
+   v         v         v         v         v         v       v
++--------------------------------------------------------------+
+|  Widgets Layer                                                |
+|  Sidebar | PosterGrid | MediaRow | VideoPlayer | MusicPlayer |
+|  FilterBar | EpisodeItem | TrackList | PhotoViewer | EPGGrid |
+|  SubtitleOverlay | PlaybackOverlay | NowPlayingBar           |
++--------------------------------------------------------------+
+   |         |         |         |
+   v         v         v         v
++--------------------------------------------------------------+
+|  API Service Layer (source/api/)                              |
+|  PlexApiService.brs  - endpoint builders, response routing    |
+|  PlexPlaybackService.brs - playback URL construction          |
+|  PlexMediaService.brs - media type detection, codec checks    |
++--------------------------------------------------------------+
+   |
+   v
++--------------------------------------------------------------+
+|  Task Layer (components/tasks/)                               |
+|  PlexApiTask (pooled, reused) | PlexSessionTask               |
+|  PlexSearchTask | PlexAuthTask | ServerConnectionTask         |
++--------------------------------------------------------------+
+   |
+   v
++--------------------------------------------------------------+
+|  Data Layer (source/)                                         |
+|  normalizers.brs  - JSON to ContentNode transforms            |
+|  utils.brs        - auth, headers, URL builders               |
+|  constants.brs    - all magic numbers and config              |
+|  capabilities.brs - server feature detection                  |
+|  logger.brs       - structured logging                        |
++--------------------------------------------------------------+
+   |
+   v
++--------------------------------------------------------------+
+|  Persistence Layer                                            |
+|  roRegistrySection("SimPlex") - auth, server, user prefs      |
++--------------------------------------------------------------+
 ```
 
-### Structure Rationale
+### Component Boundaries
 
-- **source/ for utilities**: BrightScript files here are loaded on the render thread at startup. Use for stateless helper functions only (no HTTP operations).
-- **components/ organized by role**: Screens vs widgets vs tasks creates clear boundaries. Screens are full-screen views, widgets are reusable, tasks are background workers.
-- **XML + BRS pairs**: Every SceneGraph component consists of `.xml` (layout + interface) and `.brs` (logic). Keep them adjacent for maintainability.
-- **tasks/ directory isolation**: Makes it obvious which components run in background threads. Critical for avoiding render thread blocking.
+| Component | Responsibility | Communicates With | Data Direction |
+|-----------|---------------|-------------------|----------------|
+| **MainScene** | Screen lifecycle, navigation stack, auth routing, global state | All screens (creates/destroys), m.global | Downward: pushes screen params. Upward: observes `itemSelected`, `navigateBack` |
+| **Screens** | Full-screen UI for one feature. Own their child widgets and task instances | MainScene (via interface fields), widgets (via child nodes), tasks (via observer) | Down to widgets: sets `.content`, calls functions. Up to MainScene: sets `itemSelected` |
+| **Widgets** | Reusable UI building blocks. Stateless where possible | Parent screen (via interface fields) | Up: fires events (`itemSelected`, `loadMore`). Down: receives `.content` ContentNode |
+| **Tasks** | Background HTTP I/O exclusively. No UI references | Screens/widgets (via field observers), utils.brs | In: `endpoint`, `params`. Out: `status`, `response`, `error` |
+| **Normalizers** | Transform raw JSON to ContentNode trees | Called by screens after task completion | In: JSON array. Out: ContentNode tree |
+| **Utils/Services** | Shared helper functions included via `<script>` | Available to all components that include them | Stateless function calls |
 
-## Architectural Patterns
+### Communication Rules
 
-### Pattern 1: Screen Stack Navigation
+1. **Screens to MainScene**: Always via `itemSelected` (assocarray with `action` field) or `navigateBack` (boolean). Never call MainScene methods directly.
+2. **Widgets to Screens**: Via observable interface fields defined in widget XML. Never reference parent screen.
+3. **Tasks to Screens**: Via `status` field observer. Task sets `status = "completed"` or `"error"`, screen reads `response`/`error` fields.
+4. **Cross-screen communication**: Via `m.global` fields only (e.g., `authRequired`, current user context). Keep this minimal.
+5. **No Task-to-Task communication**: All task coordination flows through the render thread.
 
-**What:** MainScene maintains an array of screen component nodes. Pushing/popping this stack handles navigation and back button behavior.
+## Data Flow for New Features
 
-**When to use:** All multi-screen Roku apps. Roku has no built-in back stack like Android/iOS, so manual implementation is required.
+### Hub Rows (Continue Watching, Recently Added)
 
-**Trade-offs:**
-- **Pros:** Full control over navigation flow, focus restoration, screen lifecycle
-- **Cons:** More code than platform-provided navigation, must handle memory cleanup manually
+```
+HomeScreen.init()
+  -> fetch /hubs via PlexApiTask
+  -> onHubsLoaded(): for each hub in response
+     -> create MediaRow widget
+     -> set MediaRow.content = NormalizeHubRow(hub.Metadata)
+     -> MediaRow handles horizontal scroll internally
+  -> MediaRow.itemSelected fires -> HomeScreen routes to detail
+```
+
+**Key decision:** Hub rows load as a single batch request to `/hubs`, not individual requests per hub. This minimizes task thread round-trips. The response contains multiple hub sections; normalize each into a separate ContentNode tree and assign to individual MediaRow widgets.
+
+### Subtitle and Audio Track Selection
+
+```
+VideoPlayer receives media metadata (already fetched)
+  -> processMediaInfo() extracts Stream[] from Part[0]
+  -> Filter streams by streamType: 1=video, 2=audio, 3=subtitle
+  -> Store in m.audioStreams[], m.subtitleStreams[]
+
+User presses * (options) during playback
+  -> Show PlaybackOverlay widget (new)
+  -> PlaybackOverlay displays audio/subtitle track lists
+  -> User selects track -> PlaybackOverlay.trackSelected fires
+  -> VideoPlayer sets subtitle/audio via:
+     - Embedded: m.video.globalCaptionMode / subtitleTrack
+     - Sidecar SRT: fetch via PlexApiTask, inject into ContentNode
+     - Burn-in: rebuild transcode URL with subtitleStreamID param
+```
+
+**Important:** Roku's built-in `Video` node supports embedded SRT/WebVTT subtitles natively. For ASS/SSA or PGS image-based subtitles, the only option is server-side burn-in via Plex transcode. Do NOT attempt to render these client-side.
+
+### Music Playback
+
+```
+MusicScreen (new)
+  -> Sidebar shows music libraries (type="artist" from /library/sections)
+  -> Browse: /library/sections/{id}/all -> NormalizeArtistList()
+  -> ArtistScreen -> /library/metadata/{id}/children -> NormalizeAlbumList()
+  -> AlbumScreen -> /library/metadata/{id}/children -> NormalizeTrackList()
+
+MusicPlayer (new widget, distinct from VideoPlayer)
+  -> Uses roAudioPlayer (NOT roVideo) for audio-only content
+  -> Manages play queue as ContentNode array
+  -> NowPlayingBar (persistent widget in MainScene, not screen-scoped)
+     -> Visible during music playback across all screens
+     -> Shows track info, play/pause, progress
+     -> Communicates with MusicPlayer via m.global fields
+```
+
+**Critical:** MusicPlayer must be a separate widget from VideoPlayer. `roVideo` works for music but wastes GPU resources. Audio playback also needs queue management (next/previous/shuffle/repeat) which is fundamentally different from video's single-item model. The NowPlayingBar must live in MainScene (outside screen stack) so it persists across screen navigation.
+
+### Live TV and DVR
+
+```
+LiveTVScreen (new)
+  -> Fetch /tv.plex.provider.epg/grid via PlexApiTask
+  -> EPGGrid (new widget): time-based grid, channels on Y, time on X
+  -> Channel select -> tune via /livetv/sessions (transcode-only, HLS)
+  -> DVR: /media/subscriptions for recordings list -> standard grid browse
+
+EPGGrid considerations:
+  -> Large dataset: 100+ channels x 24 hours = 2400+ cells
+  -> Must virtualize: only render visible portion
+  -> Use Timer to shift grid as time progresses
+  -> Roku MarkupGrid can handle this with careful ContentNode management
+```
+
+**Build order implication:** Live TV is the most complex new media type. It requires a custom EPGGrid widget that nothing else uses. Defer to a late phase.
+
+### Photos
+
+```
+PhotoScreen (new)
+  -> Browse: standard grid (reuse PosterGrid with different aspect ratio)
+  -> Full-screen viewer: single Poster node, scaled to fit
+  -> Slideshow: Timer-driven advancement through photo list
+  -> No playback state management needed (simplest media type)
+```
+
+### Managed Users
+
+```
+UserPickerScreen (new, shown after server connection)
+  -> Fetch /api/v2/home/users via PlexApiTask (plex.tv endpoint)
+  -> Display user avatars in grid
+  -> If user has PIN: show PINDialog (numeric keypad widget)
+  -> On user selected: switch X-Plex-Token to user-specific token
+  -> Store selected user in registry
+  -> m.global.currentUser field for cross-component access
+```
+
+**Data flow impact:** Managed users change the auth token used for all API requests. `GetPlexHeaders()` in utils.brs must read the current user's token, not just the admin token. This is a cross-cutting concern that affects every API call.
+
+## Patterns to Follow
+
+### Pattern 1: Task Node Pooling
+
+**What:** Reuse task nodes instead of creating new ones for each request.
+
+**When:** Any screen that makes multiple sequential API calls (most screens).
+
+**Why:** Creating a new `roSGNode("PlexApiTask")` allocates memory for the node, its fields, and its thread. Roku's garbage collection is not aggressive. Reusing tasks avoids this churn.
+
+**Current state:** HomeScreen already does this correctly (creates `m.apiTask` once in `init()` and reuses). VideoPlayer creates a fire-and-forget task for scrobble. The scrobble pattern is acceptable for one-shot calls but should not be the default.
 
 **Example:**
 ```brightscript
-' MainScene.brs
-sub pushScreen(screenType as string, params = {} as object)
-    screen = createObject("roSGNode", screenType)
-    for each key in params
-        screen[key] = params[key]
-    end for
-
-    ' Hide current screen if exists
-    if m.screenStack.count() > 0
-        m.screenStack.peek().visible = false
-    end if
-
-    m.screenStack.push(screen)
-    m.top.appendChild(screen)
-    screen.setFocus(true)
-end sub
-
-sub popScreen()
-    if m.screenStack.count() > 1
-        oldScreen = m.screenStack.pop()
-        m.top.removeChild(oldScreen)
-
-        ' Restore focus to previous screen
-        currentScreen = m.screenStack.peek()
-        currentScreen.visible = true
-        currentScreen.setFocus(true)
-    end if
-end sub
-
-function onKeyEvent(key as string, press as boolean) as boolean
-    if press and key = "back"
-        popScreen()
-        return true ' Consume event
-    end if
-    return false ' Allow propagation
-end function
-```
-
-### Pattern 2: Task Node Communication (Observer Pattern)
-
-**What:** UI components create Task nodes, observe their output fields, then trigger execution. Task nodes fetch data asynchronously and update observable fields when complete.
-
-**When to use:** All HTTP requests, any operation taking >16ms (one frame at 60fps). Roku's render thread MUST remain responsive.
-
-**Trade-offs:**
-- **Pros:** Non-blocking UI, avoids rendezvous crashes, follows Roku best practices
-- **Cons:** More verbose than synchronous code, requires field observer setup/cleanup
-
-**Example:**
-```brightscript
-' HomeScreen.brs
+' GOOD: Reuse task (already done in HomeScreen)
 sub init()
-    m.apiTask = createObject("roSGNode", "PlexApiTask")
-    m.apiTask.observeField("content", "onContentLoaded")
-    m.apiTask.observeField("error", "onApiError")
+    m.apiTask = CreateObject("roSGNode", "PlexApiTask")
+    m.apiTask.observeField("status", "onApiTaskStateChange")
 end sub
 
-sub loadLibrary(sectionId as integer)
-    m.apiTask.endpoint = "/library/sections/" + sectionId.toStr() + "/all"
-    m.apiTask.params = {
-        "X-Plex-Container-Start": 0,
-        "X-Plex-Container-Size": 50
-    }
-    m.apiTask.control = "run" ' Triggers Task execution
+sub loadData()
+    m.apiTask.endpoint = "/some/endpoint"
+    m.apiTask.params = { key: "value" }
+    m.apiTask.control = "run"
 end sub
 
-sub onContentLoaded(event as object)
-    contentNode = event.getData()
-    m.posterGrid.content = contentNode ' Bind to UI
-    ' IMPORTANT: Unobserve to prevent memory leaks in long-running apps
-    ' m.apiTask.unobserveField("content")
+' BAD: Creating new task per request
+sub loadData()
+    task = CreateObject("roSGNode", "PlexApiTask")  ' memory churn
+    task.observeField("status", "onTaskDone")
+    task.endpoint = "/some/endpoint"
+    task.control = "run"
 end sub
 ```
 
-### Pattern 3: ContentNode Data Trees
+### Pattern 2: Normalizer-per-Media-Type
 
-**What:** Use ContentNode hierarchies instead of associative arrays for structured data. ContentNodes are passed by reference (not copied), improving performance for large datasets.
+**What:** One normalizer function per Plex content type. Each returns a ContentNode tree with type-specific fields.
 
-**When to use:** Populating grids, lists, or any UI component consuming structured data. Required for MarkupGrid, PosterGrid, RowList, LabelList components.
+**When:** Adding support for new media types (music, photos, live TV).
 
-**Trade-offs:**
-- **Pros:** Much faster than associative arrays (reference vs copy), extends easily with custom fields
-- **Cons:** Slightly more verbose than plain AA, requires understanding node field API
+**Why:** The existing normalizers (`NormalizeMovieList`, `NormalizeShowList`, etc.) establish this pattern well. Extending it keeps the data transform layer consistent and testable. Normalizers should be the ONLY place where raw Plex JSON field names appear.
 
-**Example:**
+**New normalizers needed:**
 ```brightscript
-' PlexApiTask.brs - Convert JSON response to ContentNode tree
-function buildContentNode(jsonData as object) as object
-    rootNode = createObject("roSGNode", "ContentNode")
-
-    for each item in jsonData.Metadata
-        child = createObject("roSGNode", "ContentNode")
-        child.title = item.title
-        child.hdPosterUrl = buildPosterUrl(item.thumb, 240, 360)
-        child.description = item.summary
-        child.ratingKey = item.ratingKey
-        child.contentType = item.type
-
-        ' Custom fields for Plex-specific data
-        child.addFields({
-            plexKey: item.key,
-            year: item.year,
-            rating: item.contentRating
-        })
-
-        rootNode.appendChild(child)
-    end for
-
-    return rootNode
-end function
+' source/normalizers.brs - add these
+function NormalizeArtistList(jsonArray) as Object    ' music
+function NormalizeAlbumList(jsonArray) as Object      ' music
+function NormalizeTrackList(jsonArray) as Object      ' music
+function NormalizePhotoList(jsonArray) as Object      ' photos
+function NormalizeHubRow(jsonArray) as Object         ' hub rows (mixed types)
+function NormalizeChannelList(jsonArray) as Object    ' live TV
+function NormalizeEPGData(jsonArray) as Object        ' live TV guide
+function NormalizePlaylist(jsonArray) as Object       ' playlists
+function NormalizeUserList(jsonArray) as Object       ' managed users
 ```
 
-### Pattern 4: API Abstraction Layer (Service Pattern)
+### Pattern 3: Screen Interface Contract
 
-**What:** Centralize API logic in Task nodes that expose clean interfaces. UI components request operations via Task fields, not raw HTTP details.
+**What:** Every screen exposes the same interface fields for MainScene to observe.
 
-**When to use:** Any app consuming external APIs. Future-proofs against API changes, reduces duplication.
+**When:** Adding any new screen.
 
-**Trade-offs:**
-- **Pros:** Single source of truth for API logic, easier testing, cleaner UI code
-- **Cons:** Extra layer of indirection, requires planning interface fields
+**Why:** MainScene's `pushScreen()` blindly observes `itemSelected` and `navigateBack` on every screen. This contract must be maintained for the navigation stack to work.
 
-**Example:**
-```brightscript
-' PlexApiTask.xml - Interface definition
+**Required interface for all screens:**
+```xml
 <interface>
-    <field id="endpoint" type="string" />
-    <field id="params" type="assocarray" />
-    <field id="method" type="string" value="GET" />
-
-    <field id="content" type="node" alwaysNotify="true" />
-    <field id="error" type="string" alwaysNotify="true" />
+    <field id="itemSelected" type="assocarray" alwaysNotify="true" />
+    <field id="navigateBack" type="boolean" alwaysNotify="true" />
 </interface>
-
-' PlexApiTask.brs - Implementation
-sub execute()
-    url = m.global.serverUrl + m.top.endpoint
-
-    ' Add query params
-    if m.top.params <> invalid and m.top.params.count() > 0
-        url = url + "?" + buildQueryString(m.top.params)
-    end if
-
-    transfer = createObject("roUrlTransfer")
-    transfer.SetUrl(url)
-    transfer.SetCertificatesFile("common:/certs/ca-bundle.crt")
-    transfer.InitClientCertificates()
-
-    ' Add Plex headers (abstracted via utility function)
-    headers = GetPlexHeaders(m.global.authToken)
-    for each key in headers
-        transfer.AddHeader(key, headers[key])
-    end for
-
-    response = transfer.GetToString()
-    if response <> ""
-        xmlData = ParseXml(response)
-        m.top.content = buildContentNode(xmlData)
-    else
-        m.top.error = "Network request failed"
-    end if
-end sub
 ```
 
-### Pattern 5: Global State via m.global
+**Additional per-screen interface fields** (for MainScene to pass data in):
+```xml
+<!-- DetailScreen -->
+<field id="ratingKey" type="string" />
+<field id="itemType" type="string" />
 
-**What:** Use the global node (m.global) for app-wide state like auth tokens, server URLs, and user preferences. Accessible from all components.
+<!-- MusicScreen (new) -->
+<field id="sectionId" type="string" />
 
-**When to use:** Data needed across multiple screens/components. Avoid for local component state.
+<!-- UserPickerScreen (new) -->
+<field id="users" type="assocarray" />
+```
 
-**Trade-offs:**
-- **Pros:** Simple shared state, observable fields trigger updates across app
-- **Cons:** Global state can become dumping ground, requires discipline to keep clean
+### Pattern 4: Widget Cleanup Protocol
+
+**What:** Every screen implements a `cleanup()` function that unobserves all fields, stops tasks, and releases resources.
+
+**When:** On every `popScreen()` call.
+
+**Why:** Roku leaks memory when observers are left connected to removed nodes. The existing `cleanupScreen()` in MainScene calls `screen.callFunc("cleanup")` if the field exists. This pattern must be followed consistently.
 
 **Example:**
 ```brightscript
-' MainScene.brs - Initialize global state
-sub init()
-    m.global = m.top.getGlobalNode()
-    m.global.addFields({
-        authToken: "",
-        serverUrl: "",
-        userName: "",
-        isAuthenticated: false
-    })
+sub cleanup()
+    ' Stop all tasks
+    if m.apiTask <> invalid
+        m.apiTask.control = "stop"
+        m.apiTask.unobserveField("status")
+    end if
 
-    ' Load from registry (persistent storage)
-    registry = createObject("roRegistrySection", "PlexClassic")
-    if registry.Exists("authToken")
-        m.global.authToken = registry.Read("authToken")
-        m.global.serverUrl = registry.Read("serverUrl")
-        m.global.isAuthenticated = true
+    ' Unobserve child widgets
+    m.sidebar.unobserveField("selectedLibrary")
+    m.posterGrid.unobserveField("itemSelected")
+    m.posterGrid.unobserveField("loadMore")
+end sub
+```
+
+### Pattern 5: Action Routing via itemSelected
+
+**What:** Screens signal navigation intent by setting `m.top.itemSelected = { action: "actionName", ...params }`. MainScene's `onItemSelected` dispatches to the appropriate `show*Screen()` method.
+
+**When:** Adding new navigation targets.
+
+**Why:** This is the existing pattern and it works well. It keeps screens decoupled from each other - a screen never creates another screen directly.
+
+**Extending for new screens:**
+```brightscript
+' In MainScene.onItemSelected():
+sub onItemSelected(event as Object)
+    data = event.getData()
+    if data <> invalid
+        if data.action = "detail"
+            showDetailScreen(data.ratingKey, data.itemType)
+        else if data.action = "episodes"
+            showEpisodeScreen(data.ratingKey, data.title)
+        else if data.action = "search"
+            showSearchScreen()
+        else if data.action = "settings"
+            showSettingsScreen()
+        ' NEW actions:
+        else if data.action = "artist"
+            showArtistScreen(data.ratingKey)
+        else if data.action = "album"
+            showAlbumScreen(data.ratingKey)
+        else if data.action = "playlist"
+            showPlaylistScreen(data.ratingKey)
+        else if data.action = "livetv"
+            showLiveTVScreen()
+        else if data.action = "photo"
+            showPhotoScreen(data.ratingKey)
+        else if data.action = "users"
+            showUserPickerScreen()
+        end if
     end if
 end sub
-
-' Any component can access
-sub someFunction()
-    token = m.global.authToken
-    if m.global.isAuthenticated
-        ' Proceed with authenticated request
-    end if
-end sub
 ```
 
-## Data Flow
+## Anti-Patterns to Avoid
 
-### Request Flow (API Data Fetching)
+### Anti-Pattern 1: God Screen
 
-```
-[User Action] (e.g., select library in Sidebar)
-    ↓
-[Screen Component] (e.g., HomeScreen.brs:onLibrarySelected)
-    ↓ Set Task fields
-[Task Node] (e.g., PlexApiTask.endpoint = "/library/sections/1/all")
-    ↓ m.task.control = "run"
-[Task Thread Executes]
-    ↓ roUrlTransfer HTTP request
-[Plex Media Server] returns XML/JSON
-    ↓
-[Task parses response] → ContentNode tree
-    ↓ m.top.content = contentNode
-[Field Observer Fires] (Screen observes Task.content)
-    ↓
-[Screen Updates UI] m.posterGrid.content = contentNode
-    ↓
-[User sees posters] rendered by built-in PosterGrid
-```
+**What:** Putting all media-type-specific logic in a single screen (e.g., making HomeScreen handle music browse, photo browse, and video browse differently based on content type).
 
-### Playback Flow
+**Why bad:** BrightScript has no classes or inheritance. A single screen handling 5 media types becomes an unmaintainable if/else chain. Focus management becomes a nightmare.
 
-```
-[User selects item] in PosterGrid
-    ↓
-[Screen pushes DetailScreen] with ratingKey
-    ↓
-[DetailScreen loads metadata] via PlexApiTask
-    ↓
-[User presses Play]
-    ↓
-[DetailScreen pushes VideoPlayer] with streamUrl + metadata
-    ↓
-[VideoPlayer.brs sets content]
-    m.player.content = createPlaybackContentNode(streamUrl, metadata)
-    m.player.control = "play"
-    ↓
-[Native Roku Video Node] begins playback
-    ↓
-[VideoPlayer observes position] m.player.observeField("position")
-    ↓
-[PlexSessionTask reports progress] PUT /:/timeline every 10 seconds
-    ↓
-[On playback end/back] pop VideoPlayer, restore DetailScreen focus
-```
+**Instead:** Create separate screens per media type with shared widgets. `MusicScreen`, `PhotoScreen`, `LiveTVScreen` each compose `Sidebar`, `PosterGrid`, etc. as needed. Duplication of 10 lines of widget setup is preferable to 500 lines of conditional branching.
 
-### State Management Flow
+### Anti-Pattern 2: Task-to-Task Communication
 
-```
-[App Launch]
-    ↓
-[MainScene.init()]
-    ↓ Initialize m.global fields
-    ↓ Read roRegistrySection("PlexClassic")
-    ↓
-[If authenticated] → Push HomeScreen
-[Else] → Push AuthScreen
-    ↓
-[AuthScreen] creates PlexAuthTask
-    ↓ Observe authToken field
-    ↓ Task polls plex.tv PIN endpoint
-    ↓
-[On auth success] Task sets m.global.authToken
-    ↓ Field observer fires in AuthScreen
-    ↓ Write to registry.Write("authToken")
-    ↓ registry.Flush()
-    ↓
-[MainScene observes m.global.isAuthenticated]
-    ↓ Pop AuthScreen
-    ↓ Push HomeScreen
-```
+**What:** Having one task node communicate directly with another task node.
 
-### Key Data Flows
+**Why bad:** Roku requires all inter-task communication to go through the render thread, doubling rendezvous count. It also creates implicit dependencies between tasks.
 
-1. **UI → Task → API → Task → UI (Observer)**: All external data fetching follows this pattern. UI never blocks on network.
-2. **m.global as shared state**: Auth state, server config, user prefs flow through global node fields with observers.
-3. **ContentNode trees for lists/grids**: Data from API transforms to ContentNode hierarchies, bound to UI components via .content field.
-4. **Registry for persistence**: On auth success or settings change, write to roRegistrySection and call .Flush(). Read on app launch.
+**Instead:** Screen orchestrates: Task A completes -> screen processes -> sets up Task B. Sequential, explicit, debuggable.
 
-## Scaling Considerations
+### Anti-Pattern 3: Storing State in m.global
 
-| Scale | Architecture Adjustments |
-|-------|--------------------------|
-| 0-10K items | Standard ContentNode trees work fine. Use pagination (X-Plex-Container-Start/Size=50) on library fetches. |
-| 10K-100K items | Implement lazy loading: only fetch visible items + buffer. Use ImageCacheTask to prefetch next page of posters. Monitor memory via Roku Resource Monitor. |
-| 100K+ items | Virtual scrolling may be needed. Consider RowList for section-based browsing instead of flat PosterGrid. Profile with Perfetto to identify bottlenecks. |
+**What:** Using `m.global` as a general-purpose state store for user preferences, current library, current filter state, etc.
 
-### Scaling Priorities
+**Why bad:** Every field set on `m.global` triggers a rendezvous. Too many global observers create performance bottlenecks. State becomes hard to reason about when any component can read/write it.
 
-1. **First bottleneck: Image memory usage**
-   - **Problem:** Loading too many high-res posters causes memory pressure on low-tier Roku devices.
-   - **Solution:** Request resized images via Plex transcode API (`/photo/:/transcode?width=240&height=360`). Implement image cache eviction in ImageCacheTask.
+**Instead:** Use `m.global` only for truly cross-cutting concerns: `authRequired` (boolean), `currentUserToken` (string), `nowPlaying` (assocarray for music bar). Everything else stays in screen-scoped `m.*` variables or is passed via interface fields.
 
-2. **Second bottleneck: ContentNode deep-copy overhead**
-   - **Problem:** Accessing node fields triggers deep copies on render thread, slowing down large datasets.
-   - **Solution:** Use Roku OS 15.0+ APIs to move associative arrays by reference instead of copying. Minimize field accesses in loops. Prefer task thread data manipulation.
+### Anti-Pattern 4: Creating Renderable Nodes in Tasks
 
-## Anti-Patterns
+**What:** Building UI nodes (Labels, Posters, Rectangles) inside a Task thread.
 
-### Anti-Pattern 1: HTTP on Render Thread
+**Why bad:** Every property set on a renderable node from a Task thread triggers a full rendezvous with the render thread. This serializes execution and destroys performance.
 
-**What people do:** Call roUrlTransfer.GetToString() directly in screen component .brs file.
+**Instead:** Tasks should return raw data (JSON parsed to associative arrays). Normalizers in the render thread build ContentNode trees. ContentNodes are non-renderable and can be created in either thread, but creating them in the render thread after task completion is simpler and avoids confusion.
 
-**Why it's wrong:** Blocks render thread for duration of network request (100ms-5s+). Causes UI freezes, dropped frames, and rendezvous crashes under load. Fails Roku certification testing.
+### Anti-Pattern 5: Deep Observer Chains
 
-**Do this instead:** Always use Task nodes for HTTP. Example:
-```brightscript
-' WRONG - Render thread blocks
-sub loadData()
-    url = createObject("roUrlTransfer")
-    url.SetUrl("https://...")
-    response = url.GetToString() ' BLOCKS UI!
-    parseResponse(response)
-end sub
+**What:** Widget A observes Widget B, which observes Widget C, creating a chain of observer-triggered updates.
 
-' CORRECT - Task node
-sub loadData()
-    m.apiTask.endpoint = "/data"
-    m.apiTask.control = "run" ' Non-blocking
-end sub
-```
+**Why bad:** Debugging becomes impossible. Field changes cascade unpredictably. One change triggers multiple re-renders.
 
-### Anti-Pattern 2: Forgetting to Unobserve Fields
+**Instead:** Keep observer chains shallow (max 2 levels). Screen observes its direct child widgets. Widgets do NOT observe sibling widgets. If two widgets need to coordinate, the parent screen mediates.
 
-**What people do:** Call observeField() on Task nodes but never unobserveField(), especially in components created/destroyed frequently.
+## Maestro MVVM Migration Assessment
 
-**Why it's wrong:** Each observeField() adds a callback. Repeated calls without unobserve accumulate callbacks, causing the same function to fire multiple times and creating memory leaks. Long-running channels slow down or crash.
+**Recommendation: Do NOT migrate. Confidence: HIGH.**
 
-**Do this instead:** Unobserve when observer is no longer needed or component is destroyed.
-```brightscript
-' WRONG - Leaks observers
-sub loadData()
-    m.apiTask.observeField("content", "onContentLoaded") ' Called repeatedly
-    m.apiTask.control = "run"
-end sub
+### Arguments For Maestro
+- View lifecycle management (onShow, onHide, onFocus hooks)
+- MVVM binding reduces boilerplate observer setup
+- IOC container for dependency injection
+- Unit testable view models via Rooibos
+- Navigation framework (TabController, NavController)
 
-' CORRECT - Cleanup
-sub loadData()
-    m.apiTask.unobserveField("content") ' Remove old observers first
-    m.apiTask.observeField("content", "onContentLoaded")
-    m.apiTask.control = "run"
-end sub
+### Arguments Against Maestro (for this project)
+1. **Rewrite scope:** Every existing component needs conversion to BrighterScript + Maestro node classes. This is not incremental - it is a full rewrite of ~20 working components before any new features can be added.
+2. **Build toolchain:** Requires `bsc` (BrighterScript compiler) + `maestro-cli` + `ropm` package manager. Current project deploys by zipping a folder. Adding a build step for a sideloaded personal channel adds friction with no offsetting team-productivity benefit.
+3. **Single developer:** MVVM's benefits (testability, separation of concerns, team velocity) are most impactful on multi-developer projects. A solo developer already holds the full mental model.
+4. **Debugging cost:** Maestro's generated code makes debugger stack traces harder to read. The compilation step adds a translation layer between what you write and what runs on the device.
+5. **Lifecycle hooks already exist:** The current `cleanup()` pattern, `init()`, and `onKeyEvent()` provide the lifecycle hooks this app needs. Adding Maestro's `onShow`/`onHide`/`onFirstShow` hooks is nice but not necessary given the simple screen stack model.
+6. **Project constraint:** PROJECT.md explicitly lists "BrighterScript v1.0.0-alpha migration -- defer until stable release" as out of scope. Maestro requires BrighterScript.
 
-sub onContentLoaded(event as object)
-    ' Process data
-    m.apiTask.unobserveField("content") ' Clean up after use
-end sub
-```
+### What to Adopt Instead
+Cherry-pick Maestro's best ideas without the framework:
+- **Cleanup protocol:** Already implemented. Ensure consistency across all new screens.
+- **Focus management:** Add a `saveFocusState()` / `restoreFocusState()` helper to utils.brs for screens that need to preserve complex focus positions.
+- **Style centralization:** Keep using `GetConstants()` for all style values. Consider adding a `GetStyles()` function if component-level styling becomes repetitive.
 
-### Anti-Pattern 3: Storing Associative Arrays in Node Fields
+## Suggested Component Inventory (Target ~40 Components)
 
-**What people do:** Store large data structures as associative arrays in SceneGraph node fields, accessing them frequently.
+### Screens (13 total, 6 new)
 
-**Why it's wrong:** Every field access deep-copies the entire associative array. For large datasets, this causes severe performance degradation on the render thread. As noted in Roku docs: "myVar = myNode.myField marshals/unmarshals the structure underneath."
+| Screen | Status | Dependencies | Phase Implication |
+|--------|--------|-------------|-------------------|
+| HomeScreen | Existing | Sidebar, PosterGrid, FilterBar, MediaRow | Enhance with hub rows early |
+| DetailScreen | Existing | VideoPlayer | Enhance with resume, watched toggle |
+| EpisodeScreen | Existing | EpisodeItem | Enhance with auto-play next |
+| SearchScreen | Existing | PosterGrid | Stable |
+| PINScreen | Existing | PlexAuthTask | Stable |
+| ServerListScreen | Existing | ServerConnectionTask | Stable |
+| SettingsScreen | Existing | None | Enhance with prefs |
+| MusicScreen | **New** | Sidebar, PosterGrid/TrackList | Requires MusicPlayer widget first |
+| PhotoScreen | **New** | PosterGrid, PhotoViewer | Relatively independent |
+| LiveTVScreen | **New** | EPGGrid, VideoPlayer | Most complex, defer |
+| PlaylistScreen | **New** | PosterGrid, TrackList | After music basics |
+| UserPickerScreen | **New** | PINDialog | Early-ish (affects auth flow) |
+| CollectionScreen | **New** | PosterGrid | Simple, reuses existing widgets |
 
-**Do this instead:** Use ContentNode trees (passed by reference) or perform data manipulation in Task threads.
-```brightscript
-' WRONG - Deep copy on every access
-m.dataNode.movieList = largeAssociativeArray ' Copy on write
-for i = 0 to m.dataNode.movieList.count() - 1 ' Copy on read!
-    movie = m.dataNode.movieList[i] ' Copy again!
-end for
+### Widgets (16 total, 7 new)
 
-' CORRECT - ContentNode tree (by reference)
-contentNode = createObject("roSGNode", "ContentNode")
-for each movie in jsonData
-    child = createObject("roSGNode", "ContentNode")
-    child.title = movie.title
-    contentNode.appendChild(child) ' No copies
-end for
-m.posterGrid.content = contentNode ' Reference assignment
-```
+| Widget | Status | Used By |
+|--------|--------|---------|
+| Sidebar | Existing | HomeScreen, MusicScreen |
+| PosterGrid | Existing | HomeScreen, SearchScreen, PhotoScreen, CollectionScreen |
+| PosterGridItem | Existing | PosterGrid |
+| EpisodeItem | Existing | EpisodeScreen |
+| FilterBar | Existing | HomeScreen |
+| VideoPlayer | Existing | DetailScreen, LiveTVScreen |
+| LoadingSpinner | Existing | All screens |
+| MediaRow | Existing | HomeScreen (hub rows) |
+| KeyboardDialog | Existing | SearchScreen |
+| PlaybackOverlay | **New** | VideoPlayer (audio/subtitle selection, intro skip) |
+| SubtitleRenderer | **New** | VideoPlayer (sidecar SRT display) |
+| MusicPlayer | **New** | MusicScreen, MainScene (persists) |
+| NowPlayingBar | **New** | MainScene (persistent during music playback) |
+| PhotoViewer | **New** | PhotoScreen |
+| EPGGrid | **New** | LiveTVScreen |
+| TrackList | **New** | MusicScreen, PlaylistScreen |
 
-### Anti-Pattern 4: Creating Node Reference Cycles
+### Tasks (6 total, 0 new)
 
-**What people do:** Store references to ancestor nodes in child fields, or create circular references between nodes.
+| Task | Status | Notes |
+|------|--------|-------|
+| PlexApiTask | Existing | General-purpose, handles all new endpoints |
+| PlexAuthTask | Existing | Extend for managed user token switching |
+| PlexSearchTask | Existing | Stable |
+| PlexSessionTask | Existing | Extend for music scrobbling |
+| ServerConnectionTask | Existing | Stable |
+| ImageCacheTask | Existing | Stable |
 
-**Why it's wrong:** Creates memory leaks. Roku's garbage collector can't free nodes in isolated cycles, even when the app no longer references them. Channels accumulate leaked nodes and eventually crash.
+No new task types needed. `PlexApiTask` is general-purpose enough to handle all new API endpoints. Adding new tasks would fragment HTTP handling unnecessarily.
 
-**Do this instead:** Use one-way references (parent → child only). Set fields to invalid when done.
-```brightscript
-' WRONG - Circular reference
-m.childNode.parentRef = m.top ' Child references ancestor
+## Build Order (Dependency-Driven)
 
-' CORRECT - One-way only
-' Child communicates up via interface fields parent observes
-m.top.observeField("childEvent", "onChildEvent")
-' No direct parent reference stored in child
-
-' Cleanup when removing nodes
-sub removeScreen(screen)
-    screen.visible = false
-    m.top.removeChild(screen)
-    screen = invalid ' Break reference
-end sub
-```
-
-### Anti-Pattern 5: Using SGDEX for Custom Requirements
-
-**What people do:** Adopt SceneGraph Developer Extensions (SGDEX) framework to quickly scaffold an app, then struggle to implement custom features.
-
-**Why it's wrong:** SGDEX is designed for simple, template-based channels. It handles common cases well but becomes a limiting factor when custom navigation, complex state management, or unique UI patterns are required. Developers end up fighting the framework.
-
-**Do this instead:** For custom apps like PlexClassic, build components from scratch using base SceneGraph. Only use SGDEX if requirements exactly match its templates.
-```brightscript
-' SGDEX is good for: Simple grid → detail → video flow with no custom logic
-' Custom SceneGraph is required for:
-'   - Custom screen stack navigation
-'   - Complex authentication flows (PIN-based OAuth)
-'   - Multi-server management
-'   - Advanced filtering/search
-'   - Custom video player controls
-```
-
-## Integration Points
-
-### External Services
-
-| Service | Integration Pattern | Notes |
-|---------|---------------------|-------|
-| **Plex Media Server** | REST API via PlexApiTask (Task node) | All requests need X-Plex-* headers. Use GetPlexHeaders() utility. Paginate with X-Plex-Container-Start/Size. |
-| **plex.tv** | OAuth PIN flow via PlexAuthTask | POST /api/v2/pins, poll GET /api/v2/pins/{id}, GET /api/v2/resources for server discovery. Strong PIN recommended. |
-| **Image CDN** | Plex photo transcode API | Request `/photo/:/transcode?url={thumb}&width=240&height=360` for resized posters. Reduces memory usage. |
-
-### Internal Boundaries
-
-| Boundary | Communication | Notes |
-|----------|---------------|-------|
-| **Screen ↔ Task** | Field observers (observeField/unobserveField) | Screen sets Task input fields, observes output fields. Task updates fields when work completes. |
-| **Screen ↔ Widget** | Interface fields + observers | Widgets expose interface fields (e.g., PosterGrid.content). Screens set fields and observe events (itemSelected). |
-| **MainScene ↔ Screen** | Direct function calls (pushScreen/popScreen) | Screens call m.top.getParent() to access MainScene, then invoke navigation functions. Alternative: MainScene observes screen.navigateEvent field. |
-| **Any component ↔ Global State** | m.global.fieldName | Read/write global fields directly. Observe for reactive updates. No message passing needed. |
-| **Utility functions ↔ Components** | Direct function calls | utils.brs functions are loaded at startup, callable from any .brs file via namespace or direct name. |
-
-## Build Order & Dependencies
-
-### Phase 1: Foundation (No UI dependencies)
-
-**Build first:**
-1. **manifest** - Defines app metadata, SceneGraph version (declare RSG 1.3 support)
-2. **source/constants.brs** - Colors, sizes, API endpoints
-3. **source/utils.brs** - GetPlexHeaders(), BuildPlexUrl(), registry helpers
-4. **components/tasks/PlexAuthTask.xml/.brs** - PIN auth, can be tested standalone
-5. **components/tasks/PlexApiTask.xml/.brs** - General API requests
-
-**Why this order:** Tasks have no UI dependencies. Can be tested via Roku debug console before building screens. Establishes data layer first.
-
-### Phase 2: Core UI (Depends on Foundation)
-
-**Build next:**
-6. **components/MainScene.xml/.brs** - Initialize m.global, implement screen stack
-7. **components/screens/AuthScreen.xml/.brs** - Uses PlexAuthTask
-8. **components/widgets/Sidebar.xml/.brs** - Reusable navigation widget
-9. **components/screens/HomeScreen.xml/.brs** - Uses PlexApiTask + Sidebar
-
-**Why this order:** MainScene is root, must exist first. AuthScreen can function with just PlexAuthTask. Sidebar is independent, used by HomeScreen.
-
-### Phase 3: Content Browsing (Depends on Core UI + Foundation)
-
-**Build next:**
-10. **components/widgets/PosterGrid.xml/.brs** - Uses built-in MarkupGrid
-11. **components/screens/DetailScreen.xml/.brs** - Uses PlexApiTask
-12. **components/screens/EpisodesScreen.xml/.brs** - Uses PlexApiTask + PosterGrid
-
-**Why this order:** PosterGrid is reused by multiple screens. DetailScreen is entry point to EpisodesScreen.
-
-### Phase 4: Advanced Features (Depends on all previous)
-
-**Build last:**
-13. **components/tasks/PlexSearchTask.xml/.brs** - Debounced search
-14. **components/screens/SearchScreen.xml/.brs** - Uses PlexSearchTask
-15. **components/widgets/VideoPlayer.xml/.brs** - Wraps built-in Video node
-16. **components/tasks/PlexSessionTask.xml/.brs** - Playback progress reporting
-17. **components/tasks/ImageCacheTask.xml/.brs** - Poster prefetching optimization
-18. **components/screens/SettingsScreen.xml/.brs** - Configuration UI
-
-**Why this order:** Search and video playback depend on stable data layer and navigation. Image caching is performance optimization, not core functionality. Settings is last as it's non-critical.
-
-### Dependency Graph
+The dependencies between new components dictate the order in which features can be built:
 
 ```
-manifest + constants.brs + utils.brs
-    ↓
-PlexAuthTask + PlexApiTask (no UI dependencies)
-    ↓
-MainScene (depends on: utils, constants)
-    ↓
-AuthScreen (depends on: MainScene, PlexAuthTask)
-    ↓
-Sidebar (independent widget)
-    ↓
-HomeScreen (depends on: MainScene, PlexApiTask, Sidebar)
-    ↓
-PosterGrid (independent widget)
-    ↓
-DetailScreen (depends on: MainScene, PlexApiTask, PosterGrid)
-    ↓
-EpisodesScreen (depends on: MainScene, PlexApiTask, PosterGrid)
-    ↓
-PlexSearchTask + SearchScreen (depends on: all above)
-    ↓
-VideoPlayer + PlexSessionTask (depends on: all above)
-    ↓
-ImageCacheTask (performance optimization, depends on: all above)
-    ↓
-SettingsScreen (depends on: MainScene, registry utils)
+Phase order by dependency chain:
+
+1. PlaybackOverlay widget
+   |- No dependencies on new components
+   |- Unlocks: subtitle selection, audio selection, intro skip
+
+2. Hub rows on HomeScreen
+   |- Requires: MediaRow (existing), NormalizeHubRow (new normalizer)
+   |- No new components, just HomeScreen enhancement
+
+3. Filters and sorting
+   |- Requires: FilterBar (existing, enhance)
+   |- No new components
+
+4. Resume/watched toggle on DetailScreen
+   |- No new components, DetailScreen enhancement
+
+5. Auto-play next episode
+   |- Requires: EpisodeScreen enhancement
+   |- Depends on: VideoPlayer playbackComplete handling
+
+6. UserPickerScreen
+   |- Requires: PINDialog enhancement
+   |- Cross-cutting: changes auth token flow in utils.brs
+   |- Should be done before features that depend on user context
+
+7. CollectionScreen + PlaylistScreen
+   |- Reuses: PosterGrid, existing patterns
+   |- Simple screen additions
+
+8. MusicPlayer + NowPlayingBar + MusicScreen + TrackList
+   |- MusicPlayer must come first (new audio engine)
+   |- NowPlayingBar depends on MusicPlayer
+   |- MusicScreen depends on both + TrackList
+   |- This is a connected cluster, build together
+
+9. PhotoScreen + PhotoViewer
+   |- Independent from everything else
+   |- Can be built anytime after core patterns established
+
+10. LiveTVScreen + EPGGrid
+    |- Most complex new feature
+    |- EPGGrid is unique widget (nothing reuses it)
+    |- Depends on server having Live TV capability
+    |- Build last
 ```
+
+## Scalability Considerations
+
+| Concern | At current size (~20 components) | At target (~40 components) | Mitigation |
+|---------|----------------------------------|---------------------------|------------|
+| MainScene routing | 5-case if/else in onItemSelected | 12+ case if/else | Acceptable. BrightScript has no better dispatch mechanism. Keep cases alphabetically sorted. |
+| Screen stack memory | 2-3 screens deep | 4-5 screens deep (Home -> Artist -> Album -> Detail -> Player) | Add max depth check. Call `cleanup()` on all popped screens. Consider collapsing unnecessary intermediate screens. |
+| Observer count | ~20 active observers | ~40+ active observers | Ensure `cleanup()` unobserves everything. Only observe fields you actively need. |
+| ContentNode trees | Hundreds of nodes (library grid) | Thousands (EPG grid, music library) | Paginate aggressively. Use `removeChildIndex()` to trim old pages if memory is tight. |
+| Task concurrency | 1-2 tasks running simultaneously | 3-4 (API + session + search + image cache) | Acceptable for Roku. Do not exceed 5 concurrent tasks. |
+| normalizers.brs size | ~130 lines, 5 functions | ~300 lines, 14 functions | Consider splitting into `normalizers-video.brs`, `normalizers-music.brs`, `normalizers-livetv.brs` if file exceeds 400 lines. |
 
 ## Sources
 
-**Official Roku Documentation:**
-- [Roku SceneGraph Overview](https://developer.roku.com/docs/developer-program/core-concepts/scenegraph-xml/overview.md) - Core concepts, HIGH confidence
-- [Task Node Reference](https://developer.roku.com/docs/references/scenegraph/control-nodes/task.md) - Threading patterns, HIGH confidence
-- [Component Architecture](https://developer.roku.com/docs/references/brightscript/language/component-architecture.md) - Component patterns, HIGH confidence
-- [Data Management Guide](https://developer.roku.com/docs/developer-program/performance-guide/data-management.md) - ContentNode vs AA performance, HIGH confidence
-
-**Official Roku Repositories:**
-- [SceneGraph Master Sample](https://github.com/rokudev/scenegraph-master-sample) - Certification-compliant architecture example, HIGH confidence
-- [SceneGraph Developer Extensions](https://github.com/rokudev/SceneGraphDeveloperExtensions) - SGDEX patterns and limitations, HIGH confidence
-- [PosterGrid and Tasks Training](https://github.com/rymawby/SceneGraphTrainingPosterGridAndTasks) - Task node tutorial, MEDIUM confidence
-
-**2026 Updates:**
-- [New Roku Features 2026](https://www.oxagile.com/article/roku-features/) - RSG 1.3 requirement, OS 15.0 APIs, MEDIUM confidence
-- [Developer Blog](https://blog.roku.com/developer) - Official announcements, HIGH confidence
-
-**Architecture Patterns:**
-- [Navigating Screen Stacks in Roku](https://medium.com/@amitdogra70512/navigating-screen-stacks-in-roku-a-guide-to-creating-and-managing-multiple-screens-using-arrays-1f9cbb736079) - Screen stack implementation, MEDIUM confidence
-- [Understanding Threads in Roku Development](https://medium.com/@amitdogra70512/understanding-threads-in-roku-development-d890fa2fa9b5) - Task node threading, MEDIUM confidence
-- [m.global Guide](https://medium.com/@amitdogra70512/m-vs-m-top-vs-m-global-in-brighscript-a389b4fb4d77) - Global state patterns, MEDIUM confidence
-- [Component Initialization Order](https://medium.com/@amitdogra70512/understanding-component-initialization-order-in-roku-1ae0ed49472d) - Build dependencies, MEDIUM confidence
-
-**Performance & Anti-Patterns:**
-- [High-Performance Roku Development](https://www.tothenew.com/blog/revealing-the-secrets-to-high-performance-roku-development/) - Memory leaks, observer cleanup, MEDIUM confidence
-- [Roku Resource Monitor](https://blog.roku.com/developer/resource-monitor) - Performance profiling tool, HIGH confidence
-- [ContentNode Performance Discussion](http://forums.roku.com/viewtopic.php?t=101461) - AA vs ContentNode benchmarks, MEDIUM confidence
-
-**Community Resources:**
-- [Screen Stack Management](https://roku.home.blog/2019/01/02/back-stack-management-in-roku-using-scenegraph-component/) - Navigation patterns, MEDIUM confidence
-- [Observer Pattern Best Practices](https://erpsolutionsoodles.medium.com/observe-field-in-roku-4d60b103d10b) - Field observation gotchas, MEDIUM confidence
-
-**API Abstraction Examples:**
-- [roku-fetch](https://github.com/briandunnington/roku-fetch) - Fetch-like abstraction, MEDIUM confidence
-- [roku-requests](https://github.com/rokucommunity/roku-requests) - Requests-inspired abstraction, MEDIUM confidence
-- [mParticle Roku SDK](https://github.com/mParticle/mparticle-roku-sdk) - Bridge pattern example, MEDIUM confidence
+- [Roku SceneGraph Core Concepts](https://developer.roku.com/docs/developer-program/core-concepts/core-concepts.md) - HIGH confidence
+- [Roku Optimization Techniques](https://developer.roku.com/docs/developer-program/performance-guide/optimization-techniques.md) - HIGH confidence (accessed via search summaries)
+- [Maestro-roku Documentation](https://georgejecook.github.io/maestro-roku/index.html) - HIGH confidence
+- [Maestro View Framework](https://georgejecook.github.io/maestro-roku/4.%20View%20Framework/index.html) - HIGH confidence
+- [Roku SceneGraph Threads](https://sdkdocs-archive.roku.com/SceneGraph-Threads_4262152.html) - HIGH confidence (rendezvous patterns)
+- [Roku SceneGraph Benchmarks: AA vs Node](https://medium.com/dazn-tech/rokus-scenegraph-benchmarks-aa-vs-node-9be5158474c1) - MEDIUM confidence
+- [Plex Labs RSG Application](https://medium.com/plexlabs/xml-code-good-times-rsg-application-b963f0cec01b) - MEDIUM confidence
 
 ---
-*Architecture research for: PlexClassic Roku Plex Client*
-*Researched: 2026-02-09*
-*All patterns verified against official Roku documentation and community best practices*
+
+*Architecture research: 2026-03-08*

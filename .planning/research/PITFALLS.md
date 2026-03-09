@@ -1,497 +1,353 @@
-# Pitfalls Research
+# Domain Pitfalls
 
-**Domain:** Roku SceneGraph + Plex Client Development
-**Researched:** 2026-02-09
-**Confidence:** HIGH
+**Domain:** Roku Plex Media Server Client (BrightScript / SceneGraph)
+**Researched:** 2026-03-08
+**Overall confidence:** HIGH (grounded in Roku platform docs, Plex API references, and existing codebase analysis)
+
+---
 
 ## Critical Pitfalls
 
-### Pitfall 1: HTTP Requests on Render Thread (Rendezvous Crash)
+Mistakes that cause rewrites, crashes, or fundamentally broken features.
 
-**What goes wrong:**
-Application crashes with "roUrlTransfer: creating MAIN|TASK-only component failed on RENDER thread" error. The app experiences rendezvous timeouts causing UI freezes or complete crashes.
+### Pitfall 1: Roku Cannot Render PGS or Bitmap Subtitles -- Burn-In Is the Only Path
 
-**Why it happens:**
-Developers coming from web/mobile backgrounds instinctively put network code in component initialization or UI event handlers. BrightScript allows roUrlTransfer creation on the render thread without immediate error, but execution causes thread rendezvous that can timeout and crash.
+**What goes wrong:** PGS (Presentation Graphic Stream) subtitles are the default format for Blu-ray rips in MKV containers. Roku has zero support for PGS rendering. If the client requests direct play with PGS subtitles selected, the user sees no subtitles at all -- no error, just silence. This is the single most common Plex+Roku complaint.
 
-**How to avoid:**
-- ALL HTTP requests MUST be made from Task nodes, never from component init() or UI handlers
-- Create dedicated Task nodes for each HTTP operation category (PlexAuthTask, PlexApiTask, PlexSearchTask, PlexSessionTask)
-- Pass parameters to Task via interface fields, trigger with control="run", receive results via field observers
-- Never call roUrlTransfer.AsyncGetToString() or any HTTP methods from main scene thread
+**Why it happens:** Roku's Video node only supports text-based subtitle formats: SRT (universally supported), TTML/SMPTE-TT, WebVTT (HLS-embedded), and EIA-608/708 (embedded in video stream). PGS is image-based and requires the decoder to composite bitmaps onto the video frame, which Roku's hardware pipeline does not support.
 
-**Warning signs:**
-- Intermittent crashes during network operations
-- Debug logs showing "RENDER thread" errors
-- UI freezing during API calls
-- Crash dumps mentioning "rendezvous timeout"
+**Consequences:** Users with anime, foreign films, or Blu-ray rips will see "subtitles available" in the UI but get nothing on screen. This is a silent failure -- no error is thrown.
 
-**Phase to address:**
-Phase 1 (Authentication) - Establish Task node pattern immediately. All subsequent phases inherit this architecture.
+**Prevention:**
+1. When building subtitle track selection, inspect each stream's `codec` field from the Plex API response. PGS streams have codec `"pgs"`, ASS/SSA have `"ass"`, SRT has `"srt"`.
+2. For PGS, ASS, or any bitmap/styled format: force transcode with `subtitles=burn` in the transcode URL. Do not attempt direct play.
+3. For SRT: use sidecar delivery via `SubtitleTracks` content metadata on the ContentNode. SRT can be direct-played.
+4. Show a visual indicator in the subtitle picker distinguishing "direct" vs "burn-in (slower start)" tracks.
+5. The current `buildTranscodeUrl()` uses `subtitles=auto` which may not reliably burn in PGS. Change to `subtitles=burn&subtitleStreamID={id}` when a bitmap subtitle is selected.
 
----
+**Detection:** Test with an MKV containing PGS subtitles. If subtitles appear with no video re-buffering, something is wrong (PGS requires transcoding). If they do not appear at all, burn-in is not being triggered.
 
-### Pitfall 2: Missing HTTPS Certificate Configuration
+**Phase relevance:** Subtitle track selection phase. This must be the first thing validated.
 
-**What goes wrong:**
-SSL error code -60: "unable to get issuer certificate" or error code -77 (CURLE_SSL_CACERT_BADFILE). All HTTPS requests to Plex servers fail silently or with cryptic errors.
-
-**Why it happens:**
-Unlike web browsers, Roku doesn't have default certificate trust. Developers must explicitly configure certificates for every roUrlTransfer instance. Easy to forget or place incorrectly in code flow.
-
-**How to avoid:**
-```brightscript
-' ALWAYS include these two lines for HTTPS requests
-urlTransfer.SetCertificatesFile("common:/certs/ca-bundle.crt")
-urlTransfer.InitClientCertificates()
-' Order matters: SetCertificatesFile BEFORE InitClientCertificates
-```
-- Add to utility function that all Tasks use
-- Use common:/certs/ca-bundle.crt (built into Roku firmware)
-- Call BEFORE setting URL or making request
-
-**Warning signs:**
-- API calls to plex.tv return empty/invalid responses
-- Works in simulator but fails on device
-- Logs show SSL error codes -60 or -77
-- Successful HTTP requests but HTTPS fails
-
-**Phase to address:**
-Phase 1 (Authentication) - Must be correct from first plex.tv API call. Create GetPlexHeaders() utility that includes certificate setup.
+**Sources:**
+- [Roku Closed Caption docs](https://developer.roku.com/docs/developer-program/media-playback/closed-caption.md)
+- [PGS subtitle Plex+Roku pain](https://www.howtogeek.com/as-a-plex-user-im-begging-roku-to-support-pgs-subtitles/)
 
 ---
 
-### Pitfall 3: Missing X-Plex Headers
+### Pitfall 2: Rendezvous Timeouts from Observer Callback Cascades
 
-**What goes wrong:**
-Plex API returns 401 Unauthorized or "Missing required path parameter X-Plex-Client-Identifier" errors. Authentication fails intermittently. Server discovery returns empty results.
+**What goes wrong:** When a Task node completes and fires an observer callback on the render thread, that callback runs on the render thread. If the callback creates ContentNode trees, sets multiple fields, or triggers further observer chains, it blocks the render thread. On lower-end Roku hardware, cascading observer callbacks (e.g., hub row data loading triggering 8+ row population callbacks in quick succession) cause rendezvous timeouts and app crashes.
 
-**Why it happens:**
-Plex requires specific headers on EVERY request to identify the client. Documentation is scattered and incomplete. Developers add X-Plex-Token but miss other required headers.
+**Why it happens:** Each Task-to-render-thread communication is a rendezvous. Setting fields on SceneGraph nodes from the render thread is fine, but doing it in bulk (creating 200+ ContentNodes in a single callback) or triggering observer chains (setting a field that triggers another observer that sets more fields) creates a blocking cascade. Roku's rendezvous has a timeout; exceed it and the app crashes.
 
-**How to avoid:**
-Create utility function that returns ALL required headers:
-```brightscript
-function GetPlexHeaders(token = "" as String) as Object
-    headers = {
-        "X-Plex-Client-Identifier": GetDeviceUniqueId() ' UUID per device
-        "X-Plex-Product": "PlexClassic"
-        "X-Plex-Version": "1.0.0"
-        "X-Plex-Platform": "Roku"
-        "X-Plex-Platform-Version": GetOSVersion()
-        "X-Plex-Device": GetDeviceModel()
-        "X-Plex-Device-Name": GetDeviceName()
-        "X-Plex-Provides": "player"
-    }
-    if token <> "" then headers["X-Plex-Token"] = token
-    return headers
-end function
-```
-- Use on EVERY Plex API call (plex.tv and PMS)
-- X-Plex-Client-Identifier MUST be persistent UUID (store in registry)
-- Never use reserved headers like "X-Roku-Reserved-Dev-Id" (causes SSL errors)
+**Consequences:** App crash with no user-visible error. On low-end Roku devices (Express, Streaming Stick), this happens more frequently and earlier. The crash is non-deterministic, making it hard to reproduce.
 
-**Warning signs:**
-- Intermittent 401 errors
-- "Missing required parameter" errors
-- Server discovery API returns empty list
-- Works with curl/Postman but not in Roku app
+**Prevention:**
+1. Build ContentNode trees entirely within the Task thread, then pass the completed tree to the render thread via a single field assignment. One rendezvous for the whole tree, not one per node.
+2. Use `setFields()` instead of multiple individual field assignments (one rendezvous instead of N).
+3. For hub rows: load rows sequentially with small delays (`Timer` node with 100-200ms between row loads) rather than firing all row requests simultaneously.
+4. Never create SceneGraph nodes (other than ContentNode) inside Task threads -- only ContentNode trees are safe to build in tasks and pass across.
+5. Profile with `channelperf` debug port and Roku Resource Monitor to identify rendezvous hotspots.
 
-**Phase to address:**
-Phase 1 (Authentication) - Define GetPlexHeaders() before first API call. All phases use this function.
+**Detection:** Enable the BrightScript debug console and look for "rendezvous" warnings. Test on the lowest-end supported Roku device.
+
+**Phase relevance:** Hub rows phase (loading multiple hub endpoints), filter/sort phase (rebuilding grids), any phase that populates large ContentNode trees.
+
+**Sources:**
+- [Roku SceneGraph Threads](https://sdkdocs-archive.roku.com/SceneGraph-Threads_4262152.html)
+- [Rendezvous explanation](https://medium.com/@amitdogra70512/rendezevous-in-roku-bd55d81fc994)
 
 ---
 
-### Pitfall 4: Memory Leaks from Node Cycles
+### Pitfall 3: Memory Pressure from ContentNode Trees in Large Libraries
 
-**What goes wrong:**
-Channel memory usage grows over time. Eventually crashes with out-of-memory errors on lower-end Roku devices. Nodes that should be garbage collected persist indefinitely.
+**What goes wrong:** With tens of thousands of items in a library, naive approaches (loading all items, keeping all ContentNode trees in memory for back-navigation) exhaust Roku's available memory. Roku devices have limited RAM (256MB-1.5GB depending on model), and texture memory is capped at approximately 95MB shared with the OS. The app gets killed by the OS with no crash dialog.
 
-**Why it happens:**
-BrightScript uses reference counting for memory management. Circular references (node A references node B, B references A) prevent garbage collection. Common when nodes observe each other or parent/child relationships create cycles.
+**Why it happens:** Each ContentNode with custom fields costs significant memory. Benchmarks show 2,000 extended ContentNodes take ~1,324ms to create and consume substantial heap. Poster images at full resolution (even when displayed at 240x360) consume texture memory at `width * height * 4 bytes`. A grid page of 50 posters at 480x720 source resolution uses ~66MB of texture memory.
 
-**How to avoid:**
-- NEVER store references to parent/ancestor nodes in child node fields
-- Call unobserveField() in component cleanup before removing from tree
-- Use weak references pattern: store node ID instead of node reference, look up when needed
-- Clear ContentNode children arrays before removing screens: `screenNode.removeChildren(screenNode.getChildren(-1, 0))`
-- Test with Roku Resource Monitor to track node count over time
+**Consequences:** OS kills the channel silently. User sees "channel closed" or a reboot on very low-end devices. This is the hardest bug to diagnose because there is no error callback.
 
-**Warning signs:**
-- Node count increases but never decreases (check via SceneGraph debugging)
-- Memory usage grows during navigation then returning to previous screens
-- Crashes on older/low-memory Roku devices after extended use
-- Multiple observer callbacks firing for same field change
+**Prevention:**
+1. Paginate aggressively: 50 items per page maximum, which the existing code already does.
+2. When navigating away from a screen (popping the screen stack), explicitly release ContentNode trees by setting the grid's `content` field to `invalid` in the cleanup function. Do not rely on garbage collection.
+3. Request poster images at the exact display size via Plex's `/photo/:/transcode?width=240&height=360` -- the existing code does this, but verify all new image-loading paths follow this pattern.
+4. For hub rows: limit to 20 items per row initially (Plex hub endpoints return limited results by default -- do not override with large container sizes).
+5. Use Roku Resource Monitor during development to track system memory, texture memory, and node count.
+6. Use `addFields` instead of `extends` when creating ContentNode subtypes -- `extends` is significantly more expensive.
 
-**Phase to address:**
-Phase 2 (Navigation/Screens) - Implement proper cleanup pattern when popping screen stack. Add to MainScene.brs screen removal logic.
+**Detection:** Monitor memory via `sgnodes all` in the debug console. Watch for increasing node counts after navigation (indicates leaks). Test with libraries of 10,000+ items.
 
----
+**Phase relevance:** Every phase, but especially hub rows (many concurrent data sources), music (album art grids), and photo browsing (high-resolution images).
 
-### Pitfall 5: Observer Pattern Anti-Patterns
-
-**What goes wrong:**
-Callback functions fire multiple times for single field change. Task observers trigger after Task node is removed. Memory leaks from accumulated observer callbacks.
-
-**Why it happens:**
-observeField() ADDS a callback, doesn't replace existing ones. Developers call observeField() in init() then again when reusing a Task. No automatic cleanup when nodes are removed.
-
-**How to avoid:**
-```brightscript
-' ALWAYS unobserve before re-observing
-task.unobserveField("state")
-task.observeField("state", "onTaskStateChange")
-
-' Unobserve in cleanup BEFORE removing node
-sub cleanup()
-    if m.currentTask <> invalid
-        m.currentTask.unobserveField("state")
-        m.currentTask.unobserveField("response")
-        m.currentTask = invalid
-    end if
-end sub
-```
-- Each observeField() call adds another callback to the queue
-- unobserveField() before setting node to invalid
-- Don't reuse Task nodes if they have callbacks
-- Check if callback function checks node validity: `if m.task = invalid then return`
-
-**Warning signs:**
-- Callback function executes 2, 3, 4+ times for single change
-- Crashes with "field not found" in observer callback
-- Observer fires after navigating away from screen
-- Memory leaks that correlate with Task usage
-
-**Phase to address:**
-Phase 1 (Authentication) - Establish pattern in first Task node implementation. Document in utils.brs.
+**Sources:**
+- [Roku Memory Management](https://developer.roku.com/docs/developer-program/performance-guide/memory-management.md)
+- [ContentNode benchmarks](https://medium.com/dazn-tech/rokus-scenegraph-benchmarks-aa-vs-node-9be5158474c1)
 
 ---
 
-### Pitfall 6: Plex Token Invalidation
+### Pitfall 4: Music Playback Cannot Survive Screen Navigation with Current Architecture
 
-**What goes wrong:**
-User successfully authenticates, but requests fail with 401 Unauthorized hours/days later. App requires re-authentication every launch. Token saved in registry becomes invalid.
+**What goes wrong:** The current VideoPlayer is appended directly to the scene and removed when playback completes. Music playback requires audio to continue while the user browses other screens (album art, queue, library). If the Audio node is owned by a screen that gets popped from the stack, playback stops.
 
-**Why it happens:**
-Plex invalidates tokens when user changes password, removes device from account, or after extended inactivity. App doesn't detect token invalidation and continues using stale token. No refresh token mechanism in Plex PIN flow.
+**Why it happens:** Roku's SceneGraph node tree is the DOM -- removing a node from the tree stops its playback. The Audio node must remain in the scene tree for the duration of playback. The current architecture has no concept of a persistent, cross-screen playback component.
 
-**How to avoid:**
-- Store token AND validated timestamp in registry
-- Implement 401 detection in all API calls: if response code = 401, clear token and redirect to auth
-- Validate stored token on app launch: GET /user with X-Plex-Token
-- Provide "Sign Out" option that clears registry token
-- Don't assume PIN authentication is permanent - expect re-auth
+**Consequences:** Music stops every time the user navigates. The app feels broken for music use. Retrofitting this after building music screens is a significant refactor.
 
-**Warning signs:**
-- Works after fresh authentication but fails later
-- 401 errors after app has been closed and reopened
-- Users report needing to re-authenticate frequently
-- API calls fail after user changes Plex password
+**Prevention:**
+1. Create the Audio node as a child of MainScene (the root), not any individual screen. It persists across all screen stack operations.
+2. Build a `NowPlayingBar` widget that is always visible at the bottom of MainScene when audio is playing. This bar shows track info, progress, and play/pause.
+3. The NowPlayingBar observes fields on the persistent Audio node. Screens can interact with the Audio node via `m.global` fields (e.g., `m.global.audioQueue`, `m.global.audioControl`).
+4. Design this architecture before building any music screens. Retrofitting is painful.
+5. The Audio node playlist cannot be modified after playback starts -- build the full queue ContentNode tree before calling `control = "play"`.
 
-**Phase to address:**
-Phase 1 (Authentication) - Build token validation into auth flow. Add 401 handler to API utility functions.
+**Detection:** Navigate away from the music player screen. If audio stops, the node is parented incorrectly.
+
+**Phase relevance:** Music phase. This architecture decision must be made at the start of the music phase, not mid-implementation.
+
+**Sources:**
+- [Roku Audio node](https://developer.roku.com/docs/references/scenegraph/media-playback-nodes/audio.md)
 
 ---
 
-### Pitfall 7: Library Pagination Failure
+### Pitfall 5: Intro Skip Button Timing Is a Race Condition Without Marker Pre-Fetch
 
-**What goes wrong:**
-Large libraries (>1000 items) load partially or hang. UI shows first 50-100 items but never loads more. Memory crashes when loading massive libraries without pagination.
+**What goes wrong:** The intro skip button must appear at a precise timestamp (e.g., second 32) and disappear at another (e.g., second 91). Developers fetch the marker data from `/library/metadata/{id}?includeMarkers=1` after playback starts, but the API call takes 200-500ms. If the intro starts at second 0 (cold opens), the marker data arrives after the intro has already begun, and the skip button appears late or not at all.
 
-**Why it happens:**
-Plex API returns 50 items by default. Developers don't implement X-Plex-Container-Start/Size headers. Attempting to load entire 10,000-item library in one request crashes or times out.
+**Why it happens:** The Plex API returns intro/credits markers as part of the metadata response, but only when `includeMarkers=1` is included in the request. The current `processMediaInfo()` does not request markers. Even when markers are requested, network latency means marker data arrives after playback has already started.
 
-**How to avoid:**
-```brightscript
-' Always paginate library requests
-headers["X-Plex-Container-Start"] = m.currentOffset.ToStr()
-headers["X-Plex-Container-Size"] = "50"
+**Consequences:** Skip button appears 0.5-2 seconds late, or the intro window is already past when the button renders. For short intros (15-20 seconds), the button may never appear.
 
-' Check response for totalSize, load more if needed
-totalSize = xml.GetNamedElements("MediaContainer")[0].size
-if m.currentOffset + 50 < totalSize then
-    m.currentOffset = m.currentOffset + 50
-    m.loadMoreTask.control = "run"
-end if
-```
-- Use X-Plex-Container-Start and X-Plex-Container-Size on /library/sections/{id}/all requests
-- Implement "load more" pattern when user scrolls near end of grid
-- Check MediaContainer@size vs MediaContainer@totalSize in response
-- Start with size=50, increase to 100 if performance allows
+**Prevention:**
+1. Fetch markers during the `loadMedia()` phase, before playback starts. The metadata endpoint already returns markers when `includeMarkers=1` is added -- bundle it with the existing media info fetch, not as a separate request.
+2. Parse the `Marker` array from the metadata response. Each marker has `type` ("intro", "credits"), `startTimeOffset` (ms), and `endTimeOffset` (ms).
+3. Store markers in `m.markers` before calling `m.video.control = "play"`.
+4. In `onPositionChange()`, compare current position against stored marker ranges. Show/hide the skip button based on the pre-fetched data. No async call needed at playback time.
+5. Credits skip is the same mechanism but triggers the "next episode" flow instead of seeking.
 
-**Warning signs:**
-- Grid shows exactly 50 items regardless of library size
-- Memory usage spikes with large libraries
-- Timeouts on library browse requests
-- Users report missing items in large collections
+**Detection:** Test with an episode whose intro starts at 0:00. If the skip button does not appear within the first second, markers are being fetched too late.
 
-**Phase to address:**
-Phase 3 (Library Browsing) - Implement pagination from start. Never load unpaginated library lists.
+**Phase relevance:** Intro/credits skip phase, auto-play next episode phase.
+
+**Sources:**
+- [Plex marker types](https://forums.plex.tv/t/question-about-markers-and-manipulating-them/931778)
+- [Plex skip content docs](https://support.plex.tv/articles/skip-content/)
 
 ---
 
-### Pitfall 8: Poster Image Loading Without Scaling
+## Moderate Pitfalls
 
-**What goes wrong:**
-App loads slowly and consumes excessive memory. Crashes on devices with limited RAM. Grid scrolling is janky. Each poster loads full-resolution image (2000x3000px) when only displaying 240x360.
+### Pitfall 6: SubtitleTracks vs SubtitleConfig Confusion Breaks Auto-Selection
 
-**Why it happens:**
-Plex returns full-resolution poster URLs by default. Poster component loads entire image into memory before scaling. Developers forget to set loadWidth/loadHeight or set them after uri.
+**What goes wrong:** Roku has two subtitle configuration mechanisms: `SubtitleTracks` (content metadata that lists available tracks with language/description) and `SubtitleConfig` (overrides automatic track selection). Developers commonly set `SubtitleConfig` thinking it enables subtitles, but this actually disables Roku's automatic language-based selection, breaking the user's system-level caption preference.
 
-**How to avoid:**
-```brightscript
-' CRITICAL: Set load dimensions BEFORE setting uri
-posterNode = createObject("roSGNode", "Poster")
-posterNode.loadWidth = 240
-posterNode.loadHeight = 360
-posterNode.loadDisplayMode = "scaleToFit"
-' NOW set uri - image loads scaled
-posterNode.uri = posterUrl
-```
-- Use Plex transcode API for posters: `/photo/:/transcode?url={posterKey}&width=240&height=360`
-- Property order matters: load* properties MUST be set before uri
-- Match loadWidth/loadHeight to display size (don't load 1920x1080 to show 240x360)
-- Compress images, prefer non-SSL URLs where possible
+**Prevention:**
+1. Always populate `SubtitleTracks` on the ContentNode with all available subtitle streams from the Plex API response.
+2. Only use `SubtitleConfig` when the user explicitly selects a specific track from your UI picker.
+3. Map Plex stream data to Roku's expected format: `{ "TrackName": "srt/path", "Language": "eng", "Description": "English" }`.
+4. For sidecar SRT files, the `TrackName` must be the full URL to the SRT file served by the Plex server: `{serverUri}/library/streams/{streamId}?X-Plex-Token={token}`.
 
-**Warning signs:**
-- Slow grid population (>5 seconds for 50 items)
-- Memory usage grows rapidly when browsing library
-- Out of memory crashes during scrolling
-- Graphics memory warnings in debug logs
+**Phase relevance:** Subtitle track selection phase.
 
-**Phase to address:**
-Phase 3 (Library Browsing) - Implement in PosterGrid component from start. Use ImageCacheTask with proper scaling.
+**Sources:**
+- [Roku SubtitleTracks docs](https://developer.roku.com/docs/developer-program/media-playback/closed-caption.md)
 
 ---
 
-### Pitfall 9: ContentNode Creation in Loops
+### Pitfall 7: Managed User Token Swap Invalidates All Active Tasks
 
-**What goes wrong:**
-Grid takes 5-10 seconds to populate with 100 items. UI freezes during library loading. User thinks app has crashed.
+**What goes wrong:** When switching managed users via the Plex Home API (`POST /api/home/users/{id}/switch`), a new auth token is returned. Any in-flight API tasks using the old token will receive 401 responses. If the app does not cancel all active tasks and update the stored token atomically, some requests succeed with the new token while others fail with the old one, creating inconsistent state.
 
-**Why it happens:**
-ContentNode creation is 30-50x slower than AssociativeArray creation. Creating ContentNodes in tight loops blocks render thread. Benchmarks show 649ms for 2000 ContentNodes vs 3ms for 2000 AAs.
+**Prevention:**
+1. When switching users: stop all active Task nodes first (set `control = "stop"` on every task).
+2. Update the token in registry AND in `m.global.authToken` atomically (single function call).
+3. Clear all cached data (library sections, hub rows, on-deck) -- the new user may have different library access.
+4. Pop all screens and push a fresh HomeScreen. Do not try to refresh screens in place.
+5. The switch endpoint returns a token for the managed user, but managed user tokens cannot manage PINs. Store the admin token separately if PIN management is needed later.
 
-**How to avoid:**
-```brightscript
-' Do heavy ContentNode creation in Task, not UI thread
-' Task node:
-sub processLibraryData()
-    content = createObject("roSGNode", "ContentNode")
-    for each item in m.top.rawData
-        child = content.createChild("ContentNode")
-        child.addFields({
-            title: item.title
-            hdPosterUrl: item.thumb
-            ratingKey: item.ratingKey
-        })
-    end for
-    m.top.processedContent = content
-end sub
+**Phase relevance:** Managed users phase.
 
-' Main scene observes processedContent field, assigns to grid
-m.posterGrid.content = task.processedContent
-```
-- Build ContentNode trees in background Task, pass completed tree to UI
-- Use addFields() to set multiple fields at once (faster than individual assignments)
-- Consider caching ContentNode trees for recently viewed screens
-- Batch updates: build complete tree before assigning to grid.content
-
-**Warning signs:**
-- Multi-second delay when loading grids
-- Frame rate drops during library browsing
-- CPU usage spikes when populating lists
-- Render thread shows high activity in profiler
-
-**Phase to address:**
-Phase 3 (Library Browsing) - Use Task-based ContentNode creation pattern. Never build large ContentNode trees on render thread.
+**Sources:**
+- [Plex managed user switch API](https://www.plexopedia.com/plex-media-server/api-plextv/managed-user-add/)
+- [Plex fast user switching](https://support.plex.tv/articles/204232453-fast-user-switching/)
 
 ---
 
-### Pitfall 10: Registry Write Without Flush
+### Pitfall 8: RowList Vertical Lazy Loading Causes Visible Scroll Stutters
 
-**What goes wrong:**
-User settings disappear after app restart. Authentication token lost on device reboot. Selected server forgotten. Users complain about having to reconfigure app repeatedly.
+**What goes wrong:** When using RowList for hub rows on the home screen, scrolling down triggers lazy loading of the next row's data. During the load, the scroll animation freezes visibly. The user experiences the UI "sticking" for 200-500ms at each row boundary. This is especially noticeable on lower-end devices.
 
-**Why it happens:**
-Registry writes are buffered. Without Flush(), data stays in memory but never persists to storage. Power loss or crash before flush = data loss. Developers assume Write() is sufficient.
+**Prevention:**
+1. Pre-fetch 2-3 rows ahead of the current visible area. Use the RowList's `rowItemFocused` field to detect which row is focused and trigger loading for `focusedRow + 2` and `focusedRow + 3`.
+2. Populate rows with placeholder ContentNodes (empty titles, placeholder poster URLs) immediately, then update with real data when the API response arrives. This prevents the RowList from resizing during scroll.
+3. Consider using MarkupGrid instead of RowList for the main library view -- benchmarks show 50% better scroll performance in some configurations.
+4. Build the entire ContentNode subtree for a row in the Task thread, then assign it to the RowList content with a single `replaceChild()` call. Do not append children one at a time.
 
-**How to avoid:**
-```brightscript
-' ALWAYS flush after registry writes
-registry = createObject("roRegistrySection", "PlexClassic")
-registry.Write("authToken", token)
-registry.Write("serverUrl", serverUrl)
-registry.Flush()  ' Critical - don't skip this
-```
-- Call Flush() after every registry write operation
-- Flush is expensive (slow), so batch writes then flush once
-- Registry survives app exit and device reboot ONLY after flush
-- Test by killing app process before flush to verify data persists
+**Phase relevance:** Hub rows phase.
 
-**Warning signs:**
-- Settings lost after app crash
-- Inconsistent data persistence (sometimes works, sometimes doesn't)
-- User authentication lost on device reboot
-- Works in development but fails on published app
-
-**Phase to address:**
-Phase 1 (Authentication) - Establish registry pattern from first token storage. Create utility function that includes flush.
+**Sources:**
+- [RowList lazy loading issues](https://community.roku.com/t5/Roku-Developer-Program/Problem-with-vertical-lazy-loading-in-RowList/td-p/1014936)
+- [MarkupGrid vs RowList performance](https://community.roku.com/discussions/developer/markupgrid-or-rowlist-what-should-i-use/480811)
 
 ---
 
-## Technical Debt Patterns
+### Pitfall 9: Live TV HLS Streams Require Different Buffering and Error Handling
 
-| Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
-|----------|-------------------|----------------|-----------------|
-| Skip pagination, load all library items | Simpler code, no scroll tracking | Memory crashes on large libraries, slow load times | NEVER - even small libraries can grow |
-| Reuse single Task node for all API calls | Fewer nodes to manage | Race conditions, observer conflicts, difficult debugging | NEVER - create Task per operation type |
-| Store nodes in AA instead of proper cleanup | Easier to access later | Memory leaks from circular references | NEVER - use proper unobserve/remove |
-| Skip certificate configuration in dev | Faster local testing | Fails on device, blocks production deployment | Only for pure offline/mock testing |
-| Hardcode X-Plex-Client-Identifier | Works immediately | Breaks multi-device, violates Plex guidelines | NEVER - must be unique per device |
-| Load full-size images without scaling | Works on high-end devices | Crashes on low-end Rokus, slow performance | NEVER - always scale at load time |
-| Skip token validation on startup | Faster app launch | Silent failures, poor UX when token expires | Only if auth flow is extremely robust |
-| Build ContentNode trees on render thread | Simpler Task management | UI freezes, poor UX, app feels broken | Only for <10 items |
+**What goes wrong:** Live TV streams from Plex DVR tuners behave differently from VOD streams. The HLS manifest is a live sliding window (no duration, no seekability). Developers reuse the same Video node configuration as VOD, resulting in: seek buttons that crash or show errors, progress bars that display nonsensical durations, and buffering that never recovers when the tuner has a momentary signal loss.
 
-## Integration Gotchas
+**Prevention:**
+1. Detect live streams from the Plex API response: live sessions have `live="1"` in the metadata, and the stream URL is a live HLS manifest (`EVENT` or `LIVE` type, not `VOD`).
+2. Disable seek controls (forward/back keys) in `onKeyEvent` for live streams.
+3. Hide the progress bar or show a "LIVE" indicator instead of elapsed/remaining time.
+4. Set `m.video.bufferingBar.visible = true` with appropriate buffering thresholds. Live streams need higher buffer tolerance (2-5 seconds) compared to VOD.
+5. Handle the `error` state more gracefully for live streams -- a tuner glitch may resolve in seconds. Implement auto-retry with a 3-second delay before showing an error dialog.
+6. The Plex live TV API uses `/livetv/sessions` for tuner management. Each tuner session must be explicitly started and stopped. Failing to stop a session when the user navigates away leaves the tuner locked, blocking other recordings.
 
-| Integration | Common Mistake | Correct Approach |
-|-------------|----------------|------------------|
-| Plex PIN Auth | Poll immediately after PIN creation | Wait for user to see PIN code, then start polling every 1s, max 5 minutes |
-| Server Discovery | Use first server from /resources | Present server list, prioritize local connections, respect user choice |
-| Playback Progress | Report every position change | Debounce, report every 10s during playback, on pause, and on stop |
-| Direct Play Detection | Assume all content can Direct Play | Check codec, resolution, audio format against Roku capabilities before deciding |
-| Transcode URLs | Use same URL for entire playback | Transcode URLs expire; handle 404 and request new transcode decision |
-| Server Connections | Always use HTTPS | Try HTTPS first, fall back to HTTP for local connections if HTTPS fails |
-| Auth Token in URL | Include token in query params for all requests | Use X-Plex-Token header; only use URL query for direct video playback |
-| Library Sections | Assume section keys are sequential | Use actual section key from API response; keys are arbitrary strings |
+**Phase relevance:** Live TV phase.
 
-## Performance Traps
+**Sources:**
+- [Roku streaming specifications](https://developer.roku.com/docs/specs/media/streaming-specifications.md)
+- [Plex Live TV & DVR docs](https://support.plex.tv/articles/225877347-live-tv-dvr/)
 
-| Trap | Symptoms | Prevention | When It Breaks |
-|------|----------|------------|----------------|
-| Unpaginated library loads | Slow grid population, memory warnings | Always paginate: X-Plex-Container-Size=50 | Libraries >500 items |
-| Synchronous image loading | UI freezes while images load | Use loadWidth/loadHeight, transcode URLs | Grids with >20 posters |
-| Full ContentNode tree on render thread | Multi-second UI freezes | Build ContentNode in Task, assign completed tree | >50 nodes |
-| Observer accumulation | Multiple callbacks per change | unobserveField() before removing nodes | After 10+ screen navigations |
-| Registry flush in loops | Slow settings updates | Batch writes, flush once at end | Any loop >5 iterations |
-| Missing Task node cleanup | Memory growth over time | Set task = invalid after reading results | After 50+ Task executions |
-| Global AA for large datasets | Deep copy overhead | Use ContentNode (passed by reference) | Data structures >100 items |
-| Poster URLs without transcoding | High bandwidth usage | Use /photo/:/transcode with width/height | Grids with >10 full-res images |
+---
 
-## Security Mistakes
+### Pitfall 10: Focus Traps in Overlay UI (Subtitle Picker, Skip Button, Settings Dialogs)
 
-| Mistake | Risk | Prevention |
-|---------|------|------------|
-| Logging auth tokens | Token leakage via debug logs, telemetry | Never log X-Plex-Token; redact in error reporting |
-| Hardcoded client identifier | All devices appear as same client, possible ban | Generate UUID on first launch, store in registry |
-| Token in URL for API calls | Token visible in network logs, proxy logs | Use X-Plex-Token header except for video playback |
-| No token validation on startup | App continues with invalid token, poor UX | Validate token with /user endpoint on app launch |
-| Storing passwords | Plex uses OAuth PIN flow, no password storage needed | NEVER store passwords; use PIN auth only |
-| Missing HTTPS for plex.tv | Man-in-the-middle attacks, token theft | Always use HTTPS for plex.tv, configure certificates |
-| Exposing server token in logs | Local server access compromise | Treat server URLs with tokens as sensitive |
+**What goes wrong:** When an overlay UI element (subtitle track picker, audio track picker, intro skip button) is shown on top of the video player, focus management becomes complex. If the overlay consumes the "back" key to close itself but does not properly restore focus to the Video node, the video becomes uncontrollable -- the user cannot pause, seek, or exit playback. On Roku, a focus-less screen is a dead end requiring the Home button.
 
-## UX Pitfalls
+**Why it happens:** `onKeyEvent` propagates up the node tree. An overlay that returns `true` for "back" to close itself prevents the Video node (its parent or sibling) from ever receiving that key. After the overlay is removed, if `setFocus(true)` is not called on the Video node, focus falls to the scene root or nowhere.
 
-| Pitfall | User Impact | Better Approach |
-|---------|-------------|-----------------|
-| No loading indicators | User thinks app is frozen | Show spinner during API calls, progress bars for large loads |
-| Silent authentication failures | App appears broken, no error shown | Display clear error messages, offer "Retry" and "Sign Out" |
-| Losing grid position on back | User must scroll to find their place | Store scroll index in screen node, restore on back navigation |
-| No empty state messaging | Blank screen when library is empty | Show "No items found" with icon and helpful text |
-| Immediate failure on token error | Jarring re-authentication flow | Attempt silent token refresh first, show message if that fails |
-| Missing connection status | User doesn't know if server is unreachable | Show connection status in settings, warn before attempting actions |
-| No server selection UI | User stuck with wrong/offline server | Allow server switching without full re-authentication |
-| Playback starts without buffer | Instant playback attempt, then buffering pause | Pre-buffer 2-3 seconds before starting playback |
-| No intro/credits skip feedback | User presses button, nothing happens | Show confirmation toast "Intro skipped" when successful |
+**Prevention:**
+1. Every overlay component must call `m.top.getParent().setFocus(true)` or a designated focus target after removing itself.
+2. Test the sequence: open overlay -> close overlay -> verify all remote buttons still work (play, pause, back, directional).
+3. The intro skip button should auto-dismiss (hide, not remove from tree) after the intro window passes. Do not remove nodes from the tree during playback -- just toggle visibility.
+4. Use a focus management pattern: store the "focus return target" before showing any overlay, restore it on overlay dismissal.
 
-## "Looks Done But Isn't" Checklist
+**Phase relevance:** Subtitle selection phase, intro skip phase, audio track selection phase, any phase adding playback overlays.
 
-- [ ] **HTTP Requests:** Task nodes used for ALL requests - verify no roUrlTransfer on render thread
-- [ ] **HTTPS Certificates:** SetCertificatesFile + InitClientCertificates on every HTTPS request - check all Task nodes
-- [ ] **X-Plex Headers:** ALL 8 required headers on every Plex API call - audit API utility functions
-- [ ] **Pagination:** X-Plex-Container-Start/Size on library requests - check /all and /search endpoints
-- [ ] **Image Scaling:** loadWidth/loadHeight set BEFORE uri - verify property order in all Poster uses
-- [ ] **Observer Cleanup:** unobserveField() before node removal - audit all component cleanup methods
-- [ ] **Registry Flush:** Flush() after all Write() operations - search codebase for Write() calls
-- [ ] **Token Validation:** Check token validity on startup and handle 401 responses - test with expired token
-- [ ] **Memory Cleanup:** removeChildren() and node=invalid in screen removal - verify screen stack management
-- [ ] **ContentNode Performance:** Large trees built in Task, not render thread - profile grid population
-- [ ] **Focus Restoration:** Store and restore focus index on back navigation - test multi-level navigation
-- [ ] **Error Handling:** API failures show user-friendly errors - test with network disabled
+**Sources:**
+- [Roku focus handling guide](https://www.tothenew.com/blog/mastering-focus-handling-in-roku-a-comprehensive-guide-to-focus-handling-through-mapping/)
+- [Roku onKeyEvent docs](https://developer.roku.com/docs/references/scenegraph/component-functions/onkeyevent.md)
 
-## Recovery Strategies
+---
 
-| Pitfall | Recovery Cost | Recovery Steps |
-|---------|---------------|----------------|
-| HTTP on render thread | HIGH | Refactor all network code into Task nodes; significant architecture change |
-| Missing certificates | LOW | Add 2 lines to Task node utility; test on device |
-| Missing X-Plex headers | MEDIUM | Create GetPlexHeaders() utility; update all API calls to use it |
-| Memory leaks (node cycles) | HIGH | Audit entire codebase for observers and node references; add cleanup |
-| No pagination | MEDIUM | Add pagination to API calls; implement load-more UI pattern |
-| Image loading without scaling | LOW | Fix property order, add transcode parameters; simple code change |
-| Observer anti-patterns | MEDIUM | Add unobserveField() calls; requires testing all flows |
-| Token invalidation handling | MEDIUM | Add validation on launch, 401 detection; update auth flow |
-| ContentNode on render thread | MEDIUM | Move to Task-based creation; refactor grid population logic |
-| Registry without flush | LOW | Add Flush() calls; one-line fix per write location |
-| Lost focus on navigation | MEDIUM | Add focus index tracking to screen nodes; test navigation flows |
-| No SceneGraph 1.3 declaration | LOW | Add rsg_version=1.3 to manifest before Oct 2026 |
+## Minor Pitfalls
 
-## Pitfall-to-Phase Mapping
+### Pitfall 11: Plex API `/hubs` Response Structure Varies by Library Type
 
-| Pitfall | Prevention Phase | Verification |
-|---------|------------------|--------------|
-| HTTP on render thread | Phase 1: Authentication | All HTTP in Task nodes; debug logs show no render thread roUrlTransfer |
-| Missing HTTPS certificates | Phase 1: Authentication | plex.tv API calls succeed on physical device |
-| Missing X-Plex headers | Phase 1: Authentication | Token received, servers discovered; no 401 errors |
-| Observer anti-patterns | Phase 1: Authentication | Observer fires once per field change; no multi-trigger |
-| Token invalidation | Phase 1: Authentication | App handles expired token, redirects to auth |
-| Registry without flush | Phase 1: Authentication | Token persists after app kill and device reboot |
-| Memory leaks (node cycles) | Phase 2: Navigation | Node count stable over 20+ screen navigations |
-| Focus restoration | Phase 2: Navigation | Focus position correct when pressing back button |
-| Library pagination | Phase 3: Library Browsing | Libraries >1000 items load correctly |
-| Image loading without scaling | Phase 3: Library Browsing | Memory usage <50MB with 100 posters visible |
-| ContentNode on render thread | Phase 3: Library Browsing | Grid populates in <1s with 100 items |
-| Direct Play detection | Phase 4: Playback | Content plays without unnecessary transcoding |
-| Playback progress tracking | Phase 4: Playback | Resume position accurate after app restart |
-| SceneGraph 1.3 manifest | Pre-launch: Certification | manifest contains rsg_version=1.3 |
+**What goes wrong:** The `/hubs` endpoint returns different hub types depending on the library type (movie, show, music, photo). Developers build a single hub row renderer and it breaks when music hubs return `artist` items instead of `movie`/`show` items, or when photo hubs return items with no `thumb` field (they use `art` instead).
+
+**Prevention:**
+1. Build the hub row data normalizer to handle all item types: `movie`, `show`, `season`, `episode`, `artist`, `album`, `track`, `photo`, `clip`.
+2. Use a type-based poster URL builder: movies/shows use `thumb`, artists/albums use `thumb`, photos use `art` or the first `Media[0].Part[0].key`.
+3. Use the existing `normalizers.brs` module (currently unused) as the foundation -- extend it to handle all types.
+
+**Phase relevance:** Hub rows phase, music phase, photos phase.
+
+---
+
+### Pitfall 12: Audio Node Playlist Is Immutable After Playback Starts
+
+**What goes wrong:** Developers build a music queue, start playback, then try to add/remove tracks from the queue by modifying the Audio node's content ContentNode. Changes are silently ignored. The queue appears to update in the UI but the Audio node continues playing the original playlist.
+
+**Prevention:**
+1. To modify a music queue mid-playback: note the current track index and position, stop the Audio node, rebuild the entire ContentNode playlist tree, re-assign it to the Audio node, seek to the saved position.
+2. Build a queue management layer in BrightScript (an array of track metadata) that is the source of truth. The Audio node's ContentNode is rebuilt from this array whenever the queue changes.
+3. For "play next" and "add to queue" features: modify the BrightScript queue array, then rebuild and re-assign the ContentNode.
+
+**Phase relevance:** Music phase (playback queue management).
+
+---
+
+### Pitfall 13: Single Shared API Task Causes Request Collisions
+
+**What goes wrong:** The current codebase uses one `m.apiTask` per screen. If the user triggers a second API request before the first completes (e.g., rapid sidebar navigation, or loading detail metadata while hub rows are still fetching), the task's `endpoint` field is overwritten. The first request's response handler processes the second request's data, or vice versa.
+
+**Why it happens:** BrightScript Task nodes can only run one request at a time. Setting new fields on a running task overwrites the pending request. The `m.isLoading` guard in HomeScreen mitigates this partially but not completely.
+
+**Prevention:**
+1. Create a new Task node instance for each API request. Task nodes are lightweight; creating one per request avoids all collision issues.
+2. Alternatively, implement a request queue in the screen that serializes requests and processes responses in order.
+3. For screens that genuinely need multiple concurrent requests (hub rows loading 8 endpoints), create multiple Task instances (one per hub row).
+
+**Phase relevance:** Hub rows phase (multiple concurrent requests), filter/sort phase (rapid re-queries).
+
+**Note:** This is already documented in CONCERNS.md as a fragile area. Fixing it in the hub rows phase prevents compounding issues in later phases.
+
+---
+
+### Pitfall 14: EPG Grid for Live TV Is a Custom Component Nightmare
+
+**What goes wrong:** Roku has no built-in EPG (Electronic Program Guide) grid component. Developers must build a custom scrolling time-based grid from scratch using Group/Rectangle/Label nodes. This is the most complex custom UI component in any Roku app and is extremely prone to: focus management bugs, memory leaks (thousands of program cells), scroll performance issues, and time-zone rendering errors.
+
+**Prevention:**
+1. Start with the simplest possible EPG: a LabelList of channels, and when a channel is focused, show the current/next program info in a detail panel. This avoids the full grid entirely for v1.
+2. If a full grid is required: limit the visible time window to 2 hours, virtualize the grid (only render visible cells), and use `Timer` nodes to shift the time window rather than re-rendering the entire grid.
+3. Time zone handling: Plex EPG data uses UTC timestamps. Convert to local time using `CreateObject("roDateTime")` and its `toLocalTime()` method. Do not do string-based time math.
+4. Limit the EPG data fetch to the current 4-hour window. Do not pre-fetch a full day's guide data.
+
+**Phase relevance:** Live TV phase.
+
+---
+
+### Pitfall 15: GetConstants() Called on Every Key Event Creates GC Pressure
+
+**What goes wrong:** The existing `GetConstants()` function in `constants.brs` allocates a new `roAssociativeArray` every time it is called. In `VideoPlayer.brs`, it is called on every key press and every position change callback. Under rapid key repeat (holding fast-forward), this creates hundreds of allocations per second, contributing to garbage collection pauses that cause visible playback stutters.
+
+**Prevention:**
+1. Cache constants in `m.global` during app initialization. Access via `m.global.constants` everywhere.
+2. This is already documented in CONCERNS.md. Fix it before adding more constant-heavy features (subtitle picker, intro skip, music playback controls).
+
+**Phase relevance:** Should be fixed in the first phase as infrastructure cleanup. Affects every subsequent phase.
+
+---
+
+## Phase-Specific Warnings
+
+| Phase Topic | Likely Pitfall | Mitigation |
+|-------------|---------------|------------|
+| Hub Rows | Rendezvous cascade from 8+ concurrent hub row loads (#2) | Stagger row loads with 100-200ms Timer delays; build ContentNode trees in Task threads |
+| Hub Rows | Single shared API task collisions (#13) | Create one Task per hub row request |
+| Hub Rows | RowList scroll stutter (#8) | Pre-fetch 2-3 rows ahead, use placeholder ContentNodes |
+| Filters/Sort | Rebuilding grid with 1000+ items blocks render thread (#2) | Build new ContentNode tree in Task, swap atomically |
+| Subtitle Selection | PGS/bitmap subtitles show nothing on direct play (#1) | Detect codec, force burn-in transcode for non-SRT formats |
+| Subtitle Selection | SubtitleTracks vs SubtitleConfig confusion (#6) | Use SubtitleTracks for listing, SubtitleConfig only for user override |
+| Subtitle Selection | Focus trap in subtitle picker overlay (#10) | Store focus target, restore on overlay dismiss |
+| Intro Skip | Marker data arrives after intro starts (#5) | Pre-fetch markers with media metadata before playback |
+| Intro Skip | Skip button overlay focus issues (#10) | Auto-hide (visibility toggle), do not remove from tree |
+| Audio Track Selection | Focus trap in audio picker overlay (#10) | Same pattern as subtitle picker |
+| Music Playback | Audio stops on screen navigation (#4) | Parent Audio node to MainScene, not to any screen |
+| Music Playback | Immutable playlist after play starts (#12) | Rebuild entire ContentNode on queue change |
+| Live TV | VOD-style controls break on live streams (#9) | Detect `live="1"`, disable seek, show LIVE indicator |
+| Live TV | EPG grid custom component complexity (#14) | Start with simple channel list, not full grid |
+| Live TV | Tuner session not released on navigate-away (#9) | Explicitly stop tuner session in screen cleanup |
+| Managed Users | Token swap invalidates active tasks (#7) | Stop all tasks, update token atomically, clear caches, reset screen stack |
+| All Phases | Memory pressure from ContentNode accumulation (#3) | Release content on screen pop, request sized images, monitor with Resource Monitor |
+| All Phases | GetConstants() GC pressure (#15) | Cache in m.global before starting feature work |
+
+---
 
 ## Sources
 
-**Roku SceneGraph & BrightScript:**
-- [Roku SceneGraph Threads Documentation](https://sdkdocs-archive.roku.com/SceneGraph-Threads_4262152.html) - MEDIUM confidence
-- [Understanding Threads in Roku Development](https://medium.com/@amitdogra70512/understanding-threads-in-roku-development-d890fa2fa9b5) - MEDIUM confidence
-- [Rendezevous in Roku](https://medium.com/@amitdogra70512/rendezevous-in-roku-bd55d81fc994) - MEDIUM confidence
-- [Task in Roku](https://www.oodlestechnologies.com/blogs/task-in-roku/) - MEDIUM confidence
-- [Roku Memory Management](https://developer.roku.com/docs/developer-program/performance-guide/memory-management.md) - HIGH confidence (attempted)
-- [Roku SceneGraph Debugging](https://sdkdocs-archive.roku.com/Debugging-SceneGraph-Applications_3736509.html) - MEDIUM confidence
-- [SSL Certificate Problem Community Thread](https://community.roku.com/t5/Roku-Developer-Program/SSL-certificate-problem-unable-to-get-issuer-certificate/td-p/496742) - MEDIUM confidence
-- [Roku Poster Component Property Order](https://briandunnington.github.io/poster_property_order) - HIGH confidence
-- [Optimizing Roku UI Tips and Tricks](https://medium.com/@amitdogra70512/optimizing-roku-ui-tips-and-tricks-dd9d8b1a36e4) - MEDIUM confidence
-- [Image Optimization in Roku](https://www.tothenew.com/blog/image-optimisation-in-roku/) - MEDIUM confidence
-- [Mastering Focus Handling in Roku](https://www.tothenew.com/blog/mastering-focus-handling-in-roku-a-comprehensive-guide-to-focus-handling-through-mapping/) - MEDIUM confidence
-- [Managing Screen Back Stack in Roku](https://roku.home.blog/2019/01/02/back-stack-management-in-roku-using-scenegraph-component/) - MEDIUM confidence
-- [Roku Registry Discussion](https://community.roku.com/t5/Roku-Developer-Program/Anyone-seen-a-save-registry-value-fail/td-p/263592) - MEDIUM confidence
-- [ContentNode Performance Discussion](https://community.roku.com/t5/Roku-Developer-Program/Performance-of-creating-ContentNode-v-roArray-roAA/td-p/470963) - HIGH confidence
-- [Roku SceneGraph 1.3 Certification](https://blog.roku.com/developer) - MEDIUM confidence
-
-**Plex API & Authentication:**
-- [Plex API Authentication Forum](https://forums.plex.tv/t/authenticating-with-plex/609370) - HIGH confidence
-- [Finding Plex Authentication Token](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/) - HIGH confidence
-- [Plex Media Server Documentation](https://developer.plex.tv/pms/) - HIGH confidence
-- [Plex X-Plex Headers Documentation](https://github.com/phillipj/node-plex-api-headers) - MEDIUM confidence
-- [Plex Client Identifier Gist](https://gist.github.com/philipjewell/2b721ccde6f251f67454dd04829cef4b) - MEDIUM confidence
-- [Plex Server Discovery Resources](https://support.plex.tv/articles/206721658-using-plex-tv-resources-information-to-troubleshoot-app-connections/) - HIGH confidence
-- [Plex API Pagination Documentation](https://plexapi.dev/api-reference/library/get-all-media-of-library) - HIGH confidence
-- [Plex Direct Play Documentation](https://support.plex.tv/articles/200250387-streaming-media-direct-play-and-direct-stream/) - HIGH confidence
-- [Plex PIN Authentication Implementation](https://github.com/harrisonhoward/plex_pin_auth) - MEDIUM confidence
-- [Plex Token Invalidation Issues](https://github.com/goauthentik/authentik/issues/17089) - MEDIUM confidence
-
-**Community Experience (Training Data):**
-- Personal knowledge of BrightScript render thread limitations - LOW confidence (not verified with 2026 docs)
-- ContentNode performance benchmarks from community testing - MEDIUM confidence
-- Registry flush behavior based on community reports - MEDIUM confidence
+- [Roku Closed Caption Support](https://developer.roku.com/docs/developer-program/media-playback/closed-caption.md) -- subtitle format support, SubtitleTracks/SubtitleConfig
+- [Roku Video Node Reference](https://developer.roku.com/docs/references/scenegraph/media-playback-nodes/video.md) -- availableSubtitleTracks, subtitleTrack fields
+- [Roku Audio Node Reference](https://developer.roku.com/docs/references/scenegraph/media-playback-nodes/audio.md) -- playlist behavior, content field
+- [Roku SceneGraph Threads](https://sdkdocs-archive.roku.com/SceneGraph-Threads_4262152.html) -- rendezvous mechanics
+- [Roku Memory Management](https://developer.roku.com/docs/developer-program/performance-guide/memory-management.md) -- memory limits, optimization
+- [Roku Data Management](https://developer.roku.com/docs/developer-program/performance-guide/data-management.md) -- ContentNode best practices
+- [Roku Streaming Specifications](https://developer.roku.com/docs/specs/media/streaming-specifications.md) -- HLS, format support
+- [Roku Focus Handling Guide](https://www.tothenew.com/blog/mastering-focus-handling-in-roku-a-comprehensive-guide-to-focus-handling-through-mapping/)
+- [ContentNode Benchmarks (DAZN Engineering)](https://medium.com/dazn-tech/rokus-scenegraph-benchmarks-aa-vs-node-9be5158474c1)
+- [Rendezvous Explained](https://medium.com/@amitdogra70512/rendezevous-in-roku-bd55d81fc994)
+- [PGS Subtitles on Roku (How-To Geek)](https://www.howtogeek.com/as-a-plex-user-im-begging-roku-to-support-pgs-subtitles/)
+- [Plex Skip Content](https://support.plex.tv/articles/skip-content/) -- marker types, intro/credits detection
+- [Plex Marker API Discussion](https://forums.plex.tv/t/question-about-markers-and-manipulating-them/931778)
+- [Plex Live TV & DVR](https://support.plex.tv/articles/225877347-live-tv-dvr/)
+- [Plex Fast User Switching](https://support.plex.tv/articles/204232453-fast-user-switching/)
+- [Plex Managed User API](https://www.plexopedia.com/plex-media-server/api-plextv/managed-user-add/)
+- [RowList Lazy Loading Issues](https://community.roku.com/t5/Roku-Developer-Program/Problem-with-vertical-lazy-loading-in-RowList/td-p/1014936)
+- [Roku Resource Monitor](https://blog.roku.com/developer/resource-monitor)
 
 ---
-*Pitfalls research for: PlexClassic Roku Channel*
-*Researched: 2026-02-09*
+
+*Pitfalls audit: 2026-03-08*

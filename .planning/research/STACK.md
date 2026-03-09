@@ -1,293 +1,120 @@
 # Technology Stack
 
-**Project:** PlexClassic
-**Domain:** Roku Plex Media Server Client
-**Researched:** 2026-02-09
-**Overall Confidence:** MEDIUM
+**Project:** SimPlex (Roku Plex Client)
+**Researched:** 2026-03-08
+
+## Critical Finding: Maestro Is Deprecated -- Do NOT Adopt
+
+The project brief specifies Maestro MVVM v0.72.0 as a target framework. **This recommendation is now obsolete.** Tantawowa Ltd officially deprecated Maestro in late 2023. No maintenance, no updates, no new features. Critical fixes are available only to existing enterprise clients on a case-by-case basis.
+
+Tantawowa announced a replacement cross-platform TV framework "coming later in 2024" but as of March 2026, no public release has materialized. Adopting a deprecated framework with no successor would be reckless.
+
+**Confidence: HIGH** -- Verified via official GitHub README and release history.
+
+## Recommendation: BrighterScript Without Maestro
+
+Use BrighterScript as a build-time compiler for the existing plain BrightScript codebase. Do NOT adopt Maestro or any MVVM framework. The app is a single-developer, single-purpose Plex client -- MVVM abstraction adds complexity without proportional benefit.
+
+### Why BrighterScript (Without a Framework)
+
+1. **Zero-cost migration**: BrighterScript is a strict superset of BrightScript. Every existing `.brs` file is already valid BrighterScript. You adopt it by adding a build step, not by rewriting code.
+2. **Compile-time error checking**: Catches null references, type mismatches, and missing fields before sideloading. Currently these only surface at runtime on the Roku device.
+3. **Namespaces and classes**: Reduce global scope pollution as the codebase grows (e.g., normalizers, utilities, constants can be namespaced).
+4. **Better IDE experience**: The BrightScript Language VSCode extension uses BrighterScript's language server for intellisense, go-to-definition, and diagnostics -- even on plain `.brs` files.
+5. **Ecosystem standard**: Jellyfin-Roku, and many professional Roku shops use BrighterScript as their compiler. It is the de facto standard for serious Roku development.
+6. **Gradual adoption**: New files can use `.bs` extension with classes/namespaces. Existing `.brs` files work unchanged. No big-bang migration required.
+
+### Why NOT Maestro
+
+1. **Deprecated** -- No maintenance, no roadmap, no community support.
+2. **Heavy abstraction** -- MVVM with IOC containers, node classes, and annotation-driven XML generation is overengineered for a single-developer sideloaded channel.
+3. **Build complexity** -- Requires `maestro-cli-roku`, a post-install hook (`maestro-ropm-hook.js`), and the `ropm` package manager. Adds fragile toolchain dependencies.
+4. **No replacement** -- Tantawowa's promised successor hasn't shipped. Betting on vaporware is worse than betting on deprecated software.
+5. **Existing architecture is sound** -- The current observer + task node + screen stack pattern is the canonical Roku architecture. It does not need an MVVM overlay.
 
 ## Recommended Stack
 
-### Core Platform
+### Core Language & Compiler
 
-| Technology | Version | Purpose | Why Recommended |
-|------------|---------|---------|-----------------|
-| Roku OS | 15.0+ | Target platform | Latest stable release with improved BrightScript engine, better memory management, and new APIs for efficient data transfer. OS 15.1 adds Perfetto tracing support. |
-| BrightScript | Latest (OS 15.0) | Primary language | Native Roku language with improved JSON parsing, new roUtils component, and ifArraySizeInfo interface for better array management. |
-| SceneGraph | RSG 1.3 | UI framework | Required for all modern Roku apps. Version 1.3 will be mandatory for certification by October 1, 2026. Provides component-based architecture with XML layout + BrightScript logic. |
-| FHD Resolution | 1920x1080 | Display target | Standard for non-4K Roku devices, wide device compatibility. 4K devices scale down gracefully. |
+| Technology | Version | Purpose | Why | Confidence |
+|------------|---------|---------|-----|------------|
+| BrighterScript | ^0.70.3 (stable) | Compiler / transpiler | Superset of BrightScript; compile-time checking, namespaces, classes. Transpiles to standard BrightScript for Roku. Stable branch actively maintained. | HIGH |
+| BrightScript | Roku OS native | Runtime language | What actually runs on the device. BrighterScript compiles down to this. | HIGH |
+| SceneGraph XML | RSG 1.3 | UI framework | Roku's native component framework. No alternative exists. | HIGH |
 
-**Confidence:** HIGH - These are official Roku platform requirements verified from official documentation and recent Roku OS releases.
+**Do NOT use BrighterScript v1.0.0-alpha.x** -- As of v1.0.0-alpha.50 (Jan 2025), the alpha branch has breaking changes and is not production-ready. Stick with the 0.70.x stable line. The project brief's target of ^0.69.x is fine but 0.70.3 is the current stable release; use that.
 
-### Development Language Enhancement
+### Build & Deploy Tools
 
-| Technology | Version | Purpose | Why Recommended |
-|------------|---------|---------|-----------------|
-| BrighterScript | 0.70.3+ | Development language (optional) | **Recommended for new projects.** Superset of BrightScript that compiles to standard BrightScript. Adds classes, namespaces, import statements, ternary operators, template strings, null-coalescing. Catches errors at compile-time without device. 100% compatible with all Roku devices. |
+| Technology | Version | Purpose | Why | Confidence |
+|------------|---------|---------|-----|------------|
+| roku-deploy | ^3.16.1 | Package & sideload | Zips the app and deploys to Roku device over HTTP. Integrates with VSCode extension. | HIGH |
+| BrightScript Language VSCode Extension | Latest | IDE support | Debugging, intellisense, deploy-on-save. Uses BrighterScript language server internally. | HIGH |
 
-**Confidence:** HIGH - Widely adopted community standard with 189 GitHub stars, maintained by RokuCommunity.
+### Testing (Deferred -- Phase 19 Stretch Goal)
 
-**Decision:** Use BrighterScript for development, compile to BrightScript for deployment. This gives modern language features while maintaining full compatibility.
+| Technology | Version | Purpose | Why | Confidence |
+|------------|---------|---------|-----|------------|
+| Rooibos | Latest via ropm | Unit testing | The only serious BrightScript testing framework. Supports mocking, code coverage. Used in production by Jellyfin, enterprise Roku shops. | MEDIUM |
 
-### Core SceneGraph Components
+Rooibos requires BrighterScript as a compiler (it's a BSC plugin). Adopting BrighterScript now means testing is available when needed later.
 
-| Component | Purpose | When to Use |
-|-----------|---------|-------------|
-| PosterGrid | Grid of graphic images | Library browsing, collections, search results. Set basePosterSize to exact image dimensions for best appearance. |
-| MarkupGrid | Grid with markup support | Similar to PosterGrid but supports markup in labels |
-| RowList | Horizontal rows of content | Home screen, continue watching, recommendations |
-| LabelList | Text-based lists | Settings menus, simple navigation |
-| Video | Video playback | Primary playback component for direct play and transcoded content |
-| ContentNode | Data model | All list/grid data. Use instead of associative arrays - passed by reference, much faster for complex data. |
-| Task | Background threading | **Critical: All HTTP requests MUST run in Task nodes.** Using roUrlTransfer on render thread causes crashes. |
+### Package Management (Optional)
 
-**Confidence:** HIGH - These are official Roku SDK components verified from developer documentation.
-
-### Task Nodes (HTTP & Background Operations)
-
-| Task Type | Purpose | Implementation Pattern |
-|-----------|---------|------------------------|
-| PlexAuthTask | OAuth PIN flow | POST to plex.tv/api/v2/pins, poll for authToken |
-| PlexApiTask | General PMS requests | GET/POST with X-Plex-* headers, pagination support |
-| PlexSearchTask | Search queries | Debounced search with query parameters |
-| PlexSessionTask | Playback progress | PUT to /:/timeline with state/time |
-| ImageCacheTask | Poster prefetching | Request resized images via /photo/:/transcode |
-
-**Confidence:** MEDIUM - Based on standard Plex API patterns and Roku Task node best practices.
-
-### Development Tools
-
-| Tool | Version | Purpose | Why Essential |
-|------|---------|---------|---------------|
-| VSCode | Latest | Primary IDE | Industry standard with excellent Roku support |
-| vscode-brightscript-language | Latest | VSCode extension | Official RokuCommunity extension used by thousands. Provides debugging, breakpoints, syntax highlighting, device deployment. Includes roku-debug, roku-deploy, brighterscript-formatter. |
-| roku-deploy | 3.14.4+ | Deployment automation | Zip and deploy to devices. Handles staging, package creation, sideloading. Prepares for roku-deploy v4. |
-| bslint | 0.8.38+ | Static analysis | Linter for BrightScript/BrighterScript. Includes --fix for auto-formatting, --checkUsage for unused code detection. Enforces certification requirements (e.g., color-cert for broadcast safe colors). |
-| ropm | 0.11.2+ | Package manager | Roku package manager using npm behind the scenes. Prevents naming collisions via prefix rewriting. Supports OIDC for publishing. |
-
-**Confidence:** HIGH - All tools from official RokuCommunity ecosystem with active maintenance.
-
-### Testing & Quality Assurance
-
-| Tool | Purpose | When to Use |
-|------|---------|-------------|
-| Rooibos | Unit testing | **Recommended.** Modern framework inspired by Mocha. Backward compatible with official framework. Easier to use than alternatives. |
-| Official Unit Testing Framework | Unit testing | Fallback if Rooibos doesn't work. Less ergonomic but officially supported. |
-| Roku Test Automation (RTA) | Functional testing | E2E testing on actual devices. For critical user flows. |
-| Roku Developer Tools Web Portal | Device debugging | Port 8080 on device. View logs, SceneGraph hierarchy, performance metrics. |
-| Perfetto Tracing | Performance profiling | Roku OS 15.1+. Deep performance analysis for optimization. |
-
-**Confidence:** MEDIUM - Multiple frameworks available, Rooibos is community preference but official framework is more conservative choice.
-
-### Data Management
-
-| Technology | Purpose | Best Practices |
-|------------|---------|----------------|
-| ContentNode | In-memory data | Use for all grid/list data. Passed by reference (fast). Structured parent→children hierarchy. Supports Content Meta-Data fields. |
-| roRegistrySection | Persistent storage | 16KB limit per channel. ALWAYS call .Flush() after writes. Use "Transient" section for per-boot data. Store playback position, user preferences. |
-| Server-side storage | Multi-device sync | Prefer for auth tokens, watch history that syncs across devices. Registry is per-device only. |
-| Roku OS 15.0 APIs | Data transfer | Use new move APIs instead of copying for large objects. Reduces memory overhead. |
-
-**Confidence:** HIGH - Official Roku patterns verified from documentation and performance guides.
-
-### HTTP & Networking
-
-| Pattern | Implementation | Critical Requirements |
-|---------|----------------|----------------------|
-| HTTPS requests | roUrlTransfer in Task nodes | MUST call SetCertificatesFile("common:/certs/ca-bundle.crt") and InitClientCertificates() before every request |
-| Request headers | GetPlexHeaders() utility | Include ALL X-Plex-* headers on every Plex API call (Platform, Product, Version, Device-Name, Client-Identifier) |
-| Pagination | Container-Start/Size | Use X-Plex-Container-Start and X-Plex-Container-Size=50 for library fetches |
-| Multiple requests | Discrete Task nodes | For N parallel requests, use N Task nodes. Don't reuse objects across threads. |
-| Response handling | Field observers | task.observeField("state", "onTaskCallback"), check task.response after completion |
-
-**Confidence:** HIGH - Official Roku requirements and Plex API standards.
-
-### Video Playback
-
-| Technology | Purpose | Notes |
-|------------|---------|-------|
-| Video node | Primary playback | Built-in SceneGraph component. Supports direct play and HLS transcoding. |
-| Direct Play | Native file playback | Use {server}{partKey}?X-Plex-Token={token}. Check codec compatibility first. |
-| HLS Transcoding | Universal playback | Use /video/:/transcode/universal/start.m3u8 endpoint. Fallback when direct play fails. |
-| Progress Tracking | Timeline reporting | PUT to /:/timeline with ratingKey, state (playing/paused/stopped), time in milliseconds |
-| HEVC/H.265 | 4K playback | Supported only on 4K-capable devices (Roku 4, Premiere, Streaming Stick+, Ultra). Note: 2024+ Ultra models may prefer H.265 for 4K. |
-
-**Confidence:** MEDIUM - Based on Plex API documentation and community reports. Codec behavior varies by device generation.
-
-## What NOT to Use
-
-| Avoid | Why | Use Instead |
-|-------|-----|-------------|
-| roUrlTransfer on render thread | **Critical:** Causes rendezvous crashes. Roku will reject the app. | Always use Task nodes for HTTP requests |
-| Associative arrays for large data | Copied by value, slow for complex structures | ContentNode (passed by reference) |
-| Custom scrolling implementations | Reinventing the wheel, poor performance, accessibility issues | Built-in PosterGrid, RowList, LabelList components |
-| Hardcoded image URLs | No resizing, wastes bandwidth, slow loading | /photo/:/transcode?width=240&height=360 |
-| Skipping Flush() on registry writes | Data not persisted, user settings lost | Always call .Flush() after roRegistrySection writes |
-| Old RSG versions | Won't pass certification after Oct 2026 | Set rsg_version=1.3 in manifest |
-| Missing HTTPS certificates | SSL errors on all requests | SetCertificatesFile() + InitClientCertificates() |
-| Polling without debounce | Excessive API calls, poor UX | Debounce search queries, use field observers properly |
-
-**Confidence:** HIGH - These are known anti-patterns that cause app rejection or poor performance.
-
-## Development Workflow
-
-### Initial Setup
-
-```bash
-# Install Node.js tooling
-npm install -g brighterscript @rokucommunity/bslint ropm
-
-# Initialize project
-npm init -y
-npm install --save-dev brighterscript @rokucommunity/bslint
-
-# Create VSCode workspace
-# Install "BrightScript Language" extension (RokuCommunity.brightscript)
-```
-
-### Project Structure
-
-```
-PlexClassic/
-├── manifest                 # Roku app manifest (UTF-8, rsg_version=1.3)
-├── source/                  # BrightScript/BrighterScript source
-│   ├── main.brs            # Entry point
-│   ├── utils.brs           # Shared helpers
-│   └── constants.brs       # Constants
-├── components/              # SceneGraph components
-│   ├── MainScene.xml/.brs  # Root scene
-│   ├── screens/            # Full-screen views
-│   ├── widgets/            # Reusable UI components
-│   └── tasks/              # Background Task nodes
-├── images/                  # Assets (icons, splash, placeholders)
-├── bsconfig.json           # BrighterScript config
-├── .vscode/
-│   └── launch.json         # Debug configuration
-└── rokudeploy.json         # Deployment config
-```
-
-### Build & Deploy
-
-```bash
-# Compile BrighterScript to BrightScript
-npx bsc
-
-# Lint
-npx bslint --fix
-
-# Deploy to device (via VSCode extension)
-# F5 to launch debugger
-
-# Or via command line
-npx roku-deploy --host <roku-ip> --password <dev-password>
-```
-
-### Debugging
-
-```bash
-# Set breakpoints in VSCode
-# Launch debugger (F5)
-# Note: Breakpoints inject STOP statements, must restart debug session for new breakpoints
-
-# Device telnet debugging (port 8085)
-telnet <roku-ip> 8085
-
-# Web-based developer tools
-http://<roku-ip>:8080
-```
+| Technology | Version | Purpose | When to Use | Confidence |
+|------------|---------|---------|-------------|------------|
+| ropm | Latest | Roku package manager | Only if you need third-party packages (e.g., Rooibos for testing). Not needed for the core app since it has no third-party dependencies. | MEDIUM |
 
 ## Alternatives Considered
 
-| Category | Recommended | Alternative | When to Use Alternative |
-|----------|-------------|-------------|-------------------------|
-| Development Language | BrighterScript | Pure BrightScript | Legacy codebases, team unfamiliar with transpilation |
-| Unit Testing | Rooibos | Official Framework | Conservative teams, concerned about community support |
-| Package Management | ropm | Manual file management | Simple projects with no dependencies |
-| IDE | VSCode + RokuCommunity | Sublime/Atom/others | Personal preference, but VSCode has best tooling |
-| Video Component | Built-in Video node | Custom implementation | Never - built-in is certification requirement |
+| Category | Recommended | Alternative | Why Not |
+|----------|-------------|-------------|---------|
+| Language | BrighterScript 0.70.x | Plain BrightScript (status quo) | Loses compile-time checking, namespaces, classes. IDE intellisense is worse. Migration cost is near-zero since BS is a superset. |
+| Language | BrighterScript 0.70.x | BrighterScript 1.0.0-alpha | Unstable, breaking changes between alphas. Not ready for production. PROJECT.md already lists this as out of scope. |
+| Framework | None (plain SceneGraph) | Maestro MVVM 0.72.0 | **Deprecated.** Adds complexity without proportional benefit for a single-developer app. |
+| Framework | None (plain SceneGraph) | Tantawowa's successor | Does not exist publicly. Vaporware as of March 2026. |
+| Testing | Rooibos (deferred) | Roku's unit-testing-framework | Less capable, less maintained, no mocking support. Rooibos is the community standard. |
+| Build | roku-deploy + bsc CLI | Manual zip + HTTP upload | Slower iteration. roku-deploy automates the zip-and-upload cycle. |
 
-## Stack Patterns by Project Variant
+## Migration Path: Plain BrightScript to BrighterScript
 
-**If building from scratch (greenfield):**
-- Use BrighterScript with classes and namespaces
-- Implement proper API abstraction layer (PlexApiTask)
-- Use ropm for any shared libraries
-- Set up bslint with --fix from day one
+This is a LOW-RISK migration because BrighterScript is a superset -- no code changes required to start.
 
-**If modifying existing BrightScript codebase:**
-- BrighterScript is backward compatible, can adopt incrementally
-- Start by adding .bsconfig.json and renaming .brs to .bs for new files
-- Keep existing .brs files as-is, they'll work unchanged
-- Gradually refactor to use classes/namespaces as you touch files
-
-**For this project (PlexClassic):**
-- Greenfield: Use BrighterScript with modern patterns
-- Component-based architecture (XML + .bs files)
-- Task nodes for all HTTP (PlexAuthTask, PlexApiTask, PlexSearchTask, PlexSessionTask)
-- ContentNode for all data, roRegistrySection for persistence
-- Built-in PosterGrid/RowList/LabelList for UI
-- Direct Play with transcode fallback
-
-## Version Compatibility
-
-| Package | Compatible With | Notes |
-|---------|-----------------|-------|
-| brighterscript@0.70.3+ | Roku OS 9.0+ | Transpiles to compatible BrightScript |
-| bslint@0.8.38+ | brighterscript@0.65+ | Works with both .brs and .bs files |
-| roku-deploy@3.14.4+ | All Roku devices | v4 coming soon with enhanced features |
-| ropm@0.11.2+ | npm registries | Uses npm module system behind the scenes |
-| Roku OS 15.0/15.1 | All current devices | Backward compatible with OS 9.0+ features |
-
-## Installation
+### Step 1: Add BrighterScript to the project (1-2 hours)
 
 ```bash
-# Global tools (one-time)
-npm install -g brighterscript @rokucommunity/bslint ropm
-
-# Project dependencies
 npm init -y
-npm install --save-dev brighterscript @rokucommunity/bslint
-
-# VSCode extension (install via Extensions marketplace)
-# Search: "BrightScript Language" by RokuCommunity
+npm install brighterscript roku-deploy
 ```
 
-## Configuration Files
+### Step 2: Create bsconfig.json
 
-**bsconfig.json** (BrighterScript compiler):
 ```json
 {
-  "rootDir": "./",
+  "rootDir": "SimPlex",
   "files": [
+    "manifest",
     "source/**/*",
-    "components/**/*"
+    "components/**/*",
+    "images/**/*"
   ],
-  "outDir": "./out",
+  "stagingDir": "build",
+  "createPackage": true,
+  "autoImportComponentScript": true,
   "diagnosticFilters": [
-    {
-      "src": "**/roku_modules/**",
-      "codes": [1000, 1001]
-    }
+    { "src": "**/*.brs", "codes": [1001] }
   ]
 }
 ```
 
-**rokudeploy.json** (Deployment):
-```json
-{
-  "host": "192.168.1.XXX",
-  "password": "your-dev-password",
-  "rootDir": "./",
-  "files": [
-    "source/**/*",
-    "components/**/*",
-    "images/**/*",
-    "manifest"
-  ],
-  "retainStagingFolder": false
-}
+### Step 3: Build and deploy
+
+```bash
+npx bsc --project bsconfig.json
 ```
 
-**.vscode/launch.json** (Debugging):
+Or integrate with VSCode launch.json for F5 deploy:
+
 ```json
 {
   "version": "0.2.0",
@@ -295,60 +122,93 @@ npm install --save-dev brighterscript @rokucommunity/bslint
     {
       "type": "brightscript",
       "request": "launch",
-      "name": "Launch PlexClassic",
-      "host": "${env:ROKU_HOST}",
-      "password": "${env:ROKU_PASSWORD}",
-      "rootDir": "${workspaceFolder}",
-      "stopOnEntry": false
+      "name": "SimPlex",
+      "rootDir": "${workspaceFolder}/SimPlex",
+      "host": "${env:ROKU_IP}",
+      "password": "${env:ROKU_DEV_PASSWORD}",
+      "files": [
+        "manifest",
+        "source/**/*",
+        "components/**/*",
+        "images/**/*"
+      ]
     }
   ]
 }
 ```
 
-## Certification Requirements (2025-2026)
+### Step 4: Gradual adoption of BrighterScript features (ongoing)
 
-1. **RSG Version:** Must set `rsg_version=1.3` in manifest by October 1, 2026
-2. **Color Certification:** Use bslint's color-cert rule to enforce broadcast-safe colors (6.4 certification)
-3. **HTTPS:** All network requests must use HTTPS with proper certificate configuration
-4. **Memory Management:** Apps must not consume excessive memory (test with Roku Resource Monitor 4.2)
-5. **Thread Safety:** All HTTP in Task nodes, no roUrlTransfer on render thread
-6. **Accessibility:** Support for screen readers, proper focus management
+- New files: use `.bs` extension, leverage classes and namespaces
+- Existing files: rename to `.bs` only when actively refactoring
+- No big-bang rewrite needed
+
+### Migration Risk Assessment
+
+| Risk | Likelihood | Impact | Mitigation |
+|------|-----------|--------|------------|
+| BrighterScript compiler bug | Low | Medium | Pin to 0.70.3, update cautiously |
+| Transpiled output differs from hand-written BS | Very Low | Low | BrighterScript is mature (5+ years). Output is predictable. |
+| Build step slows iteration | Low | Low | Compilation is fast (seconds). VSCode extension handles it transparently. |
+| npm/Node.js dependency on dev machine | N/A | N/A | Already required if using VSCode BrightScript extension for debugging |
+
+## What NOT to Use
+
+| Technology | Why Not |
+|------------|---------|
+| Maestro MVVM | Deprecated. No maintenance. Overengineered for this project. |
+| BrighterScript 1.0.0-alpha | Unstable. Breaking changes between releases. |
+| ropm (for app dependencies) | The app has no third-party runtime dependencies. All code is first-party. Adding ropm for its own sake adds toolchain complexity. |
+| React Native for TV | Does not support Roku. Roku requires native BrightScript. |
+| Direct Publisher | For MRSS-based linear channels, not custom interactive apps. |
+| Roku's built-in unit-testing-framework | Inferior to Rooibos in every way. Use Rooibos when testing is needed. |
+
+## Installation
+
+```bash
+# Initialize Node project (for build tooling only -- nothing runs on Roku via Node)
+npm init -y
+
+# Core build tools
+npm install -D brighterscript@^0.70.3 roku-deploy@^3.16.1
+
+# Later, when adding tests (Phase 19):
+# npm install -D rooibos-roku
+```
+
+## Project Structure After Migration
+
+```
+SimPlex/                    # rootDir for bsconfig.json
+  manifest
+  source/
+    main.brs               # Keep as .brs (entry point, rarely changes)
+    constants.brs           # Keep as .brs or migrate to .bs with namespace
+    utils.brs               # Keep as .brs or migrate to .bs with namespace
+    ...
+  components/
+    ...                     # All existing files work unchanged
+  images/
+    ...
+build/                      # stagingDir -- transpiled output (gitignore this)
+bsconfig.json               # BrighterScript configuration
+package.json                # Node.js package for dev dependencies
+node_modules/               # gitignore this
+```
 
 ## Sources
 
-### Official Roku Documentation
-- [Roku OS 15.0 Beta Announcement](https://blog.roku.com/developer/roku-os-15-0-beta) - MEDIUM confidence (official source, feature descriptions)
-- [Roku Developer Portal](https://developer.roku.com) - HIGH confidence (official docs, attempted access but blocked)
-
-### Development Tools & Community
-- [BrighterScript GitHub](https://github.com/rokucommunity/brighterscript) - HIGH confidence (official repo, 189 stars, active development)
-- [vscode-brightscript-language](https://github.com/rokucommunity/vscode-brightscript-language) - HIGH confidence (official extension, thousands of users)
-- [roku-deploy GitHub](https://github.com/rokucommunity/roku-deploy) - HIGH confidence (official deployment tool)
-- [bslint GitHub](https://github.com/rokucommunity/bslint) - HIGH confidence (official linter, v0.8.38)
-- [ropm GitHub](https://github.com/rokucommunity/ropm) - HIGH confidence (official package manager, v0.11.2)
-- [RokuCommunity Documentation](https://rokucommunity.github.io/) - HIGH confidence (official community hub)
-
-### Best Practices & Patterns
-- [BrightScript Fundamentals (Medium)](https://medium.com/@krishna.kumar.chaturvedi/chapter-3-brightscript-fundamentals-the-heart-of-your-roku-app-9f5a370c0870) - MEDIUM confidence (community tutorial)
-- [Mastering Tasks and Multithreading (Medium)](https://medium.com/@krishna.kumar.chaturvedi/mastering-tasks-and-multithreading-in-roku-the-complete-guide-to-responsive-api-calls-5237511c4da3) - MEDIUM confidence (community guide)
-- [Screen Stack Navigation (Medium)](https://medium.com/@amitdogra70512/navigating-screen-stacks-in-roku-a-guide-to-creating-and-managing-multiple-screens-using-arrays-1f9cbb736079) - MEDIUM confidence (community patterns)
-- [Using HTTPS on Roku](https://rymawby.com/brightscript/roku/Using-HTTPS-on-a-Roku-device.html) - MEDIUM confidence (developer blog)
-
-### Testing Frameworks
-- [Rooibos Testing Framework](https://community.roku.com/discussions/developer/announcing-rooibos-unit-testing-framework-for-roku-/509104) - MEDIUM confidence (community announcement)
-- [Official Unit Testing Framework](https://github.com/rokudev/unit-testing-framework) - HIGH confidence (official Roku repo)
-
-### Performance & Optimization
-- [Memory Management Guide](https://developer.roku.com/docs/developer-program/performance-guide/memory-management.md) - HIGH confidence (official docs, attempted access)
-- [Roku OS 14.5 Memory Management](https://cordcuttersnews.com/roku-teases-roku-os-14-5-update-with-developer-insights-on-memory-management-and-ui-enhancements/) - MEDIUM confidence (news coverage of official announcement)
-- [Roku Developer Summit 2025](https://www.inellipse.com/roku-developer-summit-2025/) - MEDIUM confidence (event coverage)
-
-### Platform Components
-- [PosterGrid Component](https://developer.roku.com/docs/references/scenegraph/list-and-grid-nodes/postergrid.md) - HIGH confidence (official docs, attempted access)
-- [ContentNode Documentation](https://developer.roku.com/docs/references/scenegraph/control-nodes/contentnode.md) - HIGH confidence (official docs, attempted access)
-- [Field Observers](https://developer.roku.com/docs/developer-program/core-concepts/scenegraph-xml/node-field-observers.md) - HIGH confidence (official docs, attempted access)
+- [BrighterScript GitHub - rokucommunity/brighterscript](https://github.com/rokucommunity/brighterscript) -- Confirmed v0.70.3 stable, v1.0.0-alpha.50 latest alpha (HIGH confidence)
+- [BrighterScript Releases](https://github.com/rokucommunity/brighterscript/releases) -- Version history and dates verified
+- [Maestro-Roku GitHub - georgejecook/maestro-roku](https://github.com/georgejecook/maestro-roku) -- Confirmed deprecated by Tantawowa Ltd (HIGH confidence)
+- [Maestro-Roku Releases](https://github.com/georgejecook/maestro-roku/releases) -- v0.72.0 confirmed as final release, Nov 2023
+- [roku-deploy npm](https://www.npmjs.com/package/roku-deploy) -- v3.16.1 confirmed current (HIGH confidence)
+- [Rooibos GitHub - rokucommunity/rooibos](https://github.com/rokucommunity/rooibos) -- Community standard testing framework
+- [BrighterScript bsconfig.json docs](https://github.com/rokucommunity/BrighterScript/blob/master/docs/bsconfig.md) -- Configuration reference
+- [Jellyfin-Roku BrighterScript updates](https://github.com/jellyfin/jellyfin-roku/pull/232) -- Real-world production usage of BrighterScript 0.69.x-0.70.x
+- [BrightScript VSCode Extension](https://marketplace.visualstudio.com/items?itemName=RokuCommunity.brightscript) -- IDE tooling
+- [RokuCommunity](https://rokucommunity.github.io/) -- Ecosystem hub
 
 ---
-*Stack research for: PlexClassic Roku Plex Client*
-*Researched: 2026-02-09*
-*Overall Confidence: MEDIUM - Mix of HIGH confidence official sources and MEDIUM confidence community sources. Core platform and tooling recommendations are verified from official sources. Best practices synthesized from multiple community sources with consistent patterns.*
+
+*Stack research: 2026-03-08*
