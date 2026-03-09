@@ -1,5 +1,12 @@
 # Build artifacts
 *.zip
+out/
+
+# Dependencies
+node_modules/
+
+# Environment
+.env
 
 # Windows artifacts
 nul
