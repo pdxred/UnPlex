@@ -12,17 +12,16 @@ sub init()
 
     ' Set up auth task
     m.authTask = CreateObject("roSGNode", "PlexAuthTask")
-    m.authTask.observeField("state", "onAuthTaskStateChange")
-
-    ' Set up API task for server discovery
-    m.apiTask = CreateObject("roSGNode", "PlexApiTask")
-    m.apiTask.observeField("state", "onApiTaskStateChange")
+    m.authTask.observeField("status", "onAuthTaskStateChange")
 
     ' Set up poll timer
     m.pollTimer = CreateObject("roSGNode", "Timer")
     m.pollTimer.duration = 3  ' Poll every 3 seconds
     m.pollTimer.repeat = true
     m.pollTimer.observeField("fire", "onPollTimer")
+
+    ' Delegate focus when screen receives focus
+    m.top.observeField("focusedChild", "onFocusChange")
 
     ' Check if already authenticated
     token = GetAuthToken()
@@ -37,6 +36,15 @@ sub init()
     else
         ' Need to authenticate
         requestPin()
+    end if
+end sub
+
+sub onFocusChange(event as Object)
+    ' When SettingsScreen is in focus chain but no child has focus, delegate
+    if m.top.isInFocusChain() and m.top.focusedChild = invalid
+        if m.settingsGroup.visible
+            m.settingsList.setFocus(true)
+        end if
     end if
 end sub
 
@@ -130,16 +138,19 @@ sub discoverServers()
     m.serverStatus.visible = true
     m.serverStatus.text = "Discovering servers..."
 
-    m.apiTask.endpoint = "https://plex.tv/api/v2/resources"
-    m.apiTask.params = {
+    task = CreateObject("roSGNode", "PlexApiTask")
+    task.endpoint = "https://plex.tv/api/v2/resources"
+    task.params = {
         "includeHttps": "1"
         "includeRelay": "1"
     }
-    m.apiTask.isPlexTvRequest = true
-    m.apiTask.control = "run"
+    task.isPlexTvRequest = true
+    task.observeField("status", "onDiscoverTaskStateChange")
+    task.control = "run"
+    m.discoverTask = task
 end sub
 
-sub onApiTaskStateChange(event as Object)
+sub onDiscoverTaskStateChange(event as Object)
     state = event.getData()
 
     if state = "completed"
@@ -147,12 +158,12 @@ sub onApiTaskStateChange(event as Object)
         processServerList()
     else if state = "error"
         m.loadingSpinner.visible = false
-        m.serverStatus.text = "Error discovering servers: " + m.apiTask.error
+        m.serverStatus.text = "Error discovering servers: " + m.discoverTask.error
     end if
 end sub
 
 sub processServerList()
-    response = m.apiTask.response
+    response = m.discoverTask.response
     if response = invalid or type(response) <> "roArray"
         m.serverStatus.text = "No servers found"
         return
@@ -198,15 +209,18 @@ sub tryServerConnection()
 
     ' Test connection
     m.testUri = conn.uri
-    m.apiTask.endpoint = conn.uri + "/identity"
-    m.apiTask.params = {}
-    m.apiTask.isPlexTvRequest = false
-    m.apiTask.isConnectionTest = true
-    m.apiTask.control = "run"
+    task = CreateObject("roSGNode", "PlexApiTask")
+    task.endpoint = conn.uri + "/identity"
+    task.params = {}
+    task.isPlexTvRequest = false
+    task.isConnectionTest = true
+    task.observeField("status", "onConnectionTestComplete")
+    task.control = "run"
+    m.connectionTestTask = task
 end sub
 
-sub onConnectionTestComplete()
-    state = m.apiTask.state
+sub onConnectionTestComplete(event as Object)
+    state = event.getData()
     if state = "completed"
         ' Connection successful
         SetServerUri(m.testUri)

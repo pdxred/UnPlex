@@ -13,10 +13,6 @@ sub init()
     m.libraries = []
     m.activeList = "library"
 
-    ' Set up API task to fetch libraries
-    m.apiTask = CreateObject("roSGNode", "PlexApiTask")
-    m.apiTask.observeField("status", "onApiTaskStateChange")
-
     ' Observe list selections
     m.libraryList.observeField("itemSelected", "onLibrarySelected")
     m.hubList.observeField("itemSelected", "onHubSelected")
@@ -53,12 +49,15 @@ sub setupStaticLists()
 end sub
 
 sub loadLibraries()
-    m.apiTask.endpoint = "/library/sections"
-    m.apiTask.params = {}
-    m.apiTask.control = "run"
+    task = CreateObject("roSGNode", "PlexApiTask")
+    task.endpoint = "/library/sections"
+    task.params = {}
+    task.observeField("status", "onLibraryTaskStateChange")
+    task.control = "run"
+    m.libraryTask = task
 end sub
 
-sub onApiTaskStateChange(event as Object)
+sub onLibraryTaskStateChange(event as Object)
     state = event.getData()
     if state = "completed"
         processLibraries()
@@ -66,7 +65,7 @@ sub onApiTaskStateChange(event as Object)
 end sub
 
 sub processLibraries()
-    response = m.apiTask.response
+    response = m.libraryTask.response
     if response = invalid or response.MediaContainer = invalid
         return
     end if
@@ -164,9 +163,9 @@ sub onFocusChange(event as Object)
 end sub
 
 sub cleanup()
-    if m.apiTask <> invalid
-        m.apiTask.control = "stop"
-        m.apiTask.unobserveField("status")
+    if m.libraryTask <> invalid
+        m.libraryTask.control = "stop"
+        m.libraryTask.unobserveField("status")
     end if
 
     m.libraryList.unobserveField("itemSelected")

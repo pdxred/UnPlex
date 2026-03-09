@@ -12,10 +12,6 @@ sub init()
     m.viewOffset = 0
     m.buttonActions = []
 
-    ' Set up API task
-    m.apiTask = CreateObject("roSGNode", "PlexApiTask")
-    m.apiTask.observeField("status", "onApiTaskStateChange")
-
     ' Observe button selection
     m.buttonGroup.observeField("buttonSelected", "onButtonSelected")
 
@@ -39,9 +35,12 @@ end sub
 
 sub loadMetadata(ratingKey as String)
     m.loadingSpinner.visible = true
-    m.apiTask.endpoint = "/library/metadata/" + ratingKey
-    m.apiTask.params = {}
-    m.apiTask.control = "run"
+    task = CreateObject("roSGNode", "PlexApiTask")
+    task.endpoint = "/library/metadata/" + ratingKey
+    task.params = {}
+    task.observeField("status", "onApiTaskStateChange")
+    task.control = "run"
+    m.metadataTask = task
 end sub
 
 sub onApiTaskStateChange(event as Object)
@@ -51,12 +50,12 @@ sub onApiTaskStateChange(event as Object)
         processMetadata()
     else if state = "error"
         m.loadingSpinner.visible = false
-        showError(m.apiTask.error)
+        showError(m.metadataTask.error)
     end if
 end sub
 
 sub processMetadata()
-    response = m.apiTask.response
+    response = m.metadataTask.response
     if response = invalid or response.MediaContainer = invalid
         return
     end if

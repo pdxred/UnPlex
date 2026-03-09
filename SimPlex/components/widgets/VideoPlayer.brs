@@ -11,10 +11,6 @@ sub init()
     ' Set up session task for progress reporting
     m.sessionTask = CreateObject("roSGNode", "PlexSessionTask")
 
-    ' Set up API task for fetching media info
-    m.apiTask = CreateObject("roSGNode", "PlexApiTask")
-    m.apiTask.observeField("status", "onApiTaskStateChange")
-
     ' Progress report timer
     m.reportTimer = CreateObject("roSGNode", "Timer")
     m.reportTimer.duration = 10  ' Report every 10 seconds
@@ -33,23 +29,26 @@ end sub
 
 sub loadMedia()
     ' First fetch media metadata to determine playback URL
-    m.apiTask.endpoint = m.top.mediaKey
-    m.apiTask.params = {}
-    m.apiTask.control = "run"
+    task = CreateObject("roSGNode", "PlexApiTask")
+    task.endpoint = m.top.mediaKey
+    task.params = {}
+    task.observeField("status", "onMediaTaskStateChange")
+    task.control = "run"
+    m.mediaInfoTask = task
 end sub
 
-sub onApiTaskStateChange(event as Object)
+sub onMediaTaskStateChange(event as Object)
     state = event.getData()
     if state = "completed"
         processMediaInfo()
     else if state = "error"
-        showError("Failed to load media: " + m.apiTask.error)
+        showError("Failed to load media: " + m.mediaInfoTask.error)
         m.top.playbackComplete = true
     end if
 end sub
 
 sub processMediaInfo()
-    response = m.apiTask.response
+    response = m.mediaInfoTask.response
     if response = invalid or response.MediaContainer = invalid
         showError("Invalid media response")
         m.top.playbackComplete = true

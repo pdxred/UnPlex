@@ -10,10 +10,6 @@ sub init()
     m.isLoading = false
     m.focusOnSidebar = true
 
-    ' Set up API task
-    m.apiTask = CreateObject("roSGNode", "PlexApiTask")
-    m.apiTask.observeField("status", "onApiTaskStateChange")
-
     ' Observe sidebar selection
     m.sidebar.observeField("selectedLibrary", "onLibrarySelected")
     m.sidebar.observeField("specialAction", "onSpecialAction")
@@ -84,9 +80,12 @@ sub loadLibrary()
         end for
     end if
 
-    m.apiTask.endpoint = endpoint
-    m.apiTask.params = params
-    m.apiTask.control = "run"
+    task = CreateObject("roSGNode", "PlexApiTask")
+    task.endpoint = endpoint
+    task.params = params
+    task.observeField("status", "onApiTaskStateChange")
+    task.control = "run"
+    m.currentApiTask = task
 end sub
 
 sub loadOnDeck()
@@ -96,9 +95,12 @@ sub loadOnDeck()
     m.currentSectionId = "onDeck"
     m.currentOffset = 0
 
-    m.apiTask.endpoint = "/library/onDeck"
-    m.apiTask.params = {}
-    m.apiTask.control = "run"
+    task = CreateObject("roSGNode", "PlexApiTask")
+    task.endpoint = "/library/onDeck"
+    task.params = {}
+    task.observeField("status", "onApiTaskStateChange")
+    task.control = "run"
+    m.currentApiTask = task
 end sub
 
 sub loadRecentlyAdded()
@@ -108,9 +110,12 @@ sub loadRecentlyAdded()
     m.currentSectionId = "recentlyAdded"
     m.currentOffset = 0
 
-    m.apiTask.endpoint = "/library/recentlyAdded"
-    m.apiTask.params = {}
-    m.apiTask.control = "run"
+    task = CreateObject("roSGNode", "PlexApiTask")
+    task.endpoint = "/library/recentlyAdded"
+    task.params = {}
+    task.observeField("status", "onApiTaskStateChange")
+    task.control = "run"
+    m.currentApiTask = task
 end sub
 
 sub onApiTaskStateChange(event as Object)
@@ -122,12 +127,12 @@ sub onApiTaskStateChange(event as Object)
     else if state = "error"
         m.loadingSpinner.visible = false
         m.isLoading = false
-        showError(m.apiTask.error)
+        showError(m.currentApiTask.error)
     end if
 end sub
 
 sub processApiResponse()
-    response = m.apiTask.response
+    response = m.currentApiTask.response
     if response = invalid or response.MediaContainer = invalid
         return
     end if
@@ -223,9 +228,9 @@ end sub
 
 sub cleanup()
     ' Stop running task
-    if m.apiTask <> invalid
-        m.apiTask.control = "stop"
-        m.apiTask.unobserveField("status")
+    if m.currentApiTask <> invalid
+        m.currentApiTask.control = "stop"
+        m.currentApiTask.unobserveField("status")
     end if
 
     ' Unobserve child widgets

@@ -8,10 +8,6 @@ sub init()
     m.currentSeasonIndex = 0
     m.focusOnSeasons = true
 
-    ' Set up API task
-    m.apiTask = CreateObject("roSGNode", "PlexApiTask")
-    m.apiTask.observeField("status", "onApiTaskStateChange")
-
     ' Observe season selection
     m.seasonList.observeField("itemFocused", "onSeasonFocused")
     m.seasonList.observeField("itemSelected", "onSeasonSelected")
@@ -44,37 +40,48 @@ end sub
 
 sub loadSeasons(ratingKey as String)
     m.loadingSpinner.visible = true
-    m.apiTask.endpoint = "/library/metadata/" + ratingKey + "/children"
-    m.apiTask.params = {}
-    m.apiTask.requestId = "seasons"
-    m.apiTask.control = "run"
+    task = CreateObject("roSGNode", "PlexApiTask")
+    task.endpoint = "/library/metadata/" + ratingKey + "/children"
+    task.params = {}
+    task.observeField("status", "onSeasonsTaskStateChange")
+    task.control = "run"
+    m.seasonsTask = task
 end sub
 
 sub loadEpisodes(seasonKey as String)
     m.loadingSpinner.visible = true
-    m.apiTask.endpoint = "/library/metadata/" + seasonKey + "/children"
-    m.apiTask.params = {}
-    m.apiTask.requestId = "episodes"
-    m.apiTask.control = "run"
+    task = CreateObject("roSGNode", "PlexApiTask")
+    task.endpoint = "/library/metadata/" + seasonKey + "/children"
+    task.params = {}
+    task.observeField("status", "onEpisodesTaskStateChange")
+    task.control = "run"
+    m.episodesTask = task
 end sub
 
-sub onApiTaskStateChange(event as Object)
+sub onSeasonsTaskStateChange(event as Object)
     state = event.getData()
     if state = "completed"
         m.loadingSpinner.visible = false
-        if m.apiTask.requestId = "seasons"
-            processSeasons()
-        else if m.apiTask.requestId = "episodes"
-            processEpisodes()
-        end if
+        processSeasons()
     else if state = "error"
         m.loadingSpinner.visible = false
-        showError(m.apiTask.error)
+        showError(m.seasonsTask.error)
+    end if
+end sub
+
+sub onEpisodesTaskStateChange(event as Object)
+    state = event.getData()
+    if state = "completed"
+        m.loadingSpinner.visible = false
+        processEpisodes()
+    else if state = "error"
+        m.loadingSpinner.visible = false
+        showError(m.episodesTask.error)
     end if
 end sub
 
 sub processSeasons()
-    response = m.apiTask.response
+    response = m.seasonsTask.response
     if response = invalid or response.MediaContainer = invalid
         return
     end if
@@ -117,7 +124,7 @@ sub processSeasons()
 end sub
 
 sub processEpisodes()
-    response = m.apiTask.response
+    response = m.episodesTask.response
     if response = invalid or response.MediaContainer = invalid
         return
     end if
