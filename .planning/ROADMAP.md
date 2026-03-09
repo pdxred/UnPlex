@@ -64,11 +64,11 @@ Plans:
   2. Home screen displays a Recently Added row with new content across libraries
   3. Home screen displays an On Deck row for TV shows (next unwatched episode)
   4. Hub rows load without freezing the UI or causing visible stutter on navigation
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 03-01: TBD
-- [ ] 03-02: TBD
+- [ ] 03-01-PLAN.md — Hub row data layer: /hubs API fetch, RowList rendering, PosterGridItem progress bars
+- [ ] 03-02-PLAN.md — Hub row interactions: item selection, focus management, auto-refresh, sidebar view toggle
 
 ### Phase 4: Error States
 **Goal**: Every async operation communicates its status clearly and failures are recoverable without restarting the app
