@@ -325,7 +325,10 @@ end sub
 sub onItemSelected(event as Object)
     data = event.getData()
     if data <> invalid
-        if data.action = "detail"
+        if data.action = "play"
+            ' Resume playback - route to detail screen until VideoPlayer is wired
+            showDetailScreen(data.ratingKey, data.itemType)
+        else if data.action = "detail"
             showDetailScreen(data.ratingKey, data.itemType)
         else if data.action = "episodes"
             showEpisodeScreen(data.ratingKey, data.title)
