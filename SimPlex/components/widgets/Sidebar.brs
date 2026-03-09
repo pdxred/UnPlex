@@ -29,13 +29,10 @@ sub init()
 end sub
 
 sub setupStaticLists()
-    ' Hub items: On Deck, Recently Added
+    ' Hub items: Home (returns to hub+grid view)
     hubContent = CreateObject("roSGNode", "ContentNode")
-    hubItems = ["On Deck", "Recently Added"]
-    for each item in hubItems
-        node = hubContent.createChild("ContentNode")
-        node.title = "  " + item  ' Indent for visual
-    end for
+    node = hubContent.createChild("ContentNode")
+    node.title = "  Home"
     m.hubList.content = hubContent
 
     ' Bottom items: Search, Settings
@@ -110,7 +107,7 @@ sub layoutLists()
 
     ' Position hub list after separator1
     m.hubList.translation = [0, 100 + libHeight + 22]
-    hubHeight = 2 * 50  ' 2 hub items
+    hubHeight = 1 * 50  ' 1 hub item (Home)
 
     ' Position separator2 after hub list
     m.separator2.translation = [20, 100 + libHeight + 22 + hubHeight + 10]
@@ -134,9 +131,7 @@ end sub
 sub onHubSelected(event as Object)
     index = event.getData()
     if index = 0
-        m.top.specialAction = "onDeck"
-    else if index = 1
-        m.top.specialAction = "recentlyAdded"
+        m.top.specialAction = "viewHome"
     end if
 end sub
 
@@ -184,7 +179,7 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
                 return true
             end if
         else if m.activeList = "hub"
-            if m.hubList.itemFocused >= 1
+            if m.hubList.itemFocused >= 0
                 m.activeList = "bottom"
                 m.bottomList.setFocus(true)
                 return true
