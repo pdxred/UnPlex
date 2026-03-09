@@ -34,11 +34,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. Constants are loaded once at startup and accessed from m.global without per-call allocation
   3. Two or more API requests can run concurrently without one clobbering the other's callback
   4. Developer presses F5 in VSCode and the app appears on Roku with no manual zip/upload steps
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 01-01: TBD
-- [ ] 01-02: TBD
+- [ ] 01-01-PLAN.md — BrighterScript toolchain setup and VSCode F5 deploy configuration
+- [ ] 01-02-PLAN.md — Constants caching in m.global and API task collision fix
 
 ### Phase 2: Playback Foundation
 **Goal**: Users can resume where they left off and see at a glance what they have and haven't watched
