@@ -2,98 +2,124 @@
 
 ## What This Is
 
-A side-loadable Roku channel that serves as a full replacement Plex Media Server client. Replaces the official Plex Roku app with a clean, fast, grid-based UI inspired by the old "Plex Classic" Roku client, using a left sidebar navigation pattern for intuitive library browsing.
+A full-featured, personal-use Plex Media Server client for Roku 4K TV, side-loaded as a developer channel. It replaces the discontinued official Plex Roku app with a clean, fast, grid-based UI inspired by the "Plex Classic" experience — sidebar navigation, poster grids, and direct access to media without fighting the UI.
 
 ## Core Value
 
-Fast, intuitive library browsing and playback. Getting to your media quickly without fighting the UI.
+Fast, intuitive library browsing and playback on a single personal Plex server with tens of thousands of media items.
 
 ## Requirements
 
 ### Validated
 
-(None yet — ship to validate)
+<!-- Inferred from existing codebase (Phase 1 scaffold) -->
+
+- ✓ App bootstrap and SceneGraph screen creation — existing (`SimPlex/source/main.brs`)
+- ✓ MainScene with screen stack navigation (push/pop/focus preservation) — existing
+- ✓ PIN-based OAuth flow via plex.tv/api/v2/pins with polling — existing (`PINScreen`, `PlexAuthTask`)
+- ✓ Server discovery via plex.tv/api/v2/resources with connection priority (local > remote > relay) — existing (`ServerListScreen`, `ServerConnectionTask`)
+- ✓ Persistent auth token and server URI storage in roRegistry — existing (`utils.brs`)
+- ✓ General-purpose Plex API task with auth headers, JSON parsing, 401 handling — existing (`PlexApiTask`)
+- ✓ Sidebar navigation with library list from /library/sections — existing (`Sidebar`)
+- ✓ Poster grid with paginated loading (50 items/page, infinite scroll) — existing (`PosterGrid`, `PosterGridItem`)
+- ✓ Home screen with library browsing and filter bar — existing (`HomeScreen`)
+- ✓ Detail screen with metadata display — existing (`DetailScreen`)
+- ✓ Episode browser with season/episode navigation — existing (`EpisodeScreen`, `EpisodeItem`)
+- ✓ Search with debounced queries — existing (`SearchScreen`, `PlexSearchTask`)
+- ✓ Video playback with direct play and transcode fallback — existing (`VideoPlayer`)
+- ✓ Playback progress reporting every 10 seconds — existing (`PlexSessionTask`)
+- ✓ Image cache prefetching — existing (`ImageCacheTask`)
+- ✓ Settings screen with server switch and sign out — existing (`SettingsScreen`)
+- ✓ Global 401 handler with re-auth routing — existing
+- ✓ Data normalizers for movies, shows, seasons, episodes, on-deck — existing (`normalizers.brs`)
+- ✓ Server capability detection and version parsing — existing (`capabilities.brs`)
+- ✓ Structured logging with ISO timestamps — existing (`logger.brs`)
+- ✓ Constants module with layout, color, and API config — existing (`constants.brs`)
 
 ### Active
 
-**Authentication & Connection**
-- [ ] PIN-based OAuth flow via plex.tv/link
-- [ ] Server discovery with local/remote/relay connection fallback
-- [ ] Persistent token and server storage
-- [ ] Server version detection for capability awareness
+<!-- Phases 2-19 from brief — building on existing scaffold -->
 
-**Library Browsing**
-- [ ] Sidebar navigation (libraries, On Deck, Recently Added, Search, Settings)
-- [ ] Poster grid with paginated loading (50 items per page)
-- [ ] Collections browsing within libraries
-- [ ] Playlists browsing and playback
-- [ ] Filters: unwatched, genre, year, sort order
-- [ ] Search across all libraries
-
-**Media Viewing**
-- [ ] Detail screen with full metadata (poster, title, year, runtime, rating, genres, plot)
-- [ ] Episode browser with season tabs for TV shows
-- [ ] Episode list with thumbnails, titles, plots, durations
-- [ ] Unwatched indicators on items
-
-**Playback**
-- [ ] Direct play for Roku-compatible formats (H.264, HEVC, VP9, AAC, AC3, EAC3)
-- [ ] Transcode fallback via HLS for incompatible formats
-- [ ] Progress tracking every 10 seconds
-- [ ] Resume from last position
-- [ ] Mark watched on completion
-- [ ] Intro skip button (when Plex chapter markers detected)
-- [ ] Credits skip button (when Plex chapter markers detected)
-- [ ] Jump-to-time via number keys (0-9 on remote)
-- [ ] Chapter navigation menu (separate from jump-to-time)
+**Playback Enhancements**
+- [ ] Resume from last position with progress bar
+- [ ] Mark watched/unwatched toggle from detail screen
+- [ ] Intro skip button (Plex chapter markers from /library/metadata/{id}/intros)
+- [ ] Credits skip button (Plex chapter markers)
+- [ ] Auto-play next episode with countdown
 - [ ] Audio track selection during playback
 - [ ] Subtitle track selection during playback
-- [ ] Auto-play next episode with countdown
+- [ ] Sidecar SRT/ASS subtitle injection
+- [ ] Burn-in fallback for unsupported subtitle formats
 
-**Architecture**
-- [ ] API abstraction layer (all Plex calls through service layer)
-- [ ] Response normalization to internal models
-- [ ] Graceful degradation for missing server features
+**Navigation & UI**
+- [ ] Hub rows on home screen from /hubs endpoint (continue watching, recently added)
+- [ ] Library grid/list toggle view
+- [ ] Filter/sort controls (unwatched, genre, year, sort order)
+- [ ] Collections browsing within libraries
+- [ ] Playlists browsing and playback
+
+**Media Types**
+- [ ] Music: album/artist browse, track list, playback queue, now-playing bar
+- [ ] Photos: grid, full-screen viewer, slideshow
+- [ ] Live TV: EPG guide grid, channel tuning, DVR recordings list
+
+**User Management**
+- [ ] Managed users: user picker screen, PIN entry dialog
+
+**Infrastructure**
+- [ ] Pre-roll detection and playback
+- [ ] PlayQueue extras
+- [ ] Settings: quality, subtitle defaults, server config with roRegistry storage
+- [ ] Error handling: spinners, retry logic, empty states across all screens
+- [ ] Artwork caching and performance profiling
+- [ ] Focus edge case fixes
+- [ ] CI packaging script
 
 ### Out of Scope
 
-- Music library support — video-only client for v1
-- Photo library support — video-only client for v1
-- Multiple home users/profiles — single-user for v1
-- Live TV & DVR — not a core browsing use case
+- Channel store submission or certification — sideload only
+- Multi-server support — single personal server
+- Mobile companion app or remote control features — Roku only
+- Cloud relay or plex.tv hosted playback — direct server connection only
+- BrighterScript v1.0.0-alpha migration — defer until stable release
+- Automated test suite — stretch goal for Phase 19 only (Rooibos)
 - Watch Together — rarely used feature
-- Trailers & Extras — not essential for replacement
-- Prerolls — not essential for replacement
 - Parental controls / PIN protection — defer to v2
 
 ## Context
 
-The official Plex Roku app (new release) is slow, buggy, and has inefficient/non-intuitive UI navigation. The goal is to recapture the fast, clean experience of older Plex clients that used a simple sidebar navigation pattern.
+The official Plex Roku app (new release) is slow, buggy, and has inefficient UI navigation. SimPlex recaptures the fast, clean experience of the classic Plex sidebar-driven interface.
 
-This is a BrightScript + SceneGraph project. Roku apps use `.brs` files for logic and `.xml` files for UI components. This is NOT JavaScript, Python, or any web technology.
+**Current state:** Phase 1 scaffold is complete in plain BrightScript + SceneGraph. The codebase has working auth, server connection, library browsing, detail/episode screens, search, video playback with direct play and transcode, progress reporting, and settings. All HTTP I/O runs in Task nodes.
 
-Target content: Movies and TV Shows libraries. User's Plex server does not use Music or Photos.
+**Technology note:** The project brief specifies BrighterScript ^0.69.x and Maestro MVVM (v0.72.0) as target technologies. The existing Phase 1 scaffold uses plain BrightScript without Maestro. This technology migration decision must be resolved before Phase 2 planning — either migrate the scaffold or continue with plain BrightScript.
+
+**Reference repositories:** plexinc/roku-client-public (primary Plex API reference), ljunkie/rarflix (community patches), rokucommunity/brighterscript (compiler), georgejecook/maestro-roku (framework).
+
+**Target content:** Movies and TV shows primarily. Music, photos, and live TV are later phases.
 
 ## Constraints
 
-- **Platform:** Roku devices only, FHD 1920x1080 resolution
-- **Tech stack:** BrightScript + SceneGraph exclusively
-- **Deployment:** Side-loaded channel (not in Roku Channel Store)
-- **Threading:** All HTTP requests must run in Task nodes (render thread blocking causes crashes)
-- **Components:** Use built-in Roku components (MarkupGrid, PosterGrid, RowList, LabelList) for virtualization
-- **Images:** Request resized posters via Plex transcode endpoint, never full resolution
-- **Storage:** Use roRegistrySection("PlexClassic") for persistent data, always Flush() after writes
-- **Navigation:** Back button always pops screen stack, no wrap-around on grids/lists
+- **Platform:** Roku 4K TV, Roku OS 11.5+, FHD 1920x1080
+- **Language:** BrightScript (existing scaffold); brief targets BrighterScript ^0.69.x — migration TBD
+- **Framework:** Brief targets Maestro MVVM v0.72.0 — migration TBD
+- **Deployment:** Sideloaded developer channel via F5 from VSCode
+- **Server:** Single Plex Media Server, locally hosted
+- **Threading:** All HTTP via Task nodes — no roUrlTransfer on render thread
+- **API format:** Prefer JSON (Accept: application/json) over XML
+- **Storage:** roRegistrySection("SimPlex") with Flush() after every write
+- **Commit format:** feat(phaseN): description
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Sidebar navigation pattern | Matches classic Plex feel, efficient for library browsing | — Pending |
-| API abstraction layer | Future-proofs against Plex API changes, isolates maintenance | — Pending |
-| Number keys for jump-to-time | Fastest input method, most Roku remotes have number pad | — Pending |
-| Chapters as separate menu | Cleaner UX, different use case from arbitrary timestamp jumps | — Pending |
-| Video-only for v1 | Focused scope, user's primary use case | — Pending |
+| Sidebar navigation pattern | Matches classic Plex, efficient for library browsing | ✓ Good — implemented in Phase 1 |
+| Plain BrightScript vs BrighterScript + Maestro | Brief specifies BS/Maestro but scaffold is plain BrightScript. Migration adds significant scope. | — Pending |
+| Direct play first, transcode fallback | Simpler path, covers most content | ✓ Good — implemented in Phase 1 |
+| JSON over XML for Plex API | Cleaner parsing, modern API pattern | ✓ Good — implemented in Phase 1 |
+| Video-only for early phases | Focused scope, user's primary use case | — Pending |
+| GDM discovery vs manual IP | Brief prefers GDM UDP broadcast on port 32414; current code uses plex.tv resource discovery | — Pending |
 
 ---
-*Last updated: 2025-02-09 after initialization*
+*Last updated: 2026-03-08 after initialization*
