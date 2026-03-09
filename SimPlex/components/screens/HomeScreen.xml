@@ -16,6 +16,23 @@
             translation="[0, 0]"
         />
         <Group id="contentArea" translation="[280, 0]">
+            <RowList
+                id="hubRowList"
+                translation="[0, 0]"
+                itemSize="[1620, 430]"
+                numRows="0"
+                rowItemSize="[[260, 390]]"
+                rowItemSpacing="[[20, 0]]"
+                itemSpacing="[0, 10]"
+                showRowLabel="[true]"
+                rowLabelOffset="[[0, 0]]"
+                drawFocusFeedback="true"
+                focusBitmapBlendColor="0xE5A00DFF"
+                vertFocusAnimationStyle="floatingFocus"
+                rowFocusAnimationStyle="floatingFocus"
+                itemComponentName="PosterGridItem"
+                visible="false"
+            />
             <FilterBar
                 id="filterBar"
                 translation="[20, 20]"

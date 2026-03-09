@@ -2,6 +2,8 @@ sub init()
     m.poster = m.top.findNode("poster")
     m.titleLabel = m.top.findNode("titleLabel")
     m.unwatchedIndicator = m.top.findNode("unwatchedIndicator")
+    m.progressBg = m.top.findNode("progressBg")
+    m.progressBar = m.top.findNode("progressBar")
 end sub
 
 sub onItemContentChange(event as Object)
@@ -13,8 +15,6 @@ sub onItemContentChange(event as Object)
     ' Set poster image
     if content.HDPosterUrl <> invalid and content.HDPosterUrl <> ""
         m.poster.uri = content.HDPosterUrl
-    else
-        m.poster.uri = "pkg:/images/placeholder_poster.png"
     end if
 
     ' Set title
@@ -24,9 +24,13 @@ sub onItemContentChange(event as Object)
         m.titleLabel.text = ""
     end if
 
-    ' Show unwatched indicator if applicable
-    if content.viewOffset <> invalid and content.viewOffset > 0
-        ' In progress - could show progress bar instead
+    ' Update progress bar (must be called before unwatched indicator logic)
+    updateProgressBar(content)
+
+    ' Show unwatched indicator if applicable (hidden when progress bar is visible)
+    if m.progressBar.visible
+        m.unwatchedIndicator.visible = false
+    else if content.viewOffset <> invalid and content.viewOffset > 0
         m.unwatchedIndicator.visible = true
         m.unwatchedIndicator.color = "0x3399FFFF"  ' Blue for in-progress
     else if content.watched <> invalid and not content.watched
@@ -34,5 +38,23 @@ sub onItemContentChange(event as Object)
         m.unwatchedIndicator.color = "0xE5A00DFF"  ' Gold for unwatched
     else
         m.unwatchedIndicator.visible = false
+    end if
+end sub
+
+sub updateProgressBar(content as Object)
+    viewOffset = 0
+    duration = 0
+    if content.viewOffset <> invalid then viewOffset = content.viewOffset
+    if content.duration <> invalid then duration = content.duration
+
+    if viewOffset > 0 and duration > 0
+        progress = viewOffset / duration
+        if progress > 1.0 then progress = 1.0
+        m.progressBg.visible = true
+        m.progressBar.visible = true
+        m.progressBar.width = Int(240 * progress)
+    else
+        m.progressBg.visible = false
+        m.progressBar.visible = false
     end if
 end sub
