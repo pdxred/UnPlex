@@ -1,134 +1,151 @@
 ---
 phase: 03-navigation-framework
-verified: 2026-02-09T00:00:00Z
+verified: 2026-03-09T16:28:39Z
 status: passed
-score: 4/4 must-haves verified
+score: 11/11 must-haves verified
+re_verification:
+  previous_status: passed
+  previous_score: 4/4
+  note: Previous verification was for stale phase goal. Phase redefined to Hub Rows.
+  gaps_closed: []
+  gaps_remaining: []
+  regressions: []
+human_verification:
+  - test: Launch app and verify hub rows appear on home screen
+    expected: Rows display personalized content with poster images and titles
+    why_human: Requires live Plex server connection
+  - test: Select a Continue Watching item from hub row
+    expected: Navigates to detail screen with correct item metadata
+    why_human: Requires visual confirmation of screen transition
+  - test: Navigate with arrow keys between sidebar hub rows and library grid
+    expected: Focus moves cleanly between all three zones
+    why_human: Focus ring visibility requires visual confirmation on Roku device
+  - test: Verify progress bars on partially-watched items in hub rows
+    expected: Gold progress bar at bottom of poster shows proportional watch progress
+    why_human: Visual rendering requires device confirmation
+  - test: Select a library from sidebar then select Home to return
+    expected: Library selection hides hub rows and Home returns to hub+grid view
+    why_human: Layout repositioning requires visual confirmation
 ---
 
-# Phase 03: Navigation Framework Verification Report
+# Phase 03: Hub Rows Verification Report
 
-**Phase Goal:** MainScene screen stack enables navigation between views with back button support and focus restoration.
-**Verified:** 2026-02-09T00:00:00Z
+**Phase Goal:** Home screen surfaces personalized what-to-watch-next content without requiring library browsing
+**Verified:** 2026-03-09T16:28:39Z
 **Status:** passed
-**Re-verification:** No — initial verification
+**Re-verification:** No -- previous verification was for stale phase goal. Full fresh verification performed.
 
 ## Goal Achievement
 
-### Observable Truths
+### Observable Truths (Plan 03-01)
 
-| #   | Truth                                                                           | Status     | Evidence                                                                                             |
-| --- | ------------------------------------------------------------------------------- | ---------- | ---------------------------------------------------------------------------------------------------- |
-| 1   | Back button returns to previous screen without losing focus position           | ✓ VERIFIED | Back key handler → popScreen → focusStack.pop() → savedFocus.setFocus() with isValid() check        |
-| 2   | Screen cleanup prevents memory leaks (proper unobserveField and removeChild)   | ✓ VERIFIED | cleanupScreen called before removeChild in popScreen (line 242) and clearScreenStack (line 205)      |
-| 3   | Focus automatically moves to appropriate elements when screens change           | ✓ VERIFIED | pushScreen stores focusedChild to focusStack, popScreen restores with validity check (line 252)      |
-| 4   | Sidebar component displays library list and navigation options (existing)       | ✓ VERIFIED | Sidebar has libraryList/hubList/bottomList populated from API, setupStaticLists creates hub/bottom items |
+| #   | Truth                                                                              | Status     | Evidence                                                                                      |
+| --- | ---------------------------------------------------------------------------------- | ---------- | --------------------------------------------------------------------------------------------- |
+| 1   | HomeScreen displays a RowList with hub rows above the existing library grid        | VERIFIED   | HomeScreen.xml lines 19-35: RowList id=hubRowList before FilterBar/PosterGrid in contentArea   |
+| 2   | Hub rows are populated from the /hubs API endpoint via PlexApiTask                 | VERIFIED   | HomeScreen.brs lines 66-76: loadHubs() creates PlexApiTask with endpoint=/hubs                |
+| 3   | Empty hub rows are hidden (not rendered) and the grid repositions upward           | VERIFIED   | Lines 116-141 skip empty hubs; line 146 visibility based on count; lines 200-210 reposition   |
+| 4   | PosterGridItem shows a progress bar for items with viewOffset and duration         | VERIFIED   | PosterGridItem.brs lines 44-60: updateProgressBar() calculates width; XML lines 33-48         |
+| 5   | Hub row order is Continue Watching, On Deck, Recently Added                        | VERIFIED   | buildHubRowContent() lines 116-141 adds rows in exactly that order                            |
 
-**Score:** 4/4 truths verified
+### Observable Truths (Plan 03-02)
+
+| #   | Truth                                                                              | Status     | Evidence                                                                                      |
+| --- | ---------------------------------------------------------------------------------- | ---------- | --------------------------------------------------------------------------------------------- |
+| 6   | Selecting a Continue Watching item dispatches play action with resume offset       | VERIFIED   | onHubItemSelected lines 226-233: action=play with viewOffset for continueWatching             |
+| 7   | Selecting an On Deck or Recently Added item opens the detail screen                | VERIFIED   | Lines 234-241: action=detail for non-continueWatching hub types                               |
+| 8   | Pressing left on first hub row item opens the sidebar                              | VERIFIED   | onKeyEvent lines 492-499: checks focusArea=hubs and rowItemFocused[1]=0                      |
+| 9   | User can navigate down from last hub row into grid and up from grid to hubs        | VERIFIED   | Lines 469-477 (down boundary) and lines 479-489 (up boundary with GRID_COLUMNS check)        |
+| 10  | Hub rows refresh automatically on timer and when returning from playback           | VERIFIED   | Timer lines 37-41 (120s repeat); onFocusChange lines 47-62 calls loadHubs() on return        |
+| 11  | Sidebar has a view toggle between hub+grid and library-only modes                  | VERIFIED   | Sidebar fires viewHome (line 134); HomeScreen toggles viewMode and visibility (lines 258-299) |
+
+**Score:** 11/11 truths verified
 
 ### Required Artifacts
 
-| Artifact                                      | Expected                                        | Status     | Details                                                                 |
-| --------------------------------------------- | ----------------------------------------------- | ---------- | ----------------------------------------------------------------------- |
-| PlexClassic/components/MainScene.brs          | Enhanced screen stack with observer cleanup     | ✓ VERIFIED | cleanupScreen sub exists (line 189-199), calls unobserveField           |
-| PlexClassic/components/MainScene.brs          | Focus restoration with validity check           | ✓ VERIFIED | isValid() check on line 252 before setFocus                             |
-| PlexClassic/components/screens/HomeScreen.brs | Cleanup function for task and widget observers  | ✓ VERIFIED | cleanup() sub (line 204-217) stops apiTask, unobserves 5 fields         |
-| PlexClassic/components/screens/HomeScreen.xml | Cleanup function interface declaration          | ✓ VERIFIED | `<function name="cleanup" />` on line 6                                 |
-| PlexClassic/components/widgets/Sidebar.brs    | Cleanup function for task and list observers    | ✓ VERIFIED | cleanup() sub (line 150-159) stops apiTask, unobserves 3 list fields    |
-| PlexClassic/components/widgets/Sidebar.xml    | Cleanup function interface declaration          | ✓ VERIFIED | `<function name="cleanup" />` on line 6                                 |
+| Artifact             | Expected                                               | Exists | Substantive | Wired | Status   |
+| -------------------- | ------------------------------------------------------ | ------ | ----------- | ----- | -------- |
+| HomeScreen.xml       | RowList hubRowList in contentArea above PosterGrid      | Yes    | Yes         | Yes   | VERIFIED |
+| HomeScreen.brs       | loadHubs, onHubsLoaded, buildHubRowContent, addHubRow  | Yes    | Yes         | Yes   | VERIFIED |
+| PosterGridItem.xml   | progressBg and progressBar Rectangle elements          | Yes    | Yes         | Yes   | VERIFIED |
+| PosterGridItem.brs   | updateProgressBar() with viewOffset/duration logic     | Yes    | Yes         | Yes   | VERIFIED |
+| Sidebar.brs          | View mode toggle (Home item, viewHome action)          | Yes    | Yes         | Yes   | VERIFIED |
+| MainScene.brs        | Play action routing in onItemSelected                  | Yes    | Yes         | Yes   | VERIFIED |
 
 ### Key Link Verification
 
-| From                            | To                        | Via                               | Status | Details                                                                  |
-| ------------------------------- | ------------------------- | --------------------------------- | ------ | ------------------------------------------------------------------------ |
-| MainScene.brs:popScreen         | MainScene.brs:cleanupScreen | function call before removeChild | WIRED  | Line 242: `cleanupScreen(currentScreen)` before removeChild              |
-| MainScene.brs:clearScreenStack  | MainScene.brs:cleanupScreen | cleanup in while loop            | WIRED  | Line 205: `cleanupScreen(screen)` in loop                                |
-| MainScene.brs:cleanupScreen     | HomeScreen.brs:cleanup     | screen.callFunc if hasField      | WIRED  | Line 197: `screen.callFunc("cleanup")` after hasField check              |
-| MainScene.brs:cleanupScreen     | Sidebar.brs:cleanup        | HomeScreen cleanup calls Sidebar | WIRED  | Lines 212-213: m.sidebar.unobserveField in HomeScreen.cleanup()          |
+| From                              | To                    | Via                                 | Status | Evidence                                     |
+| --------------------------------- | --------------------- | ----------------------------------- | ------ | -------------------------------------------- |
+| HomeScreen.brs                    | PlexApiTask           | task.endpoint = /hubs               | WIRED  | Line 71                                      |
+| HomeScreen.brs                    | hubRowList            | m.hubRowList.content = rootContent  | WIRED  | Line 145                                     |
+| PosterGridItem.brs                | progressBar           | m.progressBar.width = calculated    | WIRED  | Line 55                                      |
+| HomeScreen.brs:onHubItemSelected  | m.top.itemSelected    | action=play for continueWatching    | WIRED  | Lines 228-233                                |
+| HomeScreen.brs:onKeyEvent         | hubRowList/posterGrid | focus transfer at boundary          | WIRED  | Lines 469-489                                |
+| HomeScreen.brs                    | Timer                 | hubRefreshTimer -> loadHubs()       | WIRED  | Lines 37-41 and 246-253                      |
+| Sidebar.brs                       | HomeScreen.brs        | specialAction=viewHome              | WIRED  | Sidebar line 134 and HomeScreen line 291-293 |
 
 ### Requirements Coverage
 
-Per user requirements, this phase must deliver:
-
-1. **MainScene manages screen stack** - ✓ SATISFIED
-   - pushScreen adds to stack, popScreen removes with cleanup
-   - clearScreenStack removes all with cleanup loop
-
-2. **Sidebar component displays library list** - ✓ SATISFIED
-   - libraryList populated from /library/sections API
-   - hubList and bottomList show static navigation options
-
-3. **Back button returns without losing focus** - ✓ SATISFIED
-   - Back key → popScreen → focusStack restoration
-   - isValid() check prevents crashes on invalid nodes
-
-4. **Screen cleanup prevents memory leaks** - ✓ SATISFIED
-   - cleanupScreen unobserves standard fields
-   - Optional cleanup() called on screens that implement it
-   - Tasks stopped with control="stop"
-
-5. **Focus moves automatically** - ✓ SATISFIED
-   - pushScreen stores focusedChild before hiding current screen
-   - popScreen restores savedFocus with validity check
+| Requirement | Description                                                       | Status    | Evidence                                                               |
+| ----------- | ----------------------------------------------------------------- | --------- | ---------------------------------------------------------------------- |
+| HOME-01     | Home screen displays hub rows (Continue Watching, Recently Added) | SATISFIED | RowList with Continue Watching and Recently Added rows from /hubs API  |
+| HOME-02     | Home screen displays On Deck row for TV shows                     | SATISFIED | On Deck row filtered from /hubs response via hubIdentifier match       |
+| HOME-03     | Hub rows load with staggered requests (no rendezvous cascade)     | SATISFIED | Single /hubs API call with client-side filtering avoids cascade        |
 
 ### Anti-Patterns Found
 
-| File | Line | Pattern | Severity | Impact |
-| ---- | ---- | ------- | -------- | ------ |
-| None | -    | -       | -        | -      |
+None. No TODOs, FIXMEs, placeholders, empty implementations, or stub patterns found.
 
-**Note:** No anti-patterns detected in phase 03 files. One TODO in EpisodeScreen.brs (auto-play next episode) is in a different phase and not blocking this goal. Placeholder image references are to actual pkg:/images files, not stub code.
+### Notable Design Decisions
+
+1. **Play action routes to detail screen as interim** (MainScene.brs line 329): Documented as intentional until VideoPlayer is wired in playback phase. The hub row correctly dispatches action=play with viewOffset -- the routing is a separate concern belonging to the playback phase.
+
+2. **Single /hubs API call** instead of separate calls per hub type: Client-side filtering on hubIdentifier is more efficient and inherently prevents rendezvous cascade (HOME-03).
+
+3. **numRows set BEFORE content** (line 144): Critical RowList ordering to prevent layout bugs -- correctly implemented.
 
 ### Human Verification Required
 
-#### 1. Back Button Focus Restoration Visual Test
+#### 1. Hub Rows Display with Live Data
 
-**Test:** 
-1. Launch app and navigate from HomeScreen sidebar to posterGrid using right arrow
-2. Focus a specific poster item (e.g., 3rd item in grid)
-3. Press OK to navigate to DetailScreen
-4. Press Back button
+**Test:** Launch app connected to a Plex server with watch history. Verify home screen shows Continue Watching, On Deck, and Recently Added rows.
+**Expected:** Rows appear with poster images, titles, and progress bars on partially-watched items.
+**Why human:** Requires live Plex server to verify real API response parsing and image rendering.
 
-**Expected:** Focus returns to the same poster item (3rd item) in the grid, not reset to first item
+#### 2. Hub Item Selection Behavior
 
-**Why human:** Focus position restoration requires visual confirmation of which grid item has focus ring
+**Test:** Select a Continue Watching item, then select an On Deck item.
+**Expected:** Both navigate to detail screen (play routes to detail as interim).
+**Why human:** Requires visual confirmation of screen transition and content correctness.
 
-#### 2. Memory Leak Validation Over Long Session
+#### 3. Three-Zone Focus Navigation
 
-**Test:**
-1. Navigate through multiple screens 20+ times (Home → Detail → Back → Home → Detail → Back...)
-2. Monitor Roku memory usage via telnet port 8080 if available
-3. Check for observer leak symptoms (sluggish UI, delayed responses)
+**Test:** Navigate with arrow keys between sidebar, hub rows, and library grid in all directions.
+**Expected:** Focus moves cleanly with no traps or dead zones.
+**Why human:** Focus ring visibility requires Roku device visual confirmation.
 
-**Expected:** Memory usage stable, no performance degradation after many navigation cycles
+#### 4. Progress Bar Rendering
 
-**Why human:** Memory leak detection requires observing app behavior over time and interpreting system metrics
+**Test:** Verify partially-watched items in Continue Watching row show gold progress bars.
+**Expected:** Gold bar at bottom of poster proportional to watch progress.
+**Why human:** Visual rendering of bar width, color, and position requires device confirmation.
 
-#### 3. Multiple Unobserve Safety
+#### 5. View Mode Toggle
 
-**Test:**
-1. Navigate to HomeScreen (observers attached)
-2. Navigate away using back button (cleanup called)
-3. Verify no crashes or warnings in Roku debug console
-
-**Expected:** No errors about unobserving fields that aren't observed or other cleanup-related crashes
-
-**Why human:** BrightScript error messages only appear in debug console, need human to monitor
+**Test:** Select a library from sidebar, verify hub rows hide. Select Home, verify hub rows return.
+**Expected:** Library view hides hubs and repositions grid to top. Home view restores hub rows above grid.
+**Why human:** Layout repositioning requires visual confirmation.
 
 ---
 
 ## Summary
 
-**Phase 03 goal achieved.** All 4 observable truths verified, all 6 artifacts exist and are substantive and wired, all 4 key links confirmed in actual code. 
+All 11 observable truths verified across both plans. All 6 artifacts exist, are substantive (real implementations, not stubs), and are properly wired together. All 7 key links confirmed in actual code. All 3 requirements (HOME-01, HOME-02, HOME-03) satisfied. No anti-patterns found.
 
-The navigation framework enhancements deliver:
-- Systematic observer cleanup pattern preventing memory leaks
-- Robust focus restoration with validity checking
-- Optional cleanup interface for extensibility
-- Proper task lifecycle management (control="stop")
+The phase goal is achieved. The HomeScreen fetches hub data from the /hubs API on init, renders Continue Watching, On Deck, and Recently Added rows in a RowList above the library grid, shows progress bars on partially-watched items, supports full arrow-key navigation between sidebar/hubs/grid, auto-refreshes every 2 minutes and on screen return, and provides a sidebar view toggle between hub+grid and library-only modes.
 
-No gaps found. Three items flagged for human verification (focus position visual test, memory leak validation, cleanup safety check).
+Five items flagged for human verification on a Roku device.
 
 ---
 
-_Verified: 2026-02-09T00:00:00Z_
+_Verified: 2026-03-09T16:28:39Z_
 _Verifier: Claude (gsd-verifier)_
