@@ -21,7 +21,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 7: Intro and Credits Skip** - Skip buttons via Plex chapter markers *(completed 2026-03-10)*
 - [x] **Phase 8: Auto-play Next Episode** - End-of-episode countdown and advance *(completed 2026-03-10)*
 - [x] **Phase 9: Collections and Playlists** - Content organization and sequential playback *(completed 2026-03-10)*
-- [ ] **Phase 10: Managed Users** - User picker, switching, PIN entry
+- [x] **Phase 10: Managed Users** - User picker, switching, PIN entry *(completed 2026-03-10)*
 
 ## Phase Details
 
@@ -167,7 +167,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 10-01-PLAN.md — User picker screen, PIN entry, admin token management, settings integration
+- [x] 10-01-PLAN.md — User picker screen, PIN entry, admin token management, settings integration
 
 ## Progress
 
@@ -185,4 +185,4 @@ Phases execute in numeric order: 1 > 2 > 3 > 4 > 5 > 6 > 7 > 8 > 9 > 10
 | 7. Intro and Credits Skip | 1/1 | Complete | 2026-03-10 |
 | 8. Auto-play Next Episode | 1/1 | Complete | 2026-03-10 |
 | 9. Collections and Playlists | 2/2 | Complete | 2026-03-10 |
-| 10. Managed Users | 0/1 | Not started | - |
+| 10. Managed Users | 1/1 | Complete | 2026-03-10 |

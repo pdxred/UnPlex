@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to discuss/plan
-stopped_at: Phase 10 context gathered
-last_updated: "2026-03-10T20:53:49.683Z"
-last_activity: 2026-03-10 -- Completed Phase 9 Collections and Playlists
+status: Milestone complete
+stopped_at: All phases complete
+last_updated: "2026-03-10T21:01:00.000Z"
+last_activity: 2026-03-10 -- Completed Phase 10 Managed Users
 progress:
-  total_phases: 11
+  total_phases: 10
   completed_phases: 10
-  total_plans: 19
-  completed_plans: 19
-  percent: 90
+  total_plans: 17
+  completed_plans: 17
+  percent: 100
 ---
 
 # Project State
@@ -21,23 +21,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-10)
 
 **Core value:** Fast, intuitive library browsing and playback on a single personal Plex server
-**Current focus:** Phase 10 Managed Users -- Ready to discuss/plan
+**Current focus:** Milestone v1.0 complete
 
 ## Current Position
 
-Phase: 10 of 10 (Managed Users) -- NOT STARTED
-Plan: Not started
-Status: Ready to discuss/plan
-Last activity: 2026-03-10 -- Completed Phase 9 Collections and Playlists
+Phase: 10 of 10 (Managed Users) -- COMPLETE
+Plan: 10-01 complete
+Status: Milestone complete
+Last activity: 2026-03-10 -- Completed Phase 10 Managed Users
 
-Progress: [█████████░] 90%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 16
-- Average duration: 3.1 min
-- Total execution time: 0.83 hours
+- Total plans completed: 17
+- Average duration: 3.2 min
+- Total execution time: 0.9 hours
 
 **By Phase:**
 
@@ -52,9 +52,10 @@ Progress: [█████████░] 90%
 | 07-intro-and-credits-skip | 1 | 3 min | 3.0 min |
 | 08-auto-play-next-episode | 1 | 3 min | 3.0 min |
 | 09-collections-and-playlists | 2 | 8 min | 4.0 min |
+| 10-managed-users | 1 | 4 min | 4.0 min |
 
 **Recent Trend:**
-- Last 5 plans: 07-01 (3 min), 08-01 (3 min), 09-01 (4 min), 09-02 (4 min)
+- Last 5 plans: 08-01 (3 min), 09-01 (4 min), 09-02 (4 min), 10-01 (4 min)
 - Trend: Stable
 
 *Updated after each plan completion*
@@ -116,18 +117,22 @@ Recent decisions affecting current work:
 - [09-02] Playlist sequential playback advances immediately on finish (no countdown)
 - [09-02] Credits overlays suppressed during playlist mode
 - [09-02] PlaylistItem shows grandparentTitle for episodes, "Movie"/"Episode" fallback
+- [10-01] Admin token preserved separately from active user token for switching back
+- [10-01] PlexApiTask authTokenOverride and suppress401 for managed user flows
+- [10-01] PIN entry via StandardKeyboardDialog (not custom component)
+- [10-01] User switch resets entire app: clearScreenStack + showHomeScreen
+- [10-01] Settings shows current user name, no-action label at index 0
 
 ### Pending Todos
 
-None yet.
+None.
 
 ### Blockers/Concerns
 
-- Phase 10 (Managed Users): Managed user token scope needs validation against Plex Home API
+None - milestone complete.
 
 ## Session Continuity
 
-Last session: 2026-03-10T20:53:49.678Z
-Stopped at: Phase 10 context gathered
-Resume file: .planning/phases/10-managed-users/10-CONTEXT.md
-Resume command: /gsd:discuss-phase 10
+Last session: 2026-03-10T21:01:00.000Z
+Stopped at: Milestone v1.0 complete
+Resume command: /gsd:complete-milestone
