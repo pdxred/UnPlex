@@ -16,6 +16,31 @@ sub init()
     m.reportTimer.duration = 10  ' Report every 10 seconds
     m.reportTimer.repeat = true
     m.reportTimer.observeField("fire", "reportProgress")
+
+    ' Track selection panel
+    m.trackPanel = m.top.findNode("trackPanel")
+    m.trackPanel.observeField("trackChanged", "onTrackChanged")
+    m.trackPanel.observeField("visible", "onPanelVisibleChange")
+
+    ' Stream metadata
+    m.audioStreams = []
+    m.subtitleStreams = []
+    m.selectedAudioId = 0
+    m.selectedSubtitleId = 0
+    m.partId = 0
+
+    ' Panel state
+    m.pausedForPanel = false
+
+    ' Playback mode tracking (for Plan 02 PGS transcode)
+    m.isTranscoding = false
+    m.isTranscodePivotInProgress = false
+    m.previousPlaybackState = invalid
+
+    ' Cache media info for potential replays
+    m.cachedMediaInfo = invalid
+    m.cachedPart = invalid
+    m.canDirectPlay = false
 end sub
 
 sub onControlChange(event as Object)
@@ -87,13 +112,24 @@ sub processMediaInfo()
 
     part = parts[0]
 
+    ' Cache media info for potential replays (PGS revert)
+    m.cachedMediaInfo = mediaInfo
+    m.cachedPart = part
+
+    ' Store part ID for track persistence (Plan 02)
+    m.partId = SafeGet(part, "id", 0)
+
+    ' Parse stream metadata from part
+    streams = SafeGet(part, "Stream", [])
+    parseStreams(streams)
+
     ' Determine if we can direct play
-    canDirectPlay = checkDirectPlay(mediaInfo)
+    m.canDirectPlay = checkDirectPlay(mediaInfo)
 
     ' Build playback URL
-    if canDirectPlay
+    if m.canDirectPlay
         playUrl = BuildPlexUrl(part.key)
-        streamFormat = getStreamFormat(part.container)
+        streamFormat = getStreamFormat(SafeGet(part, "container", "mp4"))
     else
         ' Use transcoding
         playUrl = buildTranscodeUrl()
@@ -105,6 +141,9 @@ sub processMediaInfo()
     content.url = playUrl
     content.streamFormat = streamFormat
     content.title = m.top.itemTitle
+
+    ' Set up SRT sidecar subtitles if a text subtitle is selected
+    setupInitialSubtitles(content)
 
     m.video.content = content
 
@@ -119,7 +158,90 @@ sub processMediaInfo()
 
     ' Start progress reporting
     m.reportTimer.control = "start"
+
+    ' Update track panel with stream data
+    m.trackPanel.audioStreams = m.audioStreams
+    m.trackPanel.subtitleStreams = m.subtitleStreams
+    m.trackPanel.selectedAudioId = m.selectedAudioId
+    m.trackPanel.selectedSubtitleId = m.selectedSubtitleId
 end sub
+
+' Parse audio and subtitle streams from Plex API response
+sub parseStreams(streams as Object)
+    m.audioStreams = []
+    m.subtitleStreams = []
+
+    if streams = invalid then return
+
+    for each stream in streams
+        streamType = SafeGet(stream, "streamType", 0)
+
+        if streamType = 2  ' Audio
+            audioStream = {
+                id: SafeGet(stream, "id", 0)
+                displayTitle: SafeGet(stream, "displayTitle", "")
+                language: SafeGet(stream, "language", "Unknown")
+                languageTag: SafeGet(stream, "languageTag", "")
+                codec: SafeGet(stream, "codec", "")
+                channels: SafeGet(stream, "channels", 2)
+                selected: SafeGet(stream, "selected", false)
+            }
+            m.audioStreams.push(audioStream)
+
+            if audioStream.selected
+                m.selectedAudioId = audioStream.id
+            end if
+
+        else if streamType = 3  ' Subtitle
+            codec = LCase(SafeGet(stream, "codec", ""))
+            subtitleStream = {
+                id: SafeGet(stream, "id", 0)
+                displayTitle: SafeGet(stream, "displayTitle", "")
+                language: SafeGet(stream, "language", "Unknown")
+                languageTag: SafeGet(stream, "languageTag", "")
+                codec: codec
+                forced: SafeGet(stream, "forced", false)
+                selected: SafeGet(stream, "selected", false)
+                isBitmap: (codec = "pgs" or codec = "vobsub")
+            }
+            m.subtitleStreams.push(subtitleStream)
+
+            if subtitleStream.selected
+                m.selectedSubtitleId = subtitleStream.id
+            end if
+        end if
+    end for
+
+    ' Expose streams on interface for external access
+    m.top.audioStreams = m.audioStreams
+    m.top.subtitleStreams = m.subtitleStreams
+end sub
+
+' Set up initial sidecar subtitle if a text subtitle is pre-selected
+sub setupInitialSubtitles(content as Object)
+    if m.selectedSubtitleId = 0 then return
+
+    ' Find the selected subtitle stream
+    for each stream in m.subtitleStreams
+        if stream.id = m.selectedSubtitleId and not stream.isBitmap
+            ' Text subtitle — set up sidecar delivery
+            sidecarUrl = buildSidecarUrl(stream.id)
+            content.subtitleTracks = [{
+                TrackName: "sidecar_" + stream.id.ToStr()
+                Language: stream.languageTag
+                Url: sidecarUrl
+            }]
+            exit for
+        end if
+    end for
+end sub
+
+' Build sidecar subtitle URL
+function buildSidecarUrl(streamId as Integer) as String
+    serverUri = GetServerUri()
+    token = GetAuthToken()
+    return serverUri + "/library/streams/" + streamId.ToStr() + "?X-Plex-Token=" + token
+end function
 
 function checkDirectPlay(mediaInfo as Object) as Boolean
     ' Check video codec
@@ -263,12 +385,127 @@ sub showError(message as String)
     m.top.getScene().dialog = dialog
 end sub
 
+' ========== Track Selection Panel Integration ==========
+
+sub onTrackChanged(event as Object)
+    change = event.getData()
+    if change = invalid then return
+
+    changeType = SafeGet(change, "type", "")
+    streamId = SafeGet(change, "streamId", 0)
+    codec = SafeGet(change, "codec", "")
+    isBitmap = SafeGet(change, "isBitmap", false)
+
+    if changeType = "audio"
+        handleAudioTrackChange(streamId)
+    else if changeType = "subtitle"
+        if isBitmap
+            ' PGS/bitmap subtitle — signal for Plan 02 transcode pivot
+            handlePgsSubtitleRequest(streamId)
+        else
+            ' Text subtitle or Off
+            handleTextSubtitleChange(streamId)
+        end if
+    end if
+end sub
+
+sub handleAudioTrackChange(streamId as Integer)
+    ' Find the audio track index for Roku Video node
+    for i = 0 to m.audioStreams.count() - 1
+        if m.audioStreams[i].id = streamId
+            ' Roku Video audioTrack is 0-based index of audio streams
+            m.video.audioTrack = i.ToStr()
+            m.selectedAudioId = streamId
+            m.trackPanel.selectedAudioId = streamId
+            exit for
+        end if
+    end for
+end sub
+
+sub handleTextSubtitleChange(streamId as Integer)
+    if streamId = 0
+        ' Turn off subtitles
+        m.video.subtitleTrack = ""
+        m.video.enableSubtitle = false
+        m.selectedSubtitleId = 0
+        m.trackPanel.selectedSubtitleId = 0
+        return
+    end if
+
+    ' Find the subtitle stream
+    for each stream in m.subtitleStreams
+        if stream.id = streamId
+            ' Build sidecar URL and apply to content
+            sidecarUrl = buildSidecarUrl(streamId)
+            trackName = "sidecar_" + streamId.ToStr()
+
+            content = m.video.content
+            if content <> invalid
+                content.subtitleTracks = [{
+                    TrackName: trackName
+                    Language: stream.languageTag
+                    Url: sidecarUrl
+                }]
+                m.video.subtitleTrack = trackName
+                m.video.enableSubtitle = true
+            end if
+
+            m.selectedSubtitleId = streamId
+            m.trackPanel.selectedSubtitleId = streamId
+            exit for
+        end if
+    end for
+end sub
+
+sub handlePgsSubtitleRequest(streamId as Integer)
+    ' Signal PGS request for Plan 02 to handle via transcode pivot
+    ' Store the request so Plan 02 can observe pgsRequested field
+    m.top.pgsRequested = {
+        streamId: streamId
+        position: m.currentPosition
+    }
+
+    ' Update panel selection optimistically (Plan 02 will revert on failure)
+    m.selectedSubtitleId = streamId
+    m.trackPanel.selectedSubtitleId = streamId
+end sub
+
+' Panel visibility change — manage pause/resume
+sub onPanelVisibleChange(event as Object)
+    isVisible = event.getData()
+
+    if isVisible
+        ' Panel opened — pause if playing
+        if m.video.state = "playing"
+            m.video.control = "pause"
+            m.pausedForPanel = true
+        end if
+    else
+        ' Panel closed — resume if we paused for it
+        if m.pausedForPanel
+            m.video.control = "resume"
+            m.pausedForPanel = false
+        end if
+        ' Restore focus to video
+        m.video.setFocus(true)
+    end if
+end sub
+
 function onKeyEvent(key as String, press as Boolean) as Boolean
     if not press then return false
 
     c = m.global.constants
 
-    if key = "back"
+    ' If track panel is visible, let it handle keys
+    if m.trackPanel.visible
+        return false
+    end if
+
+    if key = "options"
+        ' Toggle track selection panel
+        m.trackPanel.visible = not m.trackPanel.visible
+        return true
+    else if key = "back"
         stopPlayback()
         m.top.playbackComplete = true
         return true

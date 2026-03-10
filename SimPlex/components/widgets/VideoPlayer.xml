@@ -7,6 +7,9 @@
         <field id="itemTitle" type="string" />
         <field id="control" type="string" onChange="onControlChange" />
         <field id="playbackComplete" type="boolean" alwaysNotify="true" />
+        <field id="audioStreams" type="array" />
+        <field id="subtitleStreams" type="array" />
+        <field id="pgsRequested" type="assocarray" alwaysNotify="true" />
     </interface>
 
     <script type="text/brightscript" uri="pkg:/source/utils.brs" />
@@ -19,6 +22,11 @@
             width="1920"
             height="1080"
             enableUI="true"
+        />
+
+        <TrackSelectionPanel
+            id="trackPanel"
+            visible="false"
         />
     </children>
 </component>
