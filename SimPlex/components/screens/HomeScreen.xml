@@ -115,5 +115,9 @@
             translation="[1100, 540]"
             visible="false"
         />
+        <FilterBottomSheet
+            id="filterBottomSheet"
+            visible="false"
+        />
     </children>
 </component>

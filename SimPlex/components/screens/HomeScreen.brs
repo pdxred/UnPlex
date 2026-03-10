@@ -15,6 +15,9 @@ sub init()
     m.isFilterReload = false
     m.unfilteredTotal = 0
 
+    m.filterBottomSheet = m.top.findNode("filterBottomSheet")
+    m.isSheetOpen = false
+
     m.retryCount = 0
     m.retryContext = invalid
 
@@ -23,6 +26,10 @@ sub init()
 
     ' Observe clear filters button in empty state
     m.clearFiltersButton.observeField("buttonSelected", "onClearFiltersFromEmpty")
+
+    ' Observe bottom sheet events
+    m.filterBottomSheet.observeField("filterState", "onBottomSheetFilterChanged")
+    m.filterBottomSheet.observeField("sheetDismissed", "onSheetDismissed")
 
     ' Observe server reconnected signal
     m.global.observeField("serverReconnected", "onServerReconnected")
@@ -748,6 +755,31 @@ sub onClearFiltersFromEmpty(event as Object)
     m.filterBar.filterState = { sort: "titleSort:asc", genre: "", year: "", unwatched: "" }
 end sub
 
+' ========== Bottom Sheet Integration ==========
+
+sub onBottomSheetFilterChanged(event as Object)
+    newState = event.getData()
+    m.filterBar.filterState = newState
+    ' Pass genre display names so FilterBar can resolve genre keys to names
+    if m.filterBottomSheet.genreDisplayNames <> invalid
+        m.filterBar.genreNames = m.filterBottomSheet.genreDisplayNames
+    end if
+end sub
+
+sub onSheetDismissed(event as Object)
+    m.isSheetOpen = false
+    m.filterBottomSheet.visible = false
+
+    ' Restore focus to previous area
+    if m.focusArea = "grid"
+        m.posterGrid.setFocus(true)
+    else if m.focusArea = "sidebar"
+        m.sidebar.setFocus(true)
+    else
+        m.posterGrid.setFocus(true)
+    end if
+end sub
+
 sub retryLastRequest()
     if m.retryContext = invalid then return
     m.isLoading = true
@@ -849,10 +881,15 @@ sub cleanup()
     m.posterGrid.unobserveField("loadMore")
     m.filterBar.unobserveField("filterChanged")
     m.clearFiltersButton.unobserveField("buttonSelected")
+    m.filterBottomSheet.unobserveField("filterState")
+    m.filterBottomSheet.unobserveField("sheetDismissed")
 end sub
 
 function onKeyEvent(key as String, press as Boolean) as Boolean
     if not press then return false
+
+    ' When bottom sheet is open, let it handle all keys
+    if m.isSheetOpen then return false
 
     if key = "down"
         if m.focusArea = "hubs"
@@ -904,9 +941,12 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
             end if
         end if
     else if key = "options"
-        if m.viewMode = "libraryOnly"
-            ' In library view, options key opens filter sheet
-            m.top.openFilterSheet = true
+        if m.viewMode = "libraryOnly" and not m.isSheetOpen
+            ' In library view, options key opens filter bottom sheet
+            m.filterBottomSheet.sectionId = m.currentSectionId
+            m.filterBottomSheet.sectionType = m.currentSectionType
+            m.filterBottomSheet.visible = true
+            m.isSheetOpen = true
             return true
         else
             ' In hub view, show context menu for focused item
