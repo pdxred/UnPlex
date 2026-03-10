@@ -44,7 +44,7 @@
         </Group>
         <LoadingSpinner
             id="loadingSpinner"
-            translation="[960, 540]"
+            translation="[1100, 540]"
             visible="false"
         />
     </children>
