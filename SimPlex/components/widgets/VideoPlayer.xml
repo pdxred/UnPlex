@@ -15,6 +15,9 @@
         <field id="episodeIndex" type="integer" value="0" />
         <field id="seasonIndex" type="integer" value="0" />
         <field id="nextEpisodeStarted" type="boolean" alwaysNotify="true" />
+        <field id="playlistItems" type="array" />
+        <field id="playlistIndex" type="integer" value="-1" />
+        <field id="playlistAdvanced" type="boolean" alwaysNotify="true" />
     </interface>
 
     <script type="text/brightscript" uri="pkg:/source/utils.brs" />

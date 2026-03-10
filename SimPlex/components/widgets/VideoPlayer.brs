@@ -87,6 +87,9 @@ sub init()
     m.countdownTimer.duration = 1
     m.countdownTimer.repeat = true
     m.countdownTimer.observeField("fire", "onCountdownTick")
+
+    ' Playlist sequential playback
+    m.hasPlaylist = false
 end sub
 
 sub onControlChange(event as Object)
@@ -98,7 +101,14 @@ sub onControlChange(event as Object)
     end if
 end sub
 
+sub checkPlaylistContext()
+    items = m.top.playlistItems
+    m.hasPlaylist = (items <> invalid and items.count() > 0 and m.top.playlistIndex >= 0)
+end sub
+
 sub loadMedia()
+    checkPlaylistContext()
+
     ' First fetch media metadata to determine playback URL
     task = CreateObject("roSGNode", "PlexApiTask")
     task.endpoint = m.top.mediaKey
@@ -431,6 +441,18 @@ sub onVideoStateChange(event as Object)
         ' Mark as watched
         scrobble()
         m.reportTimer.control = "stop"
+
+        ' Check for playlist advance (immediate, no countdown)
+        if m.hasPlaylist
+            nextIndex = m.top.playlistIndex + 1
+            items = m.top.playlistItems
+            if items <> invalid and nextIndex < items.count()
+                advancePlaylist(nextIndex)
+                return
+            end if
+        end if
+
+        ' Normal completion (no playlist or end of playlist)
         m.top.playbackComplete = true
     else if state = "error"
         ' Handle transcode pivot failure
@@ -508,6 +530,9 @@ sub stopPlayback()
     m.nextEpisodeInfo = invalid
     m.noNextEpisode = false
     m.fetchingNextEpisode = false
+
+    ' Reset playlist state
+    m.hasPlaylist = false
 end sub
 
 sub showError(message as String)
@@ -920,6 +945,9 @@ sub checkMarkers()
     ' Show or hide overlays based on position
     if inIntro and (not m.skipButtonVisible or m.skipButtonType <> "intro")
         showSkipButton("intro")
+    else if inCredits and m.hasPlaylist
+        ' Playlist mode: skip credits overlays — playlist advances on finish
+        return
     else if inCredits
         ' For TV episodes: show auto-play countdown instead of skip credits
         if m.top.grandparentRatingKey <> "" and m.top.grandparentRatingKey <> invalid
@@ -1199,6 +1227,38 @@ sub startNextEpisode()
     m.skipButton.opacity = 0.0
 
     ' Load and start the next episode
+    loadMedia()
+end sub
+
+' ========== Playlist Sequential Playback ==========
+
+sub advancePlaylist(nextIndex as Integer)
+    items = m.top.playlistItems
+    nextItem = items[nextIndex]
+
+    ' Stop current playback (without triggering playbackComplete)
+    m.video.control = "stop"
+
+    ' Update playback fields for next item
+    m.top.ratingKey = nextItem.ratingKey
+    m.top.mediaKey = nextItem.mediaKey
+    m.top.itemTitle = nextItem.title
+    m.top.startOffset = 0
+    m.top.playlistIndex = nextIndex
+
+    ' Signal playlist advanced
+    m.top.playlistAdvanced = true
+
+    ' Reset marker and auto-play state
+    m.introMarker = invalid
+    m.creditsMarker = invalid
+    if m.skipButtonVisible then hideSkipButton()
+    if m.autoPlayOverlayVisible then hideAutoPlayOverlay()
+    m.nextEpisodeInfo = invalid
+    m.noNextEpisode = false
+    m.fetchingNextEpisode = false
+
+    ' Load and start the next item
     loadMedia()
 end sub
 
