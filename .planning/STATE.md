@@ -3,53 +3,55 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Phase 5 complete, ready to plan Phase 6
-last_updated: "2026-03-10T20:14:20.985Z"
-last_activity: 2026-03-10 -- Completed Phase 5 Filter and Sort
+stopped_at: Phase 6 complete, ready to plan Phase 7
+last_updated: "2026-03-10T20:15:00.000Z"
+last_activity: 2026-03-10 -- Completed Phase 6 Audio and Subtitles
 progress:
   total_phases: 10
-  completed_phases: 7
-  total_plans: 15
-  completed_plans: 15
-  percent: 50
+  completed_phases: 6
+  total_plans: 16
+  completed_plans: 12
+  percent: 60
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-08)
+See: .planning/PROJECT.md (updated 2026-03-10)
 
 **Core value:** Fast, intuitive library browsing and playback on a single personal Plex server
-**Current focus:** Phase 6 Audio and Subtitles -- Ready to plan
+**Current focus:** Phase 7 Intro and Credits Skip -- Ready to plan
 
 ## Current Position
 
-Phase: 6 of 10 (Audio and Subtitles) -- READY TO PLAN
+Phase: 7 of 10 (Intro and Credits Skip) -- READY TO PLAN
 Plan: Not started
 Status: Ready to plan
-Last activity: 2026-03-10 -- Completed Phase 5 Filter and Sort
+Last activity: 2026-03-10 -- Completed Phase 6 Audio and Subtitles
 
-Progress: [█████░░░░░] 50%
+Progress: [██████░░░░] 60%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 8
+- Total plans completed: 12
 - Average duration: 3.1 min
-- Total execution time: 0.43 hours
+- Total execution time: 0.62 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-infrastructure | 2 | 5 min | 2.5 min |
-| 03-navigation-framework | 2 | 7 min | 3.5 min |
 | 02-playback-foundation | 2 | 7 min | 3.5 min |
+| 03-navigation-framework | 2 | 7 min | 3.5 min |
 | 04-error-states | 2 | 7 min | 3.5 min |
+| 05-filter-and-sort | 2 | 6 min | 3.0 min |
+| 06-audio-and-subtitles | 2 | 6 min | 3.0 min |
 
 **Recent Trend:**
-- Last 5 plans: 02-01 (3 min), 02-02 (4 min), 04-01 (3 min), 04-02 (4 min)
+- Last 5 plans: 04-02 (4 min), 05-01 (3 min), 05-02 (3 min), 06-01 (3 min), 06-02 (3 min)
 - Trend: Stable
 
 *Updated after each plan completion*
@@ -91,6 +93,14 @@ Recent decisions affecting current work:
 - [05-02] Bottom sheet embedded directly in HomeScreen for simpler focus management
 - [05-02] Column-based focus navigation in bottom sheet: Sort -> Unwatched/Genre -> Year -> Clear All
 - [05-02] Genre multi-select uses OR logic with comma-separated keys
+- [06-01] TrackSelectionPanel 440px slide-in with LabelList and floatingFocus
+- [06-01] PGS requests flagged via pgsRequested interface field (not silently ignored)
+- [06-01] pausedForPanel flag distinguishes panel-triggered pause from user pause
+- [06-02] PUT method via X-HTTP-Method-Override for Roku compatibility
+- [06-02] PGS transcode uses subtitleStreamID + subtitles=burn + offset params
+- [06-02] isTranscodePivotInProgress guard prevents rapid PGS switching race conditions
+- [06-02] Forced PGS subtitles skipped at initial load (user can manually select)
+- [06-02] Track persistence is fire-and-forget per scrobble pattern
 
 ### Pending Todos
 
@@ -98,12 +108,11 @@ None yet.
 
 ### Blockers/Concerns
 
-- Phase 6 (Subtitles): PGS burn-in transcode URL format needs validation against real server
 - Phase 10 (Managed Users): Managed user token scope needs validation against Plex Home API
 
 ## Session Continuity
 
 Last session: 2026-03-10
-Stopped at: Phase 5 complete, ready to plan Phase 6
+Stopped at: Phase 6 complete, ready to plan Phase 7
 Resume file: None
-Resume command: /gsd:discuss-phase 6
+Resume command: /gsd:discuss-phase 7

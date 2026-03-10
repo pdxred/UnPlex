@@ -35,6 +35,12 @@ Fast, intuitive library browsing and playback on a single personal Plex server w
 - ✓ Server capability detection and version parsing — existing (`capabilities.brs`)
 - ✓ Structured logging with ISO timestamps — existing (`logger.brs`)
 - ✓ Constants module with layout, color, and API config — existing (`constants.brs`)
+- ✓ Audio track selection during playback — Phase 6
+- ✓ Subtitle track selection during playback — Phase 6
+- ✓ Sidecar SRT subtitle injection — Phase 6
+- ✓ PGS bitmap subtitle burn-in via transcode fallback — Phase 6
+- ✓ Track preference persistence to Plex server — Phase 6
+- ✓ Forced subtitle auto-enable based on device locale — Phase 6
 
 ### Active
 
@@ -46,10 +52,7 @@ Fast, intuitive library browsing and playback on a single personal Plex server w
 - [ ] Intro skip button (Plex chapter markers from /library/metadata/{id}/intros)
 - [ ] Credits skip button (Plex chapter markers)
 - [ ] Auto-play next episode with countdown
-- [ ] Audio track selection during playback
-- [ ] Subtitle track selection during playback
-- [ ] Sidecar SRT/ASS subtitle injection
-- [ ] Burn-in fallback for unsupported subtitle formats
+- [ ] ASS subtitle support (currently SRT only)
 
 **Navigation & UI**
 - [ ] Hub rows on home screen from /hubs endpoint (continue watching, recently added)
@@ -120,6 +123,10 @@ The official Plex Roku app (new release) is slow, buggy, and has inefficient UI 
 | JSON over XML for Plex API | Cleaner parsing, modern API pattern | ✓ Good — implemented in Phase 1 |
 | Video-only for early phases | Focused scope, user's primary use case | — Pending |
 | GDM discovery vs manual IP | Brief prefers GDM UDP broadcast on port 32414; current code uses plex.tv resource discovery | — Pending |
+| PUT via X-HTTP-Method-Override | Roku doesn't support PUT directly; same pattern as PlexSessionTask | ✓ Good — Phase 6 |
+| PGS transcode pivot with position preservation | Stop direct play, record position, start HLS transcode at offset, revert on failure | ✓ Good — Phase 6 |
+| Track persistence fire-and-forget | PUT /library/parts/{id} after every track change, no error handling needed | ✓ Good — Phase 6 |
+| Forced PGS subtitles skipped at initial load | Avoids unexpected transcode on first play; user can manually select from panel | ✓ Good — Phase 6 |
 
 ---
-*Last updated: 2026-03-08 after initialization*
+*Last updated: 2026-03-10 after Phase 6*
