@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Phase 7 context gathered
-last_updated: "2026-03-10T20:18:35.607Z"
-last_activity: 2026-03-10 -- Completed Phase 6 Audio and Subtitles
+stopped_at: Phase 7 complete, ready to plan Phase 8
+last_updated: "2026-03-10T20:30:00.000Z"
+last_activity: 2026-03-10 -- Completed Phase 7 Intro and Credits Skip
 progress:
   total_phases: 10
   completed_phases: 7
-  total_plans: 15
-  completed_plans: 15
-  percent: 60
+  total_plans: 17
+  completed_plans: 13
+  percent: 70
 ---
 
 # Project State
@@ -21,23 +21,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-10)
 
 **Core value:** Fast, intuitive library browsing and playback on a single personal Plex server
-**Current focus:** Phase 7 Intro and Credits Skip -- Ready to plan
+**Current focus:** Phase 8 Auto-play Next Episode -- Ready to plan
 
 ## Current Position
 
-Phase: 7 of 10 (Intro and Credits Skip) -- READY TO PLAN
+Phase: 8 of 10 (Auto-play Next Episode) -- READY TO PLAN
 Plan: Not started
 Status: Ready to plan
-Last activity: 2026-03-10 -- Completed Phase 6 Audio and Subtitles
+Last activity: 2026-03-10 -- Completed Phase 7 Intro and Credits Skip
 
-Progress: [██████░░░░] 60%
+Progress: [███████░░░] 70%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 12
+- Total plans completed: 13
 - Average duration: 3.1 min
-- Total execution time: 0.62 hours
+- Total execution time: 0.67 hours
 
 **By Phase:**
 
@@ -49,9 +49,10 @@ Progress: [██████░░░░] 60%
 | 04-error-states | 2 | 7 min | 3.5 min |
 | 05-filter-and-sort | 2 | 6 min | 3.0 min |
 | 06-audio-and-subtitles | 2 | 6 min | 3.0 min |
+| 07-intro-and-credits-skip | 1 | 3 min | 3.0 min |
 
 **Recent Trend:**
-- Last 5 plans: 04-02 (4 min), 05-01 (3 min), 05-02 (3 min), 06-01 (3 min), 06-02 (3 min)
+- Last 5 plans: 05-02 (3 min), 06-01 (3 min), 06-02 (3 min), 07-01 (3 min)
 - Trend: Stable
 
 *Updated after each plan completion*
@@ -101,6 +102,9 @@ Recent decisions affecting current work:
 - [06-02] isTranscodePivotInProgress guard prevents rapid PGS switching race conditions
 - [06-02] Forced PGS subtitles skipped at initial load (user can manually select)
 - [06-02] Track persistence is fire-and-forget per scrobble pattern
+- [07-01] Markers fetched via fire-and-forget parallel to playback start
+- [07-01] Position-based range checking in onPositionChange for timed overlays
+- [07-01] Skip button does not steal focus from TrackSelectionPanel
 
 ### Pending Todos
 
@@ -112,7 +116,7 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-10T20:18:35.602Z
-Stopped at: Phase 7 context gathered
-Resume file: .planning/phases/07-intro-and-credits-skip/07-CONTEXT.md
-Resume command: /gsd:discuss-phase 7
+Last session: 2026-03-10
+Stopped at: Phase 7 complete, ready to plan Phase 8
+Resume file: None
+Resume command: /gsd:discuss-phase 8

@@ -41,6 +41,8 @@ Fast, intuitive library browsing and playback on a single personal Plex server w
 - ✓ PGS bitmap subtitle burn-in via transcode fallback — Phase 6
 - ✓ Track preference persistence to Plex server — Phase 6
 - ✓ Forced subtitle auto-enable based on device locale — Phase 6
+- ✓ Skip Intro button during intro marker timespan — Phase 7
+- ✓ Skip Credits button during credits marker timespan — Phase 7
 
 ### Active
 
@@ -49,8 +51,7 @@ Fast, intuitive library browsing and playback on a single personal Plex server w
 **Playback Enhancements**
 - [ ] Resume from last position with progress bar
 - [ ] Mark watched/unwatched toggle from detail screen
-- [ ] Intro skip button (Plex chapter markers from /library/metadata/{id}/intros)
-- [ ] Credits skip button (Plex chapter markers)
+- [ ] Intro skip user preference (auto-skip without button press)
 - [ ] Auto-play next episode with countdown
 - [ ] ASS subtitle support (currently SRT only)
 
@@ -129,4 +130,4 @@ The official Plex Roku app (new release) is slow, buggy, and has inefficient UI 
 | Forced PGS subtitles skipped at initial load | Avoids unexpected transcode on first play; user can manually select from panel | ✓ Good — Phase 6 |
 
 ---
-*Last updated: 2026-03-10 after Phase 6*
+*Last updated: 2026-03-10 after Phase 7*

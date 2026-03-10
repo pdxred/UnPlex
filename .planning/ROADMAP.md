@@ -18,7 +18,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 4: Error States** - Loading spinners, empty states, network error handling *(completed 2026-03-10)*
 - [x] **Phase 5: Filter and Sort** - Library sorting and filtering controls *(completed 2026-03-10)*
 - [x] **Phase 6: Audio and Subtitles** - Track selection with PGS burn-in fallback *(completed 2026-03-10)*
-- [ ] **Phase 7: Intro and Credits Skip** - Skip buttons via Plex chapter markers
+- [x] **Phase 7: Intro and Credits Skip** - Skip buttons via Plex chapter markers *(completed 2026-03-10)*
 - [ ] **Phase 8: Auto-play Next Episode** - End-of-episode countdown and advance
 - [ ] **Phase 9: Collections and Playlists** - Content organization and sequential playback
 - [ ] **Phase 10: Managed Users** - User picker, switching, PIN entry
@@ -127,7 +127,7 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 07-01: TBD
+- [x] 07-01-PLAN.md — Skip button overlay with marker fetch, position-based trigger, and seek behavior
 
 ### Phase 8: Auto-play Next Episode
 **Goal**: TV show binge-watching flows seamlessly from one episode to the next
@@ -182,7 +182,7 @@ Phases execute in numeric order: 1 > 2 > 3 > 4 > 5 > 6 > 7 > 8 > 9 > 10
 | 4. Error States | 2/2 | Complete | 2026-03-10 |
 | 5. Filter and Sort | 2/2 | Complete | 2026-03-10 |
 | 6. Audio and Subtitles | 2/2 | Complete | 2026-03-10 |
-| 7. Intro and Credits Skip | 0/1 | Not started | - |
+| 7. Intro and Credits Skip | 1/1 | Complete | 2026-03-10 |
 | 8. Auto-play Next Episode | 0/1 | Not started | - |
 | 9. Collections and Playlists | 0/2 | Not started | - |
 | 10. Managed Users | 0/1 | Not started | - |
