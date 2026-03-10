@@ -164,10 +164,10 @@ Plans:
   1. A user picker screen shows all managed users from the Plex Home account
   2. Selecting a managed user switches the active session and reloads all content for that user
   3. PIN-protected managed users require PIN entry before switching
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 10-01: TBD
+- [ ] 10-01-PLAN.md — User picker screen, PIN entry, admin token management, settings integration
 
 ## Progress
 
