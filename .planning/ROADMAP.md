@@ -15,9 +15,9 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Infrastructure** - BrighterScript compiler, constants caching, API task fix *(completed 2026-03-08)*
 - [x] **Phase 2: Playback Foundation** - Resume, progress indicators, watched state *(completed 2026-03-09)*
 - [x] **Phase 3: Hub Rows** - Continue Watching, Recently Added, On Deck *(completed 2026-03-09)*
-- [ ] **Phase 4: Error States** - Loading spinners, empty states, network error handling
-- [ ] **Phase 5: Filter and Sort** - Library sorting and filtering controls
-- [ ] **Phase 6: Audio and Subtitles** - Track selection with PGS burn-in fallback
+- [x] **Phase 4: Error States** - Loading spinners, empty states, network error handling *(completed 2026-03-10)*
+- [x] **Phase 5: Filter and Sort** - Library sorting and filtering controls *(completed 2026-03-10)*
+- [x] **Phase 6: Audio and Subtitles** - Track selection with PGS burn-in fallback *(completed 2026-03-10)*
 - [ ] **Phase 7: Intro and Credits Skip** - Skip buttons via Plex chapter markers
 - [ ] **Phase 8: Auto-play Next Episode** - End-of-episode countdown and advance
 - [ ] **Phase 9: Collections and Playlists** - Content organization and sequential playback
@@ -82,8 +82,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 04-01-PLAN.md — Animated spinner upgrade and empty state messaging for all screens
-- [ ] 04-02-PLAN.md — Error retry with auto-retry and server disconnect recovery
+- [x] 04-01-PLAN.md — Animated spinner upgrade and empty state messaging for all screens
+- [x] 04-02-PLAN.md — Error retry with auto-retry and server disconnect recovery
 
 ### Phase 5: Filter and Sort
 **Goal**: Users can find specific content in large libraries without scrolling through thousands of items
@@ -98,8 +98,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 05-01-PLAN.md — FilterBar upgrade with persistent summary text and filter state management
-- [ ] 05-02-PLAN.md — FilterBottomSheet component with sort, genre, year, unwatched controls
+- [x] 05-01-PLAN.md — FilterBar upgrade with persistent summary text and filter state management
+- [x] 05-02-PLAN.md — FilterBottomSheet component with sort, genre, year, unwatched controls
 
 ### Phase 6: Audio and Subtitles
 **Goal**: Users can select audio and subtitle tracks during playback, with bitmap subtitles handled transparently
@@ -113,8 +113,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 06-01-PLAN.md — TrackSelectionPanel component, stream metadata parsing, audio and SRT subtitle selection
-- [ ] 06-02-PLAN.md — PGS transcode pivot with position preservation, track persistence, forced subtitle auto-enable
+- [x] 06-01-PLAN.md — TrackSelectionPanel component, stream metadata parsing, audio and SRT subtitle selection
+- [x] 06-02-PLAN.md — PGS transcode pivot with position preservation, track persistence, forced subtitle auto-enable
 
 ### Phase 7: Intro and Credits Skip
 **Goal**: Users can skip intros and credits with a single button press, matching the official Plex experience
@@ -176,12 +176,12 @@ Phases execute in numeric order: 1 > 2 > 3 > 4 > 5 > 6 > 7 > 8 > 9 > 10
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Infrastructure | 0/2 | Not started | - |
-| 2. Playback Foundation | 0/2 | Not started | - |
-| 3. Hub Rows | 0/2 | Not started | - |
-| 4. Error States | 1/2 | In Progress|  |
-| 5. Filter and Sort | 0/2 | Not started | - |
-| 6. Audio and Subtitles | 0/2 | Not started | - |
+| 1. Infrastructure | 2/2 | Complete | 2026-03-08 |
+| 2. Playback Foundation | 2/2 | Complete | 2026-03-09 |
+| 3. Hub Rows | 2/2 | Complete | 2026-03-09 |
+| 4. Error States | 2/2 | Complete | 2026-03-10 |
+| 5. Filter and Sort | 2/2 | Complete | 2026-03-10 |
+| 6. Audio and Subtitles | 2/2 | Complete | 2026-03-10 |
 | 7. Intro and Credits Skip | 0/1 | Not started | - |
 | 8. Auto-play Next Episode | 0/1 | Not started | - |
 | 9. Collections and Playlists | 0/2 | Not started | - |
