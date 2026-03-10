@@ -29,15 +29,17 @@ sub init()
 end sub
 
 sub setupStaticLists()
-    ' Hub items: Home (returns to hub+grid view)
+    ' Hub items: Home, Collections
     hubContent = CreateObject("roSGNode", "ContentNode")
     node = hubContent.createChild("ContentNode")
     node.title = "  Home"
+    node = hubContent.createChild("ContentNode")
+    node.title = "  Collections"
     m.hubList.content = hubContent
 
-    ' Bottom items: Search, Settings
+    ' Bottom items: Playlists, Search, Settings
     bottomContent = CreateObject("roSGNode", "ContentNode")
-    bottomItems = ["Search", "Settings"]
+    bottomItems = ["Playlists", "Search", "Settings"]
     for each item in bottomItems
         node = bottomContent.createChild("ContentNode")
         node.title = "  " + item
@@ -107,7 +109,7 @@ sub layoutLists()
 
     ' Position hub list after separator1
     m.hubList.translation = [0, 100 + libHeight + 22]
-    hubHeight = 1 * 50  ' 1 hub item (Home)
+    hubHeight = 2 * 50  ' 2 hub items (Home, Collections)
 
     ' Position separator2 after hub list
     m.separator2.translation = [20, 100 + libHeight + 22 + hubHeight + 10]
@@ -132,14 +134,18 @@ sub onHubSelected(event as Object)
     index = event.getData()
     if index = 0
         m.top.specialAction = "viewHome"
+    else if index = 1
+        m.top.specialAction = "viewCollections"
     end if
 end sub
 
 sub onBottomSelected(event as Object)
     index = event.getData()
     if index = 0
-        m.top.specialAction = "search"
+        m.top.specialAction = "playlists"
     else if index = 1
+        m.top.specialAction = "search"
+    else if index = 2
         m.top.specialAction = "settings"
     end if
 end sub
@@ -179,7 +185,7 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
                 return true
             end if
         else if m.activeList = "hub"
-            if m.hubList.itemFocused >= 0
+            if m.hubList.itemFocused >= 1
                 m.activeList = "bottom"
                 m.bottomList.setFocus(true)
                 return true

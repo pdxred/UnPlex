@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component name="PlaylistScreen" extends="Group">
+    <interface>
+        <field id="ratingKey" type="string" value="" />
+        <field id="playlistTitle" type="string" value="" />
+        <field id="itemSelected" type="assocarray" alwaysNotify="true" />
+        <field id="navigateBack" type="boolean" alwaysNotify="true" />
+        <function name="cleanup" />
+    </interface>
+
+    <script type="text/brightscript" uri="pkg:/source/utils.brs" />
+    <script type="text/brightscript" uri="pkg:/source/constants.brs" />
+    <script type="text/brightscript" uri="PlaylistScreen.brs" />
+
+    <children>
+        <Label
+            id="titleLabel"
+            translation="[60, 30]"
+            font="font:LargeBoldSystemFont"
+            color="0xFFFFFFFF"
+        />
+        <LoadingSpinner
+            id="loadingSpinner"
+            translation="[960, 540]"
+            visible="true"
+        />
+        <Group id="emptyState" translation="[960, 440]" visible="false">
+            <Label
+                id="emptyTitle"
+                horizAlign="center"
+                text="Playlist is empty"
+                font="font:LargeBoldSystemFont"
+                color="0xFFFFFFFF"
+                width="600"
+                translation="[-300, 0]"
+            />
+            <Label
+                id="emptyMessage"
+                horizAlign="center"
+                text="Add items to this playlist in Plex"
+                font="font:MediumSystemFont"
+                color="0xA0A0B0FF"
+                wrap="true"
+                width="600"
+                translation="[-300, 60]"
+            />
+        </Group>
+    </children>
+</component>

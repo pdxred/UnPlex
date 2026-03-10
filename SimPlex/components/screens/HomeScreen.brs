@@ -45,6 +45,13 @@ sub init()
     m.viewMode = "hubGrid"
     m.savedHubFocus = invalid
 
+    ' Collections view state
+    m.isCollectionsView = false
+    m.collectionRatingKey = ""
+
+    ' Playlists view state
+    m.isPlaylistsView = false
+
     ' Observe sidebar selection
     m.sidebar.observeField("selectedLibrary", "onLibrarySelected")
     m.sidebar.observeField("specialAction", "onSpecialAction")
@@ -326,8 +333,32 @@ end sub
 sub onSpecialAction(event as Object)
     action = event.getData()
     if action = "viewHome"
+        m.isCollectionsView = false
+        m.collectionRatingKey = ""
+        m.isPlaylistsView = false
         m.viewMode = "hubGrid"
+        m.filterBar.visible = true
         onViewModeChanged()
+    else if action = "viewCollections"
+        if m.currentSectionId <> ""
+            m.isCollectionsView = true
+            m.collectionRatingKey = ""
+            m.isPlaylistsView = false
+            m.currentOffset = 0
+            m.viewMode = "libraryOnly"
+            onViewModeChanged()
+            m.filterBar.visible = false
+            loadCollections()
+        end if
+    else if action = "playlists"
+        m.isPlaylistsView = true
+        m.isCollectionsView = false
+        m.collectionRatingKey = ""
+        m.currentOffset = 0
+        m.viewMode = "libraryOnly"
+        onViewModeChanged()
+        m.filterBar.visible = false
+        loadPlaylists()
     else if action = "search"
         m.top.itemSelected = { action: "search" }
     else if action = "settings"
@@ -543,12 +574,287 @@ sub processApiResponse()
     end if
 end sub
 
+' ========== Collections ==========
+
+sub loadCollections()
+    if m.isLoading then return
+    m.isLoading = true
+    m.loadingSpinner.visible = true
+    m.emptyState.visible = false
+    m.retryGroup.visible = false
+
+    ' Cancel previous API task
+    if m.currentApiTask <> invalid
+        m.currentApiTask.control = "stop"
+        m.currentApiTask.unobserveField("status")
+    end if
+
+    endpoint = "/library/sections/" + m.currentSectionId + "/collections"
+    params = {
+        "X-Plex-Container-Start": m.currentOffset.ToStr()
+        "X-Plex-Container-Size": m.global.constants.PAGE_SIZE.ToStr()
+    }
+
+    m.retryContext = { endpoint: endpoint, params: params, handler: "onCollectionsLoaded", requestType: "collections" }
+
+    task = CreateObject("roSGNode", "PlexApiTask")
+    task.endpoint = endpoint
+    task.params = params
+    task.observeField("status", "onCollectionsLoaded")
+    task.control = "run"
+    m.currentApiTask = task
+end sub
+
+sub onCollectionsLoaded(event as Object)
+    state = event.getData()
+    if state = "completed"
+        m.loadingSpinner.visible = false
+        m.isLoading = false
+        m.retryCount = 0
+        m.retryGroup.visible = false
+
+        response = m.currentApiTask.response
+        if response = invalid or response.MediaContainer = invalid then return
+
+        c = m.global.constants
+        metadata = response.MediaContainer.Metadata
+        if metadata = invalid then metadata = []
+
+        content = CreateObject("roSGNode", "ContentNode")
+
+        for each item in metadata
+            node = content.createChild("ContentNode")
+
+            ratingKeyStr = ""
+            if item.ratingKey <> invalid
+                if type(item.ratingKey) = "roString" or type(item.ratingKey) = "String"
+                    ratingKeyStr = item.ratingKey
+                else
+                    ratingKeyStr = item.ratingKey.ToStr()
+                end if
+            end if
+
+            node.addFields({
+                title: item.title
+                ratingKey: ratingKeyStr
+                itemType: "collection"
+                viewOffset: 0
+                duration: 0
+                viewCount: 0
+                leafCount: 0
+                viewedLeafCount: 0
+            })
+
+            if item.childCount <> invalid then node.leafCount = item.childCount
+
+            if item.thumb <> invalid and item.thumb <> ""
+                node.HDPosterUrl = BuildPosterUrl(item.thumb, c.POSTER_WIDTH, c.POSTER_HEIGHT)
+            end if
+        end for
+
+        m.posterGrid.content = content
+        m.posterGrid.visible = true
+
+        ' Show empty state if no collections
+        if metadata.count() = 0
+            m.emptyState.visible = true
+            m.posterGrid.visible = false
+            emptyTitle = m.top.findNode("emptyTitle")
+            emptyMessage = m.top.findNode("emptyMessage")
+            emptyTitle.text = "No collections found"
+            emptyMessage.text = "Create collections in Plex to organize your library"
+            m.clearFiltersButton.visible = false
+        else
+            m.emptyState.visible = false
+        end if
+    else if state = "error"
+        m.loadingSpinner.visible = false
+        m.isLoading = false
+        if m.currentApiTask.responseCode < 0
+            if m.retryCount = 0
+                m.retryCount = 1
+                retryLastRequest()
+            else
+                m.retryCount = 0
+                m.global.serverUnreachable = true
+            end if
+        else
+            if m.retryCount = 0
+                m.retryCount = 1
+                retryLastRequest()
+            else
+                m.retryCount = 0
+                showErrorDialog("Error", "Couldn't load collections. Please try again.")
+            end if
+        end if
+    end if
+end sub
+
+sub loadCollectionContents(collectionKey as String)
+    m.collectionRatingKey = collectionKey
+    m.currentOffset = 0
+    m.isLoading = true
+    m.loadingSpinner.visible = true
+    m.emptyState.visible = false
+
+    ' Cancel previous API task
+    if m.currentApiTask <> invalid
+        m.currentApiTask.control = "stop"
+        m.currentApiTask.unobserveField("status")
+    end if
+
+    endpoint = "/library/collections/" + collectionKey + "/children"
+    params = {
+        "X-Plex-Container-Start": "0"
+        "X-Plex-Container-Size": m.global.constants.PAGE_SIZE.ToStr()
+    }
+
+    m.retryContext = { endpoint: endpoint, params: params, handler: "onApiTaskStateChange", requestType: "library" }
+
+    task = CreateObject("roSGNode", "PlexApiTask")
+    task.endpoint = endpoint
+    task.params = params
+    task.observeField("status", "onApiTaskStateChange")
+    task.control = "run"
+    m.currentApiTask = task
+end sub
+
+' ========== Playlists ==========
+
+sub loadPlaylists()
+    if m.isLoading then return
+    m.isLoading = true
+    m.loadingSpinner.visible = true
+    m.emptyState.visible = false
+    m.retryGroup.visible = false
+
+    ' Cancel previous API task
+    if m.currentApiTask <> invalid
+        m.currentApiTask.control = "stop"
+        m.currentApiTask.unobserveField("status")
+    end if
+
+    m.retryContext = { endpoint: "/playlists", params: {}, handler: "onPlaylistsLoaded", requestType: "playlists" }
+
+    task = CreateObject("roSGNode", "PlexApiTask")
+    task.endpoint = "/playlists"
+    task.params = {}
+    task.observeField("status", "onPlaylistsLoaded")
+    task.control = "run"
+    m.currentApiTask = task
+end sub
+
+sub onPlaylistsLoaded(event as Object)
+    state = event.getData()
+    if state = "completed"
+        m.loadingSpinner.visible = false
+        m.isLoading = false
+        m.retryCount = 0
+        m.retryGroup.visible = false
+
+        response = m.currentApiTask.response
+        if response = invalid or response.MediaContainer = invalid then return
+
+        c = m.global.constants
+        metadata = response.MediaContainer.Metadata
+        if metadata = invalid then metadata = []
+
+        content = CreateObject("roSGNode", "ContentNode")
+
+        for each item in metadata
+            ' Only show video playlists
+            if item.playlistType = "video"
+                node = content.createChild("ContentNode")
+
+                ratingKeyStr = ""
+                if item.ratingKey <> invalid
+                    if type(item.ratingKey) = "roString" or type(item.ratingKey) = "String"
+                        ratingKeyStr = item.ratingKey
+                    else
+                        ratingKeyStr = item.ratingKey.ToStr()
+                    end if
+                end if
+
+                node.addFields({
+                    title: item.title
+                    ratingKey: ratingKeyStr
+                    itemType: "playlist"
+                    viewOffset: 0
+                    duration: 0
+                    viewCount: 0
+                    leafCount: 0
+                    viewedLeafCount: 0
+                })
+
+                if item.leafCount <> invalid then node.leafCount = item.leafCount
+
+                if item.thumb <> invalid and item.thumb <> ""
+                    node.HDPosterUrl = BuildPosterUrl(item.thumb, c.POSTER_WIDTH, c.POSTER_HEIGHT)
+                end if
+            end if
+        end for
+
+        m.posterGrid.content = content
+        m.posterGrid.visible = true
+
+        ' Show empty state if no video playlists
+        if content.getChildCount() = 0
+            m.emptyState.visible = true
+            m.posterGrid.visible = false
+            emptyTitle = m.top.findNode("emptyTitle")
+            emptyMessage = m.top.findNode("emptyMessage")
+            emptyTitle.text = "No playlists found"
+            emptyMessage.text = "Create playlists in Plex to organize your media"
+            m.clearFiltersButton.visible = false
+        else
+            m.emptyState.visible = false
+        end if
+    else if state = "error"
+        m.loadingSpinner.visible = false
+        m.isLoading = false
+        if m.currentApiTask.responseCode < 0
+            if m.retryCount = 0
+                m.retryCount = 1
+                retryLastRequest()
+            else
+                m.retryCount = 0
+                m.global.serverUnreachable = true
+            end if
+        else
+            if m.retryCount = 0
+                m.retryCount = 1
+                retryLastRequest()
+            else
+                m.retryCount = 0
+                showErrorDialog("Error", "Couldn't load playlists. Please try again.")
+            end if
+        end if
+    end if
+end sub
+
 sub onGridItemSelected(event as Object)
     index = event.getData()
     content = m.posterGrid.content
     if content <> invalid and index >= 0 and index < content.getChildCount()
         item = content.getChild(index)
         c = m.global.constants
+
+        ' Handle collection item selection
+        if item.itemType = "collection"
+            loadCollectionContents(item.ratingKey)
+            m.isCollectionsView = false
+            return
+        end if
+
+        ' Handle playlist item selection
+        if item.itemType = "playlist"
+            m.top.itemSelected = {
+                action: "playlist"
+                ratingKey: item.ratingKey
+                title: item.title
+            }
+            return
+        end if
 
         ' Check if partially watched (viewOffset > 0 and >= 5% progress)
         if item.viewOffset > 0 and item.duration > 0
@@ -725,6 +1031,16 @@ sub onLoadMore(event as Object)
     if m.currentOffset >= m.totalItems then return
     if m.currentSectionId = "onDeck" or m.currentSectionId = "recentlyAdded" then return
 
+    ' No pagination for collections list or playlists list
+    if m.isCollectionsView then return
+    if m.isPlaylistsView then return
+
+    ' Collection contents use normal library pagination
+    if m.collectionRatingKey <> ""
+        loadCollectionContents(m.collectionRatingKey)
+        return
+    end if
+
     loadLibrary()
 end sub
 
@@ -847,7 +1163,16 @@ sub onServerReconnected(event as Object)
         if m.viewMode = "hubGrid"
             loadHubs()
         end if
-        if m.currentSectionId <> ""
+        if m.isPlaylistsView
+            m.currentOffset = 0
+            loadPlaylists()
+        else if m.isCollectionsView
+            m.currentOffset = 0
+            loadCollections()
+        else if m.collectionRatingKey <> ""
+            m.currentOffset = 0
+            loadCollectionContents(m.collectionRatingKey)
+        else if m.currentSectionId <> ""
             m.currentOffset = 0
             loadLibrary()
         end if
@@ -941,7 +1266,7 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
             end if
         end if
     else if key = "options"
-        if m.viewMode = "libraryOnly" and not m.isSheetOpen
+        if m.viewMode = "libraryOnly" and not m.isSheetOpen and not m.isCollectionsView and not m.isPlaylistsView and m.collectionRatingKey = ""
             ' In library view, options key opens filter bottom sheet
             m.filterBottomSheet.sectionId = m.currentSectionId
             m.filterBottomSheet.sectionType = m.currentSectionType
@@ -977,6 +1302,30 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
             end if
         end if
     else if key = "back"
+        if m.collectionRatingKey <> ""
+            ' Return to collections list from collection contents
+            m.collectionRatingKey = ""
+            m.isCollectionsView = true
+            m.currentOffset = 0
+            loadCollections()
+            return true
+        else if m.isCollectionsView
+            ' Return to library from collections list
+            m.isCollectionsView = false
+            m.currentOffset = 0
+            m.filterBar.visible = true
+            loadLibrary()
+            return true
+        else if m.isPlaylistsView
+            ' Return to home view from playlists
+            m.isPlaylistsView = false
+            m.viewMode = "hubGrid"
+            onViewModeChanged()
+            m.filterBar.visible = true
+            m.focusArea = "sidebar"
+            m.sidebar.setFocus(true)
+            return true
+        end if
         m.top.navigateBack = true
         return true
     end if

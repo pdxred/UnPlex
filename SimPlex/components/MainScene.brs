@@ -194,6 +194,14 @@ sub showSearchScreen()
     m.top.currentScreen = "search"
 end sub
 
+sub showPlaylistScreen(ratingKey as String, title as String)
+    screen = CreateObject("roSGNode", "PlaylistScreen")
+    screen.ratingKey = ratingKey
+    screen.playlistTitle = title
+    pushScreen(screen)
+    m.top.currentScreen = "playlist"
+end sub
+
 sub cleanupScreen(screen as Object)
     ' Unobserve all standard screen fields
     screen.unobserveField("itemSelected")
@@ -287,6 +295,8 @@ sub popScreen()
         m.top.currentScreen = "search"
     else if previousScreen.subtype() = "SettingsScreen"
         m.top.currentScreen = "settings"
+    else if previousScreen.subtype() = "PlaylistScreen"
+        m.top.currentScreen = "playlist"
     else if previousScreen.subtype() = "PINScreen"
         m.top.currentScreen = "pin"
     end if
@@ -339,6 +349,8 @@ sub onItemSelected(event as Object)
             showEpisodeScreen(data.ratingKey, data.title)
         else if data.action = "search"
             showSearchScreen()
+        else if data.action = "playlist"
+            showPlaylistScreen(data.ratingKey, data.title)
         else if data.action = "settings"
             showSettingsScreen()
         end if
