@@ -4,10 +4,20 @@ sub init()
     m.resultsGrid = m.top.findNode("resultsGrid")
     m.emptyState = m.top.findNode("emptyState")
     m.loadingSpinner = m.top.findNode("loadingSpinner")
+    m.retryGroup = m.top.findNode("retryGroup")
+    m.retryButton = m.top.findNode("retryButton")
 
     m.searchQuery = ""
     m.debounceTimer = invalid
     m.focusOnKeyboard = true
+    m.retryCount = 0
+    m.retryContext = invalid
+
+    ' Observe inline retry button
+    m.retryButton.observeField("buttonSelected", "onRetryButtonSelected")
+
+    ' Observe server reconnected signal
+    m.global.observeField("serverReconnected", "onServerReconnected")
 
     ' Set up search task
     m.searchTask = CreateObject("roSGNode", "PlexSearchTask")
@@ -64,6 +74,13 @@ end sub
 sub performSearch()
     m.loadingSpinner.visible = true
     m.emptyState.visible = false
+    m.retryGroup.visible = false
+
+    ' Store retry context
+    m.retryContext = { query: m.searchQuery, requestType: "search" }
+
+    m.searchTask = CreateObject("roSGNode", "PlexSearchTask")
+    m.searchTask.observeField("status", "onSearchTaskStateChange")
     m.searchTask.query = m.searchQuery
     m.searchTask.control = "run"
 end sub
@@ -72,10 +89,19 @@ sub onSearchTaskStateChange(event as Object)
     state = event.getData()
     if state = "completed"
         m.loadingSpinner.visible = false
+        m.retryCount = 0
+        m.retryGroup.visible = false
         processSearchResults()
     else if state = "error"
         m.loadingSpinner.visible = false
-        showError(m.searchTask.error)
+        ' Search uses PlexSearchTask which may not have responseCode, treat all as HTTP errors
+        if m.retryCount = 0
+            m.retryCount = 1
+            retryLastSearch()
+        else
+            m.retryCount = 0
+            showErrorDialog("Error", "Search failed. Please try again.")
+        end if
     end if
 end sub
 
@@ -149,12 +175,67 @@ sub onGridItemSelected(event as Object)
     end if
 end sub
 
-sub showError(message as String)
+sub retryLastSearch()
+    if m.retryContext = invalid then return
+    m.loadingSpinner.visible = true
+
+    m.searchTask = CreateObject("roSGNode", "PlexSearchTask")
+    m.searchTask.observeField("status", "onSearchTaskStateChange")
+    m.searchTask.query = m.retryContext.query
+    m.searchTask.control = "run"
+end sub
+
+sub showErrorDialog(title as String, message as String)
+    if m.top.getScene().dialog <> invalid then return
+
     dialog = CreateObject("roSGNode", "StandardMessageDialog")
-    dialog.title = "Error"
+    dialog.title = title
     dialog.message = [message]
-    dialog.buttons = ["OK"]
+    dialog.buttons = ["Retry", "Dismiss"]
+    dialog.observeField("buttonSelected", "onErrorDialogButton")
+    dialog.observeField("wasClosed", "onErrorDialogClosed")
     m.top.getScene().dialog = dialog
+end sub
+
+sub onErrorDialogButton(event as Object)
+    index = event.getData()
+    m.top.getScene().dialog.close = true
+
+    if index = 0
+        retryLastSearch()
+    else if index = 1
+        showInlineRetry()
+    end if
+end sub
+
+sub onErrorDialogClosed(event as Object)
+    if m.focusOnKeyboard
+        m.keyboard.setFocus(true)
+    else
+        m.resultsGrid.setFocus(true)
+    end if
+end sub
+
+sub showInlineRetry()
+    m.resultsGrid.visible = false
+    m.emptyState.visible = false
+    m.retryGroup.visible = true
+    m.retryButton.setFocus(true)
+end sub
+
+sub onRetryButtonSelected(event as Object)
+    m.retryGroup.visible = false
+    m.resultsGrid.visible = true
+    retryLastSearch()
+end sub
+
+sub onServerReconnected(event as Object)
+    if m.global.serverReconnected = true
+        m.global.serverReconnected = false
+        if m.searchQuery.Len() >= 2
+            performSearch()
+        end if
+    end if
 end sub
 
 function onKeyEvent(key as String, press as Boolean) as Boolean

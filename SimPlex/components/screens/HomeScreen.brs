@@ -5,6 +5,17 @@ sub init()
     m.loadingSpinner = m.top.findNode("loadingSpinner")
     m.hubRowList = m.top.findNode("hubRowList")
     m.emptyState = m.top.findNode("emptyState")
+    m.retryGroup = m.top.findNode("retryGroup")
+    m.retryButton = m.top.findNode("retryButton")
+
+    m.retryCount = 0
+    m.retryContext = invalid
+
+    ' Observe inline retry button
+    m.retryButton.observeField("buttonSelected", "onRetryButtonSelected")
+
+    ' Observe server reconnected signal
+    m.global.observeField("serverReconnected", "onServerReconnected")
 
     m.currentSectionId = ""
     m.currentOffset = 0
@@ -312,6 +323,7 @@ sub loadLibrary()
     m.isLoading = true
     m.loadingSpinner.visible = true
     m.emptyState.visible = false
+    m.retryGroup.visible = false
 
     c = m.global.constants
     endpoint = "/library/sections/" + m.currentSectionId + "/all"
@@ -328,6 +340,9 @@ sub loadLibrary()
         end for
     end if
 
+    ' Store retry context
+    m.retryContext = { endpoint: endpoint, params: params, handler: "onApiTaskStateChange", requestType: "library" }
+
     task = CreateObject("roSGNode", "PlexApiTask")
     task.endpoint = endpoint
     task.params = params
@@ -341,11 +356,31 @@ sub onApiTaskStateChange(event as Object)
     if state = "completed"
         m.loadingSpinner.visible = false
         m.isLoading = false
+        m.retryCount = 0
+        m.retryGroup.visible = false
         processApiResponse()
     else if state = "error"
         m.loadingSpinner.visible = false
         m.isLoading = false
-        showError(m.currentApiTask.error)
+        ' Check if network-level error (responseCode < 0) for server disconnect
+        if m.currentApiTask.responseCode < 0
+            if m.retryCount = 0
+                m.retryCount = 1
+                retryLastRequest()
+            else
+                m.retryCount = 0
+                m.global.serverUnreachable = true
+            end if
+        else
+            ' HTTP error (4xx/5xx) - use per-screen error dialog
+            if m.retryCount = 0
+                m.retryCount = 1
+                retryLastRequest()
+            else
+                m.retryCount = 0
+                showErrorDialog("Error", "Couldn't load your library. Please try again.")
+            end if
+        end if
     end if
 end sub
 
@@ -623,12 +658,74 @@ sub onFilterChanged(event as Object)
     loadLibrary()
 end sub
 
-sub showError(message as String)
+sub retryLastRequest()
+    if m.retryContext = invalid then return
+    m.isLoading = true
+    m.loadingSpinner.visible = true
+
+    task = CreateObject("roSGNode", "PlexApiTask")
+    task.endpoint = m.retryContext.endpoint
+    task.params = m.retryContext.params
+    task.observeField("status", "onApiTaskStateChange")
+    task.control = "run"
+    m.currentApiTask = task
+end sub
+
+sub showErrorDialog(title as String, message as String)
+    ' Guard against dialog stacking
+    if m.top.getScene().dialog <> invalid then return
+
     dialog = CreateObject("roSGNode", "StandardMessageDialog")
-    dialog.title = "Error"
+    dialog.title = title
     dialog.message = [message]
-    dialog.buttons = ["OK"]
+    dialog.buttons = ["Retry", "Dismiss"]
+    dialog.observeField("buttonSelected", "onErrorDialogButton")
+    dialog.observeField("wasClosed", "onErrorDialogClosed")
     m.top.getScene().dialog = dialog
+end sub
+
+sub onErrorDialogButton(event as Object)
+    index = event.getData()
+    m.top.getScene().dialog.close = true
+
+    if index = 0
+        ' Retry
+        retryLastRequest()
+    else if index = 1
+        ' Dismiss - show inline retry
+        showInlineRetry()
+    end if
+end sub
+
+sub onErrorDialogClosed(event as Object)
+    restoreFocusAfterDialog()
+end sub
+
+sub showInlineRetry()
+    m.posterGrid.visible = false
+    m.hubRowList.visible = false
+    m.emptyState.visible = false
+    m.retryGroup.visible = true
+    m.retryButton.setFocus(true)
+end sub
+
+sub onRetryButtonSelected(event as Object)
+    m.retryGroup.visible = false
+    retryLastRequest()
+end sub
+
+sub onServerReconnected(event as Object)
+    if m.global.serverReconnected = true
+        m.global.serverReconnected = false
+        ' Re-fetch data based on current view
+        if m.viewMode = "hubGrid"
+            loadHubs()
+        end if
+        if m.currentSectionId <> ""
+            m.currentOffset = 0
+            loadLibrary()
+        end if
+    end if
 end sub
 
 sub cleanup()

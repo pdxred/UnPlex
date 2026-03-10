@@ -63,6 +63,32 @@
                 translation="[-300, 60]"
             />
         </Group>
+        <Group id="retryGroup" translation="[1100, 440]" visible="false">
+            <Label
+                id="retryTitle"
+                horizAlign="center"
+                text="Something went wrong"
+                font="font:LargeBoldSystemFont"
+                color="0xFFFFFFFF"
+                width="600"
+                translation="[-300, 0]"
+            />
+            <Label
+                id="retryMessage"
+                horizAlign="center"
+                text="Couldn't load your library"
+                font="font:MediumSystemFont"
+                color="0xA0A0B0FF"
+                wrap="true"
+                width="600"
+                translation="[-300, 60]"
+            />
+            <ButtonGroup
+                id="retryButton"
+                translation="[-100, 130]"
+                buttons="[&quot;Retry&quot;]"
+            />
+        </Group>
         <LoadingSpinner
             id="loadingSpinner"
             translation="[1100, 540]"

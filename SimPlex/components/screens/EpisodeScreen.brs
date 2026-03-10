@@ -4,10 +4,20 @@ sub init()
     m.episodeList = m.top.findNode("episodeList")
     m.loadingSpinner = m.top.findNode("loadingSpinner")
     m.emptyState = m.top.findNode("emptyState")
+    m.retryGroup = m.top.findNode("retryGroup")
+    m.retryButton = m.top.findNode("retryButton")
 
     m.seasons = []
     m.currentSeasonIndex = 0
     m.focusOnSeasons = true
+    m.retryCount = 0
+    m.retryContext = invalid
+
+    ' Observe inline retry button
+    m.retryButton.observeField("buttonSelected", "onRetryButtonSelected")
+
+    ' Observe server reconnected signal
+    m.global.observeField("serverReconnected", "onServerReconnected")
 
     ' Observe season selection
     m.seasonList.observeField("itemFocused", "onSeasonFocused")
@@ -41,8 +51,13 @@ end sub
 
 sub loadSeasons(ratingKey as String)
     m.loadingSpinner.visible = true
+    m.retryGroup.visible = false
+
+    endpoint = "/library/metadata/" + ratingKey + "/children"
+    m.retryContext = { endpoint: endpoint, params: {}, handler: "onSeasonsTaskStateChange", requestType: "seasons" }
+
     task = CreateObject("roSGNode", "PlexApiTask")
-    task.endpoint = "/library/metadata/" + ratingKey + "/children"
+    task.endpoint = endpoint
     task.params = {}
     task.observeField("status", "onSeasonsTaskStateChange")
     task.control = "run"
@@ -52,8 +67,13 @@ end sub
 sub loadEpisodes(seasonKey as String)
     m.loadingSpinner.visible = true
     m.emptyState.visible = false
+    m.retryGroup.visible = false
+
+    endpoint = "/library/metadata/" + seasonKey + "/children"
+    m.retryContext = { endpoint: endpoint, params: {}, handler: "onEpisodesTaskStateChange", requestType: "episodes" }
+
     task = CreateObject("roSGNode", "PlexApiTask")
-    task.endpoint = "/library/metadata/" + seasonKey + "/children"
+    task.endpoint = endpoint
     task.params = {}
     task.observeField("status", "onEpisodesTaskStateChange")
     task.control = "run"
@@ -64,10 +84,29 @@ sub onSeasonsTaskStateChange(event as Object)
     state = event.getData()
     if state = "completed"
         m.loadingSpinner.visible = false
+        m.retryCount = 0
+        m.retryGroup.visible = false
         processSeasons()
     else if state = "error"
         m.loadingSpinner.visible = false
-        showError(m.seasonsTask.error)
+        currentTask = m.seasonsTask
+        if currentTask.responseCode < 0
+            if m.retryCount = 0
+                m.retryCount = 1
+                retryLastRequest()
+            else
+                m.retryCount = 0
+                m.global.serverUnreachable = true
+            end if
+        else
+            if m.retryCount = 0
+                m.retryCount = 1
+                retryLastRequest()
+            else
+                m.retryCount = 0
+                showErrorDialog("Error", "Couldn't load episodes. Please try again.")
+            end if
+        end if
     end if
 end sub
 
@@ -75,10 +114,29 @@ sub onEpisodesTaskStateChange(event as Object)
     state = event.getData()
     if state = "completed"
         m.loadingSpinner.visible = false
+        m.retryCount = 0
+        m.retryGroup.visible = false
         processEpisodes()
     else if state = "error"
         m.loadingSpinner.visible = false
-        showError(m.episodesTask.error)
+        currentTask = m.episodesTask
+        if currentTask.responseCode < 0
+            if m.retryCount = 0
+                m.retryCount = 1
+                retryLastRequest()
+            else
+                m.retryCount = 0
+                m.global.serverUnreachable = true
+            end if
+        else
+            if m.retryCount = 0
+                m.retryCount = 1
+                retryLastRequest()
+            else
+                m.retryCount = 0
+                showErrorDialog("Error", "Couldn't load episodes. Please try again.")
+            end if
+        end if
     end if
 end sub
 
@@ -378,6 +436,76 @@ sub onPlaybackComplete(event as Object)
             end if
         end if
         loadEpisodes(seasonKey)
+    end if
+end sub
+
+sub retryLastRequest()
+    if m.retryContext = invalid then return
+    m.loadingSpinner.visible = true
+
+    task = CreateObject("roSGNode", "PlexApiTask")
+    task.endpoint = m.retryContext.endpoint
+    task.params = m.retryContext.params
+    if m.retryContext.requestType = "seasons"
+        task.observeField("status", "onSeasonsTaskStateChange")
+        m.seasonsTask = task
+    else
+        task.observeField("status", "onEpisodesTaskStateChange")
+        m.episodesTask = task
+    end if
+    task.control = "run"
+end sub
+
+sub showErrorDialog(title as String, message as String)
+    if m.top.getScene().dialog <> invalid then return
+
+    dialog = CreateObject("roSGNode", "StandardMessageDialog")
+    dialog.title = title
+    dialog.message = [message]
+    dialog.buttons = ["Retry", "Dismiss"]
+    dialog.observeField("buttonSelected", "onErrorDialogButton")
+    dialog.observeField("wasClosed", "onErrorDialogClosed")
+    m.top.getScene().dialog = dialog
+end sub
+
+sub onErrorDialogButton(event as Object)
+    index = event.getData()
+    m.top.getScene().dialog.close = true
+
+    if index = 0
+        retryLastRequest()
+    else if index = 1
+        showInlineRetry()
+    end if
+end sub
+
+sub onErrorDialogClosed(event as Object)
+    if m.focusOnSeasons
+        m.seasonList.setFocus(true)
+    else
+        m.episodeList.setFocus(true)
+    end if
+end sub
+
+sub showInlineRetry()
+    m.episodeList.visible = false
+    m.emptyState.visible = false
+    m.retryGroup.visible = true
+    m.retryButton.setFocus(true)
+end sub
+
+sub onRetryButtonSelected(event as Object)
+    m.retryGroup.visible = false
+    m.episodeList.visible = true
+    retryLastRequest()
+end sub
+
+sub onServerReconnected(event as Object)
+    if m.global.serverReconnected = true
+        m.global.serverReconnected = false
+        if m.top.ratingKey <> "" and m.top.ratingKey <> invalid
+            loadSeasons(m.top.ratingKey)
+        end if
     end if
 end sub
 

@@ -13,13 +13,24 @@ sub init()
     m.detailProgressFill = m.top.findNode("detailProgressFill")
     m.remainingLabel = m.top.findNode("remainingLabel")
 
+    m.retryGroup = m.top.findNode("retryGroup")
+    m.retryButton = m.top.findNode("retryButton")
+
     m.constants = m.global.constants
     m.itemData = invalid
     m.viewOffset = 0
     m.buttonActions = []
+    m.retryCount = 0
+    m.retryContext = invalid
 
     ' Observe button selection
     m.buttonGroup.observeField("buttonSelected", "onButtonSelected")
+
+    ' Observe inline retry button
+    m.retryButton.observeField("buttonSelected", "onRetryButtonSelected")
+
+    ' Observe server reconnected signal
+    m.global.observeField("serverReconnected", "onServerReconnected")
 
     ' Delegate focus when screen receives focus
     m.top.observeField("focusedChild", "onFocusChange")
@@ -41,8 +52,13 @@ end sub
 
 sub loadMetadata(ratingKey as String)
     m.loadingSpinner.visible = true
+    m.retryGroup.visible = false
+
+    endpoint = "/library/metadata/" + ratingKey
+    m.retryContext = { endpoint: endpoint, params: {}, handler: "onApiTaskStateChange", ratingKey: ratingKey }
+
     task = CreateObject("roSGNode", "PlexApiTask")
-    task.endpoint = "/library/metadata/" + ratingKey
+    task.endpoint = endpoint
     task.params = {}
     task.observeField("status", "onApiTaskStateChange")
     task.control = "run"
@@ -53,10 +69,28 @@ sub onApiTaskStateChange(event as Object)
     state = event.getData()
     if state = "completed"
         m.loadingSpinner.visible = false
+        m.retryCount = 0
+        m.retryGroup.visible = false
         processMetadata()
     else if state = "error"
         m.loadingSpinner.visible = false
-        showError(m.metadataTask.error)
+        if m.metadataTask.responseCode < 0
+            if m.retryCount = 0
+                m.retryCount = 1
+                retryLastRequest()
+            else
+                m.retryCount = 0
+                m.global.serverUnreachable = true
+            end if
+        else
+            if m.retryCount = 0
+                m.retryCount = 1
+                retryLastRequest()
+            else
+                m.retryCount = 0
+                showErrorDialog("Error", "Couldn't load details. Please try again.")
+            end if
+        end if
     end if
 end sub
 
@@ -343,6 +377,64 @@ sub onWatchedStateChange(event as Object)
         showError("Failed to update watch state. Changes may not be saved.")
     end if
     ' On success, do nothing - optimistic update already applied
+end sub
+
+sub retryLastRequest()
+    if m.retryContext = invalid then return
+    m.loadingSpinner.visible = true
+
+    task = CreateObject("roSGNode", "PlexApiTask")
+    task.endpoint = m.retryContext.endpoint
+    task.params = m.retryContext.params
+    task.observeField("status", "onApiTaskStateChange")
+    task.control = "run"
+    m.metadataTask = task
+end sub
+
+sub showErrorDialog(title as String, message as String)
+    if m.top.getScene().dialog <> invalid then return
+
+    dialog = CreateObject("roSGNode", "StandardMessageDialog")
+    dialog.title = title
+    dialog.message = [message]
+    dialog.buttons = ["Retry", "Dismiss"]
+    dialog.observeField("buttonSelected", "onErrorDialogButton")
+    dialog.observeField("wasClosed", "onErrorDialogClosed")
+    m.top.getScene().dialog = dialog
+end sub
+
+sub onErrorDialogButton(event as Object)
+    index = event.getData()
+    m.top.getScene().dialog.close = true
+
+    if index = 0
+        retryLastRequest()
+    else if index = 1
+        showInlineRetry()
+    end if
+end sub
+
+sub onErrorDialogClosed(event as Object)
+    m.buttonGroup.setFocus(true)
+end sub
+
+sub showInlineRetry()
+    m.retryGroup.visible = true
+    m.retryButton.setFocus(true)
+end sub
+
+sub onRetryButtonSelected(event as Object)
+    m.retryGroup.visible = false
+    retryLastRequest()
+end sub
+
+sub onServerReconnected(event as Object)
+    if m.global.serverReconnected = true
+        m.global.serverReconnected = false
+        if m.top.ratingKey <> "" and m.top.ratingKey <> invalid
+            loadMetadata(m.top.ratingKey)
+        end if
+    end if
 end sub
 
 sub showError(message as String)
