@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: in-progress
-stopped_at: Phase 5 all plans complete, verifying
-last_updated: "2026-03-10T12:05:00.000Z"
-last_activity: 2026-03-10 -- Completed 05-02 FilterBottomSheet and HomeScreen wiring
+stopped_at: Phase 5 complete, ready to plan Phase 6
+last_updated: "2026-03-10T12:10:00.000Z"
+last_activity: 2026-03-10 -- Completed Phase 5 Filter and Sort (all plans verified)
 progress:
   total_phases: 10
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 14
   completed_plans: 14
   percent: 50
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-08)
 
 **Core value:** Fast, intuitive library browsing and playback on a single personal Plex server
-**Current focus:** Phase 5 all plans complete, verifying
+**Current focus:** Phase 6 Audio and Subtitles -- Ready to plan
 
 ## Current Position
 
-Phase: 5 of 10 (Filter and Sort) -- VERIFYING
-Plan: 2 of 2 in current phase (all complete)
-Status: All plans executed, verifying phase goal
-Last activity: 2026-03-10 -- Completed 05-02 FilterBottomSheet and HomeScreen wiring
+Phase: 6 of 10 (Audio and Subtitles) -- READY TO PLAN
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-03-10 -- Completed Phase 5 Filter and Sort
 
 Progress: [█████░░░░░] 50%
 
@@ -85,6 +85,12 @@ Recent decisions affecting current work:
 - [04-02] Silent auto-retry once before user notification
 - [04-02] Server List button in disconnect dialog fetches fresh server list from plex.tv
 - [04-02] Playback screens excluded from disconnect dialog interruption
+- [05-01] Filter state modeled as AA with sort/genre/year/unwatched keys mapped to Plex API params
+- [05-01] Summary text uses dot-separated format: "Genre: Action . Unwatched . Sort: Title A-Z"
+- [05-01] Grid fades out before API re-fetch, fades in when new data arrives
+- [05-02] Bottom sheet embedded directly in HomeScreen for simpler focus management
+- [05-02] Column-based focus navigation in bottom sheet: Sort -> Unwatched/Genre -> Year -> Clear All
+- [05-02] Genre multi-select uses OR logic with comma-separated keys
 
 ### Pending Todos
 
@@ -98,6 +104,6 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-10
-Stopped at: Phase 5 executing — plan 05-01 complete, plan 05-02 in progress
-Resume file: .planning/phases/05-filter-and-sort/05-01-SUMMARY.md
-Resume command: /gsd:execute-phase 5
+Stopped at: Phase 5 complete, ready to plan Phase 6
+Resume file: None
+Resume command: /gsd:discuss-phase 6
