@@ -179,7 +179,7 @@ Phases execute in numeric order: 1 > 2 > 3 > 4 > 5 > 6 > 7 > 8 > 9 > 10
 | 1. Infrastructure | 0/2 | Not started | - |
 | 2. Playback Foundation | 0/2 | Not started | - |
 | 3. Hub Rows | 0/2 | Not started | - |
-| 4. Error States | 0/2 | Not started | - |
+| 4. Error States | 1/2 | In Progress|  |
 | 5. Filter and Sort | 0/2 | Not started | - |
 | 6. Audio and Subtitles | 0/2 | Not started | - |
 | 7. Intro and Credits Skip | 0/1 | Not started | - |
