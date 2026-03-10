@@ -95,11 +95,11 @@ Plans:
   3. User can filter by genre and see only matching items
   4. User can filter by year or decade and see only matching items
   5. Active filters are visually indicated and can be cleared
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 05-01: TBD
-- [ ] 05-02: TBD
+- [ ] 05-01-PLAN.md — FilterBar upgrade with persistent summary text and filter state management
+- [ ] 05-02-PLAN.md — FilterBottomSheet component with sort, genre, year, unwatched controls
 
 ### Phase 6: Audio and Subtitles
 **Goal**: Users can select audio and subtitle tracks during playback, with bitmap subtitles handled transparently
