@@ -53,5 +53,38 @@
                 />
             </Group>
         </Group>
+        <!-- Skip button overlay - shown during intro/credits markers -->
+        <Group id="skipButton" visible="false" opacity="0.0" translation="[1520, 940]">
+            <Rectangle
+                id="skipButtonBg"
+                width="300"
+                height="60"
+                color="0x000000AA"
+            />
+            <Label
+                id="skipButtonLabel"
+                translation="[0, 15]"
+                text="Skip Intro"
+                font="font:MediumSystemFont"
+                color="0xFFFFFFFF"
+                horizAlign="center"
+                width="300"
+            />
+            <Rectangle
+                id="skipButtonFocus"
+                width="300"
+                height="60"
+                color="0x00000000"
+                visible="false"
+            />
+        </Group>
+
+        <!-- Fade animations for skip button -->
+        <Animation id="skipFadeIn" duration="0.3" easeFunction="inOutQuad">
+            <FloatFieldInterpolator id="skipFadeInInterp" key="[0.0, 1.0]" keyValue="[0.0, 1.0]" fieldToInterp="skipButton.opacity" />
+        </Animation>
+        <Animation id="skipFadeOut" duration="0.3" easeFunction="inOutQuad">
+            <FloatFieldInterpolator id="skipFadeOutInterp" key="[0.0, 1.0]" keyValue="[1.0, 0.0]" fieldToInterp="skipButton.opacity" />
+        </Animation>
     </children>
 </component>

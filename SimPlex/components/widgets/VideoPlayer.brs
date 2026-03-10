@@ -48,6 +48,22 @@ sub init()
 
     ' PGS pivot target subtitle ID (set during pivot, checked on completion)
     m.pendingPgsSubtitleId = 0
+
+    ' Skip button (intro/credits markers)
+    m.skipButton = m.top.findNode("skipButton")
+    m.skipButtonLabel = m.top.findNode("skipButtonLabel")
+    m.skipButtonBg = m.top.findNode("skipButtonBg")
+    m.skipButtonFocus = m.top.findNode("skipButtonFocus")
+    m.skipFadeIn = m.top.findNode("skipFadeIn")
+    m.skipFadeOut = m.top.findNode("skipFadeOut")
+    m.skipFadeOut.observeField("state", "onSkipFadeOutComplete")
+
+    ' Marker storage
+    m.introMarker = invalid
+    m.creditsMarker = invalid
+    m.skipButtonVisible = false
+    m.skipButtonType = ""
+    m.skipButtonFocused = false
 end sub
 
 sub onControlChange(event as Object)
@@ -153,6 +169,9 @@ sub processMediaInfo()
     setupInitialSubtitles(content)
 
     m.video.content = content
+
+    ' Fetch intro/credits markers in parallel with playback start
+    fetchMarkers()
 
     ' Set seek position if resuming
     if m.top.startOffset > 0
@@ -410,6 +429,7 @@ end sub
 sub onPositionChange(event as Object)
     position = event.getData()
     m.currentPosition = position * 1000  ' Convert to ms
+    checkMarkers()
 end sub
 
 sub reportProgress()
@@ -446,6 +466,13 @@ sub stopPlayback()
 
     m.reportTimer.control = "stop"
     m.video.control = "stop"
+
+    ' Reset marker state
+    m.introMarker = invalid
+    m.creditsMarker = invalid
+    if m.skipButtonVisible
+        hideSkipButton()
+    end if
 end sub
 
 sub showError(message as String)
@@ -790,12 +817,157 @@ sub checkForcedSubtitles(content as Object)
     end for
 end sub
 
+' ========== Intro/Credits Skip Markers ==========
+
+' Fetch intro and credits markers from Plex API
+sub fetchMarkers()
+    task = CreateObject("roSGNode", "PlexApiTask")
+    task.endpoint = "/library/metadata/" + m.top.ratingKey + "/markers"
+    task.observeField("status", "onMarkersLoaded")
+    task.control = "run"
+    m.markersTask = task
+end sub
+
+' Parse marker response and store intro/credits timespans
+sub onMarkersLoaded(event as Object)
+    state = event.getData()
+    if state <> "completed" then return
+
+    response = m.markersTask.response
+    if response = invalid or response.MediaContainer = invalid then return
+
+    markers = SafeGet(response.MediaContainer, "Marker", [])
+    if markers = invalid or markers.count() = 0 then return
+
+    for each marker in markers
+        markerType = SafeGet(marker, "type", "")
+        startMs = SafeGet(marker, "startTimeOffset", 0)
+        endMs = SafeGet(marker, "endTimeOffset", 0)
+
+        if markerType = "intro" and startMs > 0 and endMs > startMs
+            m.introMarker = { startMs: startMs, endMs: endMs }
+        else if markerType = "credits" and startMs > 0 and endMs > startMs
+            m.creditsMarker = { startMs: startMs, endMs: endMs }
+        end if
+    end for
+end sub
+
+' Check current position against marker ranges and show/hide skip button
+sub checkMarkers()
+    if m.currentPosition = invalid then return
+    if m.isTranscodePivotInProgress then return
+
+    pos = m.currentPosition
+    inIntro = false
+    inCredits = false
+
+    ' Check intro marker range
+    if m.introMarker <> invalid
+        if pos >= m.introMarker.startMs and pos < m.introMarker.endMs
+            inIntro = true
+        end if
+    end if
+
+    ' Check credits marker range
+    if m.creditsMarker <> invalid
+        if pos >= m.creditsMarker.startMs and pos < m.creditsMarker.endMs
+            inCredits = true
+        end if
+    end if
+
+    ' Show or hide skip button based on position
+    if inIntro and (not m.skipButtonVisible or m.skipButtonType <> "intro")
+        showSkipButton("intro")
+    else if inCredits and (not m.skipButtonVisible or m.skipButtonType <> "credits")
+        showSkipButton("credits")
+    else if not inIntro and not inCredits and m.skipButtonVisible
+        hideSkipButton()
+    end if
+end sub
+
+' Show skip button with fade-in animation
+sub showSkipButton(markerType as String)
+    ' Set button label text
+    if markerType = "intro"
+        m.skipButtonLabel.text = "Skip Intro"
+    else
+        m.skipButtonLabel.text = "Skip Credits"
+    end if
+
+    m.skipButtonType = markerType
+    m.skipButton.visible = true
+    m.skipFadeIn.control = "start"
+    m.skipButtonVisible = true
+
+    ' Focus management: only take focus if track panel is not open
+    if not m.trackPanel.visible
+        m.skipButton.setFocus(true)
+        m.skipButtonFocused = true
+        m.skipButtonFocus.color = m.global.constants.FOCUS_RING
+        m.skipButtonFocus.visible = true
+    else
+        m.skipButtonFocused = false
+        m.skipButtonFocus.visible = false
+    end if
+end sub
+
+' Hide skip button with fade-out animation
+sub hideSkipButton()
+    if not m.skipButtonVisible then return
+
+    m.skipFadeOut.control = "start"
+    m.skipButtonVisible = false
+    m.skipButtonFocus.visible = false
+
+    ' Return focus to video if we had focus
+    if m.skipButtonFocused
+        m.skipButtonFocused = false
+        m.video.setFocus(true)
+    end if
+end sub
+
+' Called when fade-out animation completes
+sub onSkipFadeOutComplete(event as Object)
+    state = event.getData()
+    if state = "stopped"
+        m.skipButton.visible = false
+        m.skipButton.opacity = 0.0
+    end if
+end sub
+
+' Handle skip button OK press — seek to marker end position
+sub handleSkipPress()
+    endMs = 0
+    if m.skipButtonType = "intro" and m.introMarker <> invalid
+        endMs = m.introMarker.endMs
+    else if m.skipButtonType = "credits" and m.creditsMarker <> invalid
+        endMs = m.creditsMarker.endMs
+    end if
+
+    if endMs > 0
+        m.video.seek = endMs / 1000
+    end if
+
+    hideSkipButton()
+end sub
+
 ' ========== Key Event Handling ==========
 
 function onKeyEvent(key as String, press as Boolean) as Boolean
     if not press then return false
 
     c = m.global.constants
+
+    ' Handle skip button keys (before track panel check)
+    if m.skipButtonFocused
+        if key = "OK"
+            handleSkipPress()
+            return true
+        else if key = "back"
+            hideSkipButton()
+            return true
+        end if
+    end if
 
     ' If track panel is visible, let it handle keys
     if m.trackPanel.visible
