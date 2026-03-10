@@ -110,11 +110,11 @@ Plans:
   2. User can select a subtitle track from the overlay and subtitles appear on screen
   3. SRT/text subtitles render correctly via sidecar delivery without transcoding
   4. PGS/bitmap subtitle selection automatically triggers transcode with burn-in (no silent failure)
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 06-01: TBD
-- [ ] 06-02: TBD
+- [ ] 06-01-PLAN.md — TrackSelectionPanel component, stream metadata parsing, audio and SRT subtitle selection
+- [ ] 06-02-PLAN.md — PGS transcode pivot with position preservation, track persistence, forced subtitle auto-enable
 
 ### Phase 7: Intro and Credits Skip
 **Goal**: Users can skip intros and credits with a single button press, matching the official Plex experience
