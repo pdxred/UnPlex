@@ -3,6 +3,7 @@
     <interface>
         <field id="itemSelected" type="assocarray" alwaysNotify="true" />
         <field id="navigateBack" type="boolean" alwaysNotify="true" />
+        <field id="openFilterSheet" type="boolean" alwaysNotify="true" />
         <function name="cleanup" />
     </interface>
 
@@ -41,6 +42,20 @@
                 id="posterGrid"
                 translation="[20, 100]"
             />
+            <Animation id="gridFadeOut" duration="0.15" easeFunction="linear">
+                <FloatFieldInterpolator
+                    key="[0.0, 1.0]"
+                    keyValue="[1.0, 0.0]"
+                    fieldToInterp="posterGrid.opacity"
+                />
+            </Animation>
+            <Animation id="gridFadeIn" duration="0.2" easeFunction="linear">
+                <FloatFieldInterpolator
+                    key="[0.0, 1.0]"
+                    keyValue="[0.0, 1.0]"
+                    fieldToInterp="posterGrid.opacity"
+                />
+            </Animation>
         </Group>
         <Group id="emptyState" translation="[1100, 440]" visible="false">
             <Label
@@ -61,6 +76,12 @@
                 wrap="true"
                 width="600"
                 translation="[-300, 60]"
+            />
+            <ButtonGroup
+                id="clearFiltersButton"
+                translation="[-100, 130]"
+                buttons="[&quot;Clear Filters&quot;]"
+                visible="false"
             />
         </Group>
         <Group id="retryGroup" translation="[1100, 440]" visible="false">

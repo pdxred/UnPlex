@@ -8,11 +8,21 @@ sub init()
     m.retryGroup = m.top.findNode("retryGroup")
     m.retryButton = m.top.findNode("retryButton")
 
+    m.gridFadeOut = m.top.findNode("gridFadeOut")
+    m.gridFadeIn = m.top.findNode("gridFadeIn")
+    m.clearFiltersButton = m.top.findNode("clearFiltersButton")
+    m.requestSequence = 0
+    m.isFilterReload = false
+    m.unfilteredTotal = 0
+
     m.retryCount = 0
     m.retryContext = invalid
 
     ' Observe inline retry button
     m.retryButton.observeField("buttonSelected", "onRetryButtonSelected")
+
+    ' Observe clear filters button in empty state
+    m.clearFiltersButton.observeField("buttonSelected", "onClearFiltersFromEmpty")
 
     ' Observe server reconnected signal
     m.global.observeField("serverReconnected", "onServerReconnected")
@@ -323,21 +333,32 @@ sub loadLibrary()
     m.isLoading = true
     m.loadingSpinner.visible = true
     m.emptyState.visible = false
+    m.clearFiltersButton.visible = false
     m.retryGroup.visible = false
+
+    ' Cancel previous API task before starting new one
+    if m.currentApiTask <> invalid
+        m.currentApiTask.control = "stop"
+        m.currentApiTask.unobserveField("status")
+    end if
 
     c = m.global.constants
     endpoint = "/library/sections/" + m.currentSectionId + "/all"
     params = {
-        "sort": "titleSort:asc"
         "X-Plex-Container-Start": m.currentOffset.ToStr()
         "X-Plex-Container-Size": c.PAGE_SIZE.ToStr()
     }
 
-    ' Apply any active filters
+    ' Apply active filters (includes sort from filterState)
     if m.filterBar.activeFilters <> invalid
         for each key in m.filterBar.activeFilters
             params[key] = m.filterBar.activeFilters[key]
         end for
+    end if
+
+    ' Fallback: ensure sort is always present
+    if params["sort"] = invalid
+        params["sort"] = "titleSort:asc"
     end if
 
     ' Store retry context
@@ -457,10 +478,58 @@ sub processApiResponse()
     m.posterGrid.content = content
     m.currentOffset = m.currentOffset + metadata.count()
 
+    ' Update filter bar item counts
+    filteredTotal = container.totalSize
+    m.filterBar.totalFiltered = filteredTotal
+
+    ' Track unfiltered total: if no filters beyond sort are active, this IS the unfiltered total
+    hasActiveFilters = false
+    if m.filterBar.activeFilters <> invalid
+        for each key in m.filterBar.activeFilters
+            if key <> "sort"
+                hasActiveFilters = true
+                exit for
+            end if
+        end for
+    end if
+
+    if not hasActiveFilters
+        m.unfilteredTotal = filteredTotal
+    end if
+    m.filterBar.totalItems = m.unfilteredTotal
+
+    ' Fade in grid if it was faded out
+    if m.posterGrid.opacity < 1.0
+        m.gridFadeIn.control = "start"
+    end if
+
+    ' Reset focus to top-left after filter change
+    if m.isFilterReload and m.currentOffset > 0
+        gridNode = m.posterGrid.findNode("grid")
+        if gridNode <> invalid
+            gridNode.jumpToItem = 0
+        end if
+        m.isFilterReload = false
+    end if
+
     ' Show empty state if library has zero items on initial load
     if m.currentOffset = 0 or (m.currentOffset = metadata.count() and metadata.count() = 0)
         m.emptyState.visible = true
         m.posterGrid.visible = false
+
+        ' Show filter-specific empty message if filters are active
+        emptyTitle = m.top.findNode("emptyTitle")
+        emptyMessage = m.top.findNode("emptyMessage")
+        if hasActiveFilters
+            emptyTitle.text = "No items match your filters"
+            emptyMessage.text = "Try changing or clearing your filters"
+            m.clearFiltersButton.visible = true
+            m.clearFiltersButton.setFocus(true)
+        else
+            emptyTitle.text = "Nothing here yet"
+            emptyMessage.text = "Add some content to your Plex library to see it here"
+            m.clearFiltersButton.visible = false
+        end if
     else
         m.emptyState.visible = false
         m.posterGrid.visible = true
@@ -655,7 +724,28 @@ end sub
 sub onFilterChanged(event as Object)
     ' Reset and reload with new filters
     m.currentOffset = 0
-    loadLibrary()
+    m.requestSequence = m.requestSequence + 1
+    m.isFilterReload = true
+
+    ' Fade out grid before reloading if it has content
+    if m.posterGrid.opacity = 1.0 and m.posterGrid.content <> invalid and m.posterGrid.content.getChildCount() > 0
+        m.gridFadeOut.observeField("state", "onGridFadeOutDone")
+        m.gridFadeOut.control = "start"
+    else
+        loadLibrary()
+    end if
+end sub
+
+sub onGridFadeOutDone(event as Object)
+    if event.getData() = "stopped"
+        m.gridFadeOut.unobserveField("state")
+        loadLibrary()
+    end if
+end sub
+
+sub onClearFiltersFromEmpty(event as Object)
+    ' Reset filter state to defaults, triggering the filterChanged cascade
+    m.filterBar.filterState = { sort: "titleSort:asc", genre: "", year: "", unwatched: "" }
 end sub
 
 sub retryLastRequest()
@@ -711,6 +801,10 @@ end sub
 
 sub onRetryButtonSelected(event as Object)
     m.retryGroup.visible = false
+    m.posterGrid.visible = true
+    if m.hubRowCount > 0 and m.viewMode = "hubGrid"
+        m.hubRowList.visible = true
+    end if
     retryLastRequest()
 end sub
 
@@ -754,6 +848,7 @@ sub cleanup()
     m.posterGrid.unobserveField("itemSelected")
     m.posterGrid.unobserveField("loadMore")
     m.filterBar.unobserveField("filterChanged")
+    m.clearFiltersButton.unobserveField("buttonSelected")
 end sub
 
 function onKeyEvent(key as String, press as Boolean) as Boolean
@@ -809,28 +904,34 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
             end if
         end if
     else if key = "options"
-        ' Show context menu for focused grid item
-        if m.focusArea = "grid"
-            gridNode = m.posterGrid.findNode("grid")
-            if gridNode <> invalid
-                focusedIndex = gridNode.itemFocused
-                content = m.posterGrid.content
-                if content <> invalid and focusedIndex >= 0 and focusedIndex < content.getChildCount()
-                    item = content.getChild(focusedIndex)
-                    showOptionsMenu(item)
-                    return true
-                end if
-            end if
-        else if m.focusArea = "hubs"
-            ' Get focused hub row item
-            focusedInfo = m.hubRowList.rowItemFocused
-            if focusedInfo <> invalid
-                rowContent = m.hubRowList.content.getChild(focusedInfo[0])
-                if rowContent <> invalid
-                    itemContent = rowContent.getChild(focusedInfo[1])
-                    if itemContent <> invalid
-                        showOptionsMenu(itemContent)
+        if m.viewMode = "libraryOnly"
+            ' In library view, options key opens filter sheet
+            m.top.openFilterSheet = true
+            return true
+        else
+            ' In hub view, show context menu for focused item
+            if m.focusArea = "grid"
+                gridNode = m.posterGrid.findNode("grid")
+                if gridNode <> invalid
+                    focusedIndex = gridNode.itemFocused
+                    content = m.posterGrid.content
+                    if content <> invalid and focusedIndex >= 0 and focusedIndex < content.getChildCount()
+                        item = content.getChild(focusedIndex)
+                        showOptionsMenu(item)
                         return true
+                    end if
+                end if
+            else if m.focusArea = "hubs"
+                ' Get focused hub row item
+                focusedInfo = m.hubRowList.rowItemFocused
+                if focusedInfo <> invalid
+                    rowContent = m.hubRowList.content.getChild(focusedInfo[0])
+                    if rowContent <> invalid
+                        itemContent = rowContent.getChild(focusedInfo[1])
+                        if itemContent <> invalid
+                            showOptionsMenu(itemContent)
+                            return true
+                        end if
                     end if
                 end if
             end if
