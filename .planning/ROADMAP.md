@@ -79,11 +79,11 @@ Plans:
   2. Empty libraries and searches display a clear "no items" message instead of a blank screen
   3. Network failures show an error message with a retry option that re-attempts the failed request
   4. Server unreachable state shows a message with a reconnect option that re-tests server connectivity
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 04-01: TBD
-- [ ] 04-02: TBD
+- [ ] 04-01-PLAN.md — Animated spinner upgrade and empty state messaging for all screens
+- [ ] 04-02-PLAN.md — Error retry with auto-retry and server disconnect recovery
 
 ### Phase 5: Filter and Sort
 **Goal**: Users can find specific content in large libraries without scrolling through thousands of items
