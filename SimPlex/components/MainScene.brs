@@ -10,6 +10,11 @@ sub init()
     m.global.addFields({ authRequired: false })
     m.global.observeField("authRequired", "onAuthRequired")
 
+    ' Initialize global server disconnect/reconnect fields
+    m.global.addFields({ serverUnreachable: false })
+    m.global.addFields({ serverReconnected: false })
+    m.global.observeField("serverUnreachable", "onServerUnreachable")
+
     ' Observe showSignOut field
     m.top.observeField("showSignOut", "onShowSignOut")
 
@@ -342,6 +347,113 @@ end sub
 
 sub onNavigateBack(event as Object)
     popScreen()
+end sub
+
+' ========== Server Disconnect / Reconnect ==========
+
+sub onServerUnreachable(event as Object)
+    if event.getData() <> true then return
+
+    ' Reset flag to prevent duplicate triggers
+    m.global.serverUnreachable = false
+
+    ' Don't show disconnect dialog during playback
+    currentScreen = getCurrentScreen()
+    if currentScreen <> invalid and currentScreen.subtype() = "VideoPlayer" then return
+
+    ' Don't show if a dialog is already open
+    if m.top.dialog <> invalid then return
+
+    ' Silent background connectivity test first
+    testServerConnectivity()
+end sub
+
+sub testServerConnectivity()
+    serverUri = GetServerUri()
+    if serverUri = "" then return
+
+    m.reconnectTask = CreateObject("roSGNode", "ServerConnectionTask")
+
+    ' Build a simple connections object with just the current server URI
+    connections = { local: [], remote: [{ uri: serverUri }], relay: [] }
+    m.reconnectTask.connections = connections
+    m.reconnectTask.authToken = GetAuthToken()
+    m.reconnectTask.observeField("status", "onReconnectTestResult")
+    m.reconnectTask.control = "run"
+end sub
+
+sub onReconnectTestResult(event as Object)
+    state = event.getData()
+
+    if state = "connected"
+        ' Server is back - signal screens to re-fetch
+        m.global.serverReconnected = true
+    else if state = "error"
+        ' Server still down - show disconnect dialog
+        showServerDisconnectDialog()
+    end if
+end sub
+
+sub showServerDisconnectDialog()
+    if m.top.dialog <> invalid then return
+
+    dialog = CreateObject("roSGNode", "StandardMessageDialog")
+    dialog.title = "Server Unreachable"
+    dialog.message = ["Can't connect to your Plex server. Check your network connection and try again."]
+    dialog.buttons = ["Try Again", "Server List"]
+    dialog.observeField("buttonSelected", "onDisconnectDialogButton")
+    dialog.observeField("wasClosed", "onDisconnectDialogClosed")
+    m.top.dialog = dialog
+end sub
+
+sub onDisconnectDialogButton(event as Object)
+    index = event.getData()
+    m.top.dialog.close = true
+
+    if index = 0
+        ' Try Again - re-test connectivity
+        testServerConnectivity()
+    else if index = 1
+        ' Server List - navigate to server selection
+        navigateToServerList()
+    end if
+end sub
+
+sub onDisconnectDialogClosed(event as Object)
+    ' Restore focus to current screen
+    currentScreen = getCurrentScreen()
+    if currentScreen <> invalid
+        currentScreen.setFocus(true)
+    end if
+end sub
+
+sub navigateToServerList()
+    ' Pop all screens and show server list
+    ' Need auth token and servers from plex.tv
+    clearScreenStack()
+
+    ' Fetch servers from plex.tv
+    m.serverFetchTask = CreateObject("roSGNode", "PlexApiTask")
+    m.serverFetchTask.isPlexTvRequest = true
+    m.serverFetchTask.endpoint = "https://plex.tv/api/v2/resources?includeHttps=1&includeRelay=1"
+    m.serverFetchTask.observeField("status", "onServerFetchForList")
+    m.serverFetchTask.control = "run"
+end sub
+
+sub onServerFetchForList(event as Object)
+    state = event.getData()
+    if state = "completed"
+        servers = m.serverFetchTask.response
+        if servers <> invalid
+            showServerListScreen(servers, GetAuthToken())
+        else
+            ' Fallback to PIN screen if can't fetch servers
+            showPINScreen()
+        end if
+    else
+        ' Can't reach plex.tv either - show PIN screen
+        showPINScreen()
+    end if
 end sub
 
 function onKeyEvent(key as String, press as Boolean) as Boolean
