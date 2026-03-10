@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component name="UserAvatarItem" extends="Group">
+    <interface>
+        <field id="itemContent" type="node" onChange="onContentChange" />
+    </interface>
+
+    <script type="text/brightscript" uri="pkg:/source/utils.brs" />
+    <script type="text/brightscript" uri="pkg:/source/constants.brs" />
+    <script type="text/brightscript" uri="UserAvatarItem.brs" />
+
+    <children>
+        <!-- Avatar background circle -->
+        <Rectangle
+            id="avatarBg"
+            translation="[10, 10]"
+            width="180"
+            height="180"
+            color="0x333355FF"
+        />
+        <!-- Avatar image -->
+        <Poster
+            id="avatarImage"
+            translation="[10, 10]"
+            width="180"
+            height="180"
+            loadingBitmapOpacity="0.0"
+        />
+        <!-- Initials fallback (shown when no avatar) -->
+        <Label
+            id="initialsLabel"
+            translation="[10, 60]"
+            width="180"
+            height="60"
+            horizAlign="center"
+            vertAlign="center"
+            font="font:LargeBoldSystemFont"
+            color="0xFFFFFFFF"
+            visible="false"
+        />
+        <!-- Lock badge for PIN-protected users -->
+        <Rectangle
+            id="lockBadgeBg"
+            translation="[150, 150]"
+            width="40"
+            height="40"
+            color="0x000000CC"
+            visible="false"
+        />
+        <Label
+            id="lockBadge"
+            translation="[150, 150]"
+            width="40"
+            height="40"
+            text="PIN"
+            font="font:SmallSystemFont"
+            color="0xE5A00DFF"
+            horizAlign="center"
+            vertAlign="center"
+            visible="false"
+        />
+        <!-- User name -->
+        <Label
+            id="nameLabel"
+            translation="[0, 200]"
+            width="200"
+            height="40"
+            horizAlign="center"
+            font="font:MediumSystemFont"
+            color="0xFFFFFFFF"
+        />
+    </children>
+</component>

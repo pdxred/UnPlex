@@ -7,11 +7,13 @@
         <field id="body" type="assocarray" />
         <field id="response" type="assocarray" />
         <field id="error" type="string" />
-        <field id="state" type="string" value="idle" />
+        <field id="status" type="string" value="idle" />
         <field id="requestId" type="string" />
         <field id="isPlexTvRequest" type="boolean" value="false" />
         <field id="isConnectionTest" type="boolean" value="false" />
         <field id="responseCode" type="integer" value="0" />
+        <field id="authTokenOverride" type="string" value="" />
+        <field id="suppress401" type="boolean" value="false" />
     </interface>
     <script type="text/brightscript" uri="pkg:/source/utils.brs" />
     <script type="text/brightscript" uri="pkg:/source/constants.brs" />

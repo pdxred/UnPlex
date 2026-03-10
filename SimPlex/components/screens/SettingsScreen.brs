@@ -54,7 +54,9 @@ sub showSettingsMenu()
 
     content = CreateObject("roSGNode", "ContentNode")
 
-    items = ["Switch Server", "Sign Out"]
+    ' Show current user name and menu options
+    userName = GetActiveUserName()
+    items = ["Signed in as: " + userName, "Switch User", "Switch Server", "Sign Out"]
     for each item in items
         node = content.createChild("ContentNode")
         node.title = item
@@ -68,20 +70,22 @@ end sub
 sub onSettingsItemSelected(event as Object)
     index = event.getData()
     if index = 0
+        ' Current user label - no action
+        return
+    else if index = 1
+        ' Switch user
+        m.top.itemSelected = { action: "switchUser" }
+    else if index = 2
         ' Switch server
         discoverServers()
-    else if index = 1
+    else if index = 3
         ' Sign out
         signOut()
     end if
 end sub
 
 sub signOut()
-    ' Clear stored credentials
-    sec = CreateObject("roRegistrySection", "PlexClassic")
-    sec.Delete("authToken")
-    sec.Delete("serverUri")
-    sec.Flush()
+    ClearAuthData()
 
     ' Show auth screen
     m.settingsGroup.visible = false

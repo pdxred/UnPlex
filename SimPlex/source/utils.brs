@@ -36,12 +36,42 @@ sub SetServerUri(uri as String)
     sec.Flush()
 end sub
 
+' Get stored admin (owner) token
+function GetAdminToken() as String
+    sec = CreateObject("roRegistrySection", "SimPlex")
+    return sec.Read("adminToken")
+end function
+
+' Store admin (owner) token separately from active user token
+sub SetAdminToken(token as String)
+    sec = CreateObject("roRegistrySection", "SimPlex")
+    sec.Write("adminToken", token)
+    sec.Flush()
+end sub
+
+' Get active user display name
+function GetActiveUserName() as String
+    sec = CreateObject("roRegistrySection", "SimPlex")
+    name = sec.Read("activeUserName")
+    if name = "" then return "Admin"
+    return name
+end function
+
+' Set active user display name
+sub SetActiveUserName(name as String)
+    sec = CreateObject("roRegistrySection", "SimPlex")
+    sec.Write("activeUserName", name)
+    sec.Flush()
+end sub
+
 ' Clear all stored authentication data (sign out)
 sub ClearAuthData()
     sec = CreateObject("roRegistrySection", "SimPlex")
     sec.Delete("authToken")
+    sec.Delete("adminToken")
     sec.Delete("serverUri")
     sec.Delete("serverClientId")
+    sec.Delete("activeUserName")
     sec.Flush()
     LogEvent("Auth data cleared")
 end sub

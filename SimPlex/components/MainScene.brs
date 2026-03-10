@@ -194,6 +194,21 @@ sub showSearchScreen()
     m.top.currentScreen = "search"
 end sub
 
+sub showUserPickerScreen()
+    screen = CreateObject("roSGNode", "UserPickerScreen")
+    screen.observeField("userSwitched", "onUserSwitched")
+    pushScreen(screen)
+    m.top.currentScreen = "userPicker"
+end sub
+
+sub onUserSwitched(event as Object)
+    if event.getData() = true
+        ' User switch successful - reset everything
+        clearScreenStack()
+        showHomeScreen()
+    end if
+end sub
+
 sub showPlaylistScreen(ratingKey as String, title as String)
     screen = CreateObject("roSGNode", "PlaylistScreen")
     screen.ratingKey = ratingKey
@@ -207,6 +222,7 @@ sub cleanupScreen(screen as Object)
     screen.unobserveField("itemSelected")
     screen.unobserveField("navigateBack")
     screen.unobserveField("state")
+    screen.unobserveField("userSwitched")
 
     ' Optional: Call screen's own cleanup if it exists
     if screen.hasField("cleanup")
@@ -297,6 +313,8 @@ sub popScreen()
         m.top.currentScreen = "settings"
     else if previousScreen.subtype() = "PlaylistScreen"
         m.top.currentScreen = "playlist"
+    else if previousScreen.subtype() = "UserPickerScreen"
+        m.top.currentScreen = "userPicker"
     else if previousScreen.subtype() = "PINScreen"
         m.top.currentScreen = "pin"
     end if
@@ -351,6 +369,8 @@ sub onItemSelected(event as Object)
             showSearchScreen()
         else if data.action = "playlist"
             showPlaylistScreen(data.ratingKey, data.title)
+        else if data.action = "switchUser"
+            showUserPickerScreen()
         else if data.action = "settings"
             showSettingsScreen()
         end if

@@ -47,7 +47,9 @@ sub run()
 
     ' Add auth token for plex.tv requests
     if m.top.isPlexTvRequest
-        token = GetAuthToken()
+        ' Use override token if provided, otherwise active token
+        token = m.top.authTokenOverride
+        if token = "" then token = GetAuthToken()
         if token <> ""
             url.AddHeader("X-Plex-Token", token)
         end if
@@ -106,6 +108,13 @@ sub run()
 
     ' Check for 401 Unauthorized (token expired/invalid)
     if responseCode = 401
+        if m.top.suppress401
+            ' Caller handles 401 (e.g., wrong PIN for managed user switch)
+            LogEvent("401 suppressed by caller")
+            m.top.error = "Unauthorized"
+            m.top.status = "error"
+            return
+        end if
         LogError("401 Unauthorized - authentication required")
         ' Clear the stored token since it's invalid
         SetAuthToken("")
