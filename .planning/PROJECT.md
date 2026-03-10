@@ -43,6 +43,9 @@ Fast, intuitive library browsing and playback on a single personal Plex server w
 - ✓ Forced subtitle auto-enable based on device locale — Phase 6
 - ✓ Skip Intro button during intro marker timespan — Phase 7
 - ✓ Skip Credits button during credits marker timespan — Phase 7
+- ✓ Auto-play next episode with 10-second countdown overlay — Phase 8
+- ✓ Cancel auto-play countdown via Back key — Phase 8
+- ✓ 90% duration fallback when no credits marker exists — Phase 8
 
 ### Active
 
@@ -130,4 +133,4 @@ The official Plex Roku app (new release) is slow, buggy, and has inefficient UI 
 | Forced PGS subtitles skipped at initial load | Avoids unexpected transcode on first play; user can manually select from panel | ✓ Good — Phase 6 |
 
 ---
-*Last updated: 2026-03-10 after Phase 7*
+*Last updated: 2026-03-10 after Phase 8*

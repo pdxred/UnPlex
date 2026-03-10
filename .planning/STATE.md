@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Phase 8 context gathered
-last_updated: "2026-03-10T20:26:49.169Z"
-last_activity: 2026-03-10 -- Completed Phase 7 Intro and Credits Skip
+stopped_at: Phase 8 complete, ready to plan Phase 9
+last_updated: "2026-03-10T20:35:00.000Z"
+last_activity: 2026-03-10 -- Completed Phase 8 Auto-play Next Episode
 progress:
   total_phases: 10
   completed_phases: 8
-  total_plans: 16
-  completed_plans: 16
-  percent: 70
+  total_plans: 18
+  completed_plans: 14
+  percent: 80
 ---
 
 # Project State
@@ -21,23 +21,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-10)
 
 **Core value:** Fast, intuitive library browsing and playback on a single personal Plex server
-**Current focus:** Phase 8 Auto-play Next Episode -- Ready to plan
+**Current focus:** Phase 9 Collections and Playlists -- Ready to plan
 
 ## Current Position
 
-Phase: 8 of 10 (Auto-play Next Episode) -- READY TO PLAN
+Phase: 9 of 10 (Collections and Playlists) -- READY TO PLAN
 Plan: Not started
 Status: Ready to plan
-Last activity: 2026-03-10 -- Completed Phase 7 Intro and Credits Skip
+Last activity: 2026-03-10 -- Completed Phase 8 Auto-play Next Episode
 
-Progress: [███████░░░] 70%
+Progress: [████████░░] 80%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 13
+- Total plans completed: 14
 - Average duration: 3.1 min
-- Total execution time: 0.67 hours
+- Total execution time: 0.72 hours
 
 **By Phase:**
 
@@ -50,9 +50,10 @@ Progress: [███████░░░] 70%
 | 05-filter-and-sort | 2 | 6 min | 3.0 min |
 | 06-audio-and-subtitles | 2 | 6 min | 3.0 min |
 | 07-intro-and-credits-skip | 1 | 3 min | 3.0 min |
+| 08-auto-play-next-episode | 1 | 3 min | 3.0 min |
 
 **Recent Trend:**
-- Last 5 plans: 05-02 (3 min), 06-01 (3 min), 06-02 (3 min), 07-01 (3 min)
+- Last 5 plans: 06-01 (3 min), 06-02 (3 min), 07-01 (3 min), 08-01 (3 min)
 - Trend: Stable
 
 *Updated after each plan completion*
@@ -105,6 +106,9 @@ Recent decisions affecting current work:
 - [07-01] Markers fetched via fire-and-forget parallel to playback start
 - [07-01] Position-based range checking in onPositionChange for timed overlays
 - [07-01] Skip button does not steal focus from TrackSelectionPanel
+- [08-01] Countdown replaces skip credits button for TV episodes
+- [08-01] 90% duration fallback when no credits marker exists
+- [08-01] Cross-season auto-play deferred (noNextEpisode for last episode)
 
 ### Pending Todos
 
@@ -116,7 +120,7 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-10T20:26:49.164Z
-Stopped at: Phase 8 context gathered
-Resume file: .planning/phases/08-auto-play-next-episode/08-CONTEXT.md
-Resume command: /gsd:discuss-phase 8
+Last session: 2026-03-10T20:35:00.000Z
+Stopped at: Phase 8 complete, ready to plan Phase 9
+Resume file: .planning/phases/08-auto-play-next-episode/08-01-SUMMARY.md
+Resume command: /gsd:discuss-phase 9
