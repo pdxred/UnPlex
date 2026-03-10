@@ -64,6 +64,29 @@ sub init()
     m.skipButtonVisible = false
     m.skipButtonType = ""
     m.skipButtonFocused = false
+
+    ' Auto-play next episode
+    m.autoPlayOverlay = m.top.findNode("autoPlayOverlay")
+    m.autoPlayEpisodeLabel = m.top.findNode("autoPlayEpisodeLabel")
+    m.autoPlayCountdownLabel = m.top.findNode("autoPlayCountdownLabel")
+    m.autoPlayFocusBorder = m.top.findNode("autoPlayFocusBorder")
+    m.autoPlayFadeIn = m.top.findNode("autoPlayFadeIn")
+    m.autoPlayFadeOut = m.top.findNode("autoPlayFadeOut")
+    m.autoPlayFadeOut.observeField("state", "onAutoPlayFadeOutComplete")
+
+    m.nextEpisodeInfo = invalid
+    m.noNextEpisode = false
+    m.fetchingNextEpisode = false
+    m.countdownSeconds = 10
+    m.countdownActive = false
+    m.autoPlayOverlayVisible = false
+    m.autoPlayFocused = false
+
+    ' Countdown timer (1-second ticks)
+    m.countdownTimer = CreateObject("roSGNode", "Timer")
+    m.countdownTimer.duration = 1
+    m.countdownTimer.repeat = true
+    m.countdownTimer.observeField("fire", "onCountdownTick")
 end sub
 
 sub onControlChange(event as Object)
@@ -473,6 +496,18 @@ sub stopPlayback()
     if m.skipButtonVisible
         hideSkipButton()
     end if
+
+    ' Reset auto-play state
+    if m.countdownActive
+        m.countdownTimer.control = "stop"
+        m.countdownActive = false
+    end if
+    if m.autoPlayOverlayVisible
+        hideAutoPlayOverlay()
+    end if
+    m.nextEpisodeInfo = invalid
+    m.noNextEpisode = false
+    m.fetchingNextEpisode = false
 end sub
 
 sub showError(message as String)
@@ -875,13 +910,36 @@ sub checkMarkers()
         end if
     end if
 
-    ' Show or hide skip button based on position
+    ' Fallback: 90% of duration for auto-play when no credits marker
+    if not inCredits and m.creditsMarker = invalid and m.duration > 0
+        if pos >= m.duration * 0.9
+            inCredits = true
+        end if
+    end if
+
+    ' Show or hide overlays based on position
     if inIntro and (not m.skipButtonVisible or m.skipButtonType <> "intro")
         showSkipButton("intro")
-    else if inCredits and (not m.skipButtonVisible or m.skipButtonType <> "credits")
-        showSkipButton("credits")
-    else if not inIntro and not inCredits and m.skipButtonVisible
-        hideSkipButton()
+    else if inCredits
+        ' For TV episodes: show auto-play countdown instead of skip credits
+        if m.top.grandparentRatingKey <> "" and m.top.grandparentRatingKey <> invalid
+            if m.nextEpisodeInfo <> invalid and not m.autoPlayOverlayVisible
+                showAutoPlayOverlay()
+            else if not m.fetchingNextEpisode and m.nextEpisodeInfo = invalid and not m.noNextEpisode
+                fetchNextEpisode()
+            else if m.noNextEpisode and (not m.skipButtonVisible or m.skipButtonType <> "credits")
+                showSkipButton("credits")
+            end if
+        else if not m.skipButtonVisible or m.skipButtonType <> "credits"
+            showSkipButton("credits")
+        end if
+    else if not inIntro and not inCredits
+        if m.skipButtonVisible
+            hideSkipButton()
+        end if
+        if m.autoPlayOverlayVisible
+            cancelAutoPlay()
+        end if
     end if
 end sub
 
@@ -951,12 +1009,216 @@ sub handleSkipPress()
     hideSkipButton()
 end sub
 
+' ========== Auto-play Next Episode ==========
+
+' Fetch next episode in current season via Plex API
+sub fetchNextEpisode()
+    if m.top.parentRatingKey = "" or m.top.parentRatingKey = invalid then return
+    m.fetchingNextEpisode = true
+
+    task = CreateObject("roSGNode", "PlexApiTask")
+    task.endpoint = "/library/metadata/" + m.top.parentRatingKey + "/children"
+    task.observeField("status", "onNextEpisodeLoaded")
+    task.control = "run"
+    m.nextEpisodeTask = task
+end sub
+
+' Parse next episode from season children response
+sub onNextEpisodeLoaded(event as Object)
+    state = event.getData()
+    m.fetchingNextEpisode = false
+    if state <> "completed" then return
+
+    response = m.nextEpisodeTask.response
+    if response = invalid or response.MediaContainer = invalid then return
+
+    episodes = SafeGet(response.MediaContainer, "Metadata", [])
+    if episodes = invalid or episodes.count() = 0
+        m.noNextEpisode = true
+        return
+    end if
+
+    ' Find next episode by index
+    currentIndex = m.top.episodeIndex
+    nextEp = invalid
+    for each ep in episodes
+        epIndex = SafeGet(ep, "index", 0)
+        if epIndex = currentIndex + 1
+            nextEp = ep
+            exit for
+        end if
+    end for
+
+    if nextEp <> invalid
+        ratingKey = SafeGet(nextEp, "ratingKey", "")
+        epTitle = SafeGet(nextEp, "title", "Episode " + (currentIndex + 1).ToStr())
+        parentIndex = SafeGet(nextEp, "parentIndex", m.top.seasonIndex)
+        epIndex = SafeGet(nextEp, "index", currentIndex + 1)
+        seasonEp = "S" + parentIndex.ToStr() + " E" + epIndex.ToStr()
+
+        m.nextEpisodeInfo = {
+            ratingKey: ratingKey
+            mediaKey: "/library/metadata/" + ratingKey
+            title: epTitle
+            seasonEp: seasonEp
+        }
+
+        ' If we're currently in credits range, show overlay now
+        if m.currentPosition <> invalid
+            inCredits = false
+            if m.creditsMarker <> invalid
+                if m.currentPosition >= m.creditsMarker.startMs and m.currentPosition < m.creditsMarker.endMs
+                    inCredits = true
+                end if
+            else if m.duration > 0 and m.currentPosition >= m.duration * 0.9
+                inCredits = true
+            end if
+
+            if inCredits and not m.autoPlayOverlayVisible
+                showAutoPlayOverlay()
+            end if
+        end if
+    else
+        ' Last episode of season — no auto-play
+        m.noNextEpisode = true
+    end if
+end sub
+
+' Show auto-play countdown overlay
+sub showAutoPlayOverlay()
+    if m.autoPlayOverlayVisible or m.nextEpisodeInfo = invalid then return
+
+    ' Hide skip button if visible (countdown replaces it)
+    if m.skipButtonVisible
+        hideSkipButton()
+    end if
+
+    ' Set episode info
+    m.autoPlayEpisodeLabel.text = m.nextEpisodeInfo.seasonEp + " - " + m.nextEpisodeInfo.title
+    m.countdownSeconds = 10
+    m.autoPlayCountdownLabel.text = "Starting in 10..."
+
+    ' Show overlay with fade-in
+    m.autoPlayOverlay.visible = true
+    m.autoPlayFadeIn.control = "start"
+    m.autoPlayOverlayVisible = true
+
+    ' Start countdown timer
+    m.countdownTimer.control = "start"
+    m.countdownActive = true
+
+    ' Focus management
+    if not m.trackPanel.visible
+        m.autoPlayOverlay.setFocus(true)
+        m.autoPlayFocused = true
+        m.autoPlayFocusBorder.color = m.global.constants.FOCUS_RING
+        m.autoPlayFocusBorder.visible = true
+    else
+        m.autoPlayFocused = false
+        m.autoPlayFocusBorder.visible = false
+    end if
+end sub
+
+' Hide auto-play countdown overlay
+sub hideAutoPlayOverlay()
+    if not m.autoPlayOverlayVisible then return
+
+    m.countdownTimer.control = "stop"
+    m.countdownActive = false
+    m.autoPlayFadeOut.control = "start"
+    m.autoPlayOverlayVisible = false
+    m.autoPlayFocusBorder.visible = false
+
+    if m.autoPlayFocused
+        m.autoPlayFocused = false
+        m.video.setFocus(true)
+    end if
+end sub
+
+' Called when auto-play fade-out animation completes
+sub onAutoPlayFadeOutComplete(event as Object)
+    state = event.getData()
+    if state = "stopped"
+        m.autoPlayOverlay.visible = false
+        m.autoPlayOverlay.opacity = 0.0
+    end if
+end sub
+
+' Countdown tick — update display and trigger auto-play at 0
+sub onCountdownTick(event as Object)
+    m.countdownSeconds = m.countdownSeconds - 1
+
+    if m.countdownSeconds <= 0
+        startNextEpisode()
+    else
+        m.autoPlayCountdownLabel.text = "Starting in " + m.countdownSeconds.ToStr() + "..."
+    end if
+end sub
+
+' Cancel auto-play countdown — dismiss overlay, resume normal playback
+sub cancelAutoPlay()
+    hideAutoPlayOverlay()
+end sub
+
+' Start the next episode — scrobble current, reset, and load next
+sub startNextEpisode()
+    if m.nextEpisodeInfo = invalid then return
+
+    ' Stop countdown
+    m.countdownTimer.control = "stop"
+    m.countdownActive = false
+
+    ' Scrobble current episode as watched
+    scrobble()
+
+    ' Stop current playback (without triggering playbackComplete)
+    m.reportTimer.control = "stop"
+    m.video.control = "stop"
+
+    ' Update playback fields for next episode
+    m.top.ratingKey = m.nextEpisodeInfo.ratingKey
+    m.top.mediaKey = m.nextEpisodeInfo.mediaKey
+    m.top.itemTitle = m.nextEpisodeInfo.title
+    m.top.startOffset = 0
+
+    ' Signal next episode started
+    m.top.nextEpisodeStarted = true
+
+    ' Reset auto-play and marker state
+    m.nextEpisodeInfo = invalid
+    m.noNextEpisode = false
+    m.fetchingNextEpisode = false
+    m.introMarker = invalid
+    m.creditsMarker = invalid
+    m.autoPlayOverlayVisible = false
+    m.autoPlayFocused = false
+    m.autoPlayOverlay.visible = false
+    m.autoPlayOverlay.opacity = 0.0
+    m.skipButtonVisible = false
+    m.skipButton.visible = false
+    m.skipButton.opacity = 0.0
+
+    ' Load and start the next episode
+    loadMedia()
+end sub
+
 ' ========== Key Event Handling ==========
 
 function onKeyEvent(key as String, press as Boolean) as Boolean
     if not press then return false
 
     c = m.global.constants
+
+    ' Handle auto-play overlay keys (highest priority)
+    if m.autoPlayFocused
+        if key = "OK"
+            startNextEpisode()
+            return true
+        else if key = "back"
+            cancelAutoPlay()
+            return true
+        end if
+    end if
 
     ' Handle skip button keys (before track panel check)
     if m.skipButtonFocused
@@ -1000,8 +1262,16 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
     else if key = "play" or key = "pause"
         if m.video.state = "playing"
             m.video.control = "pause"
+            ' Pause countdown timer if active
+            if m.countdownActive
+                m.countdownTimer.control = "stop"
+            end if
         else if m.video.state = "paused"
             m.video.control = "resume"
+            ' Resume countdown timer if active
+            if m.countdownActive
+                m.countdownTimer.control = "start"
+            end if
         end if
         return true
     end if
