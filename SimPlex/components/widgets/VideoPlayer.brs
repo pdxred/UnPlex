@@ -187,13 +187,23 @@ sub parseStreams(streams as Object)
         streamType = SafeGet(stream, "streamType", 0)
 
         if streamType = 2  ' Audio
+            displayTitle = SafeGet(stream, "displayTitle", "")
+            lang = SafeGet(stream, "language", "Unknown")
+            codecStr = SafeGet(stream, "codec", "")
+            channels = SafeGet(stream, "channels", 2)
+
+            ' Fallback display title for tracks with no metadata
+            if displayTitle = ""
+                displayTitle = lang + " (" + UCase(codecStr) + " " + channels.ToStr() + "ch)"
+            end if
+
             audioStream = {
                 id: SafeGet(stream, "id", 0)
-                displayTitle: SafeGet(stream, "displayTitle", "")
-                language: SafeGet(stream, "language", "Unknown")
+                displayTitle: displayTitle
+                language: lang
                 languageTag: SafeGet(stream, "languageTag", "")
-                codec: SafeGet(stream, "codec", "")
-                channels: SafeGet(stream, "channels", 2)
+                codec: codecStr
+                channels: channels
                 selected: SafeGet(stream, "selected", false)
             }
             m.audioStreams.push(audioStream)
@@ -204,10 +214,18 @@ sub parseStreams(streams as Object)
 
         else if streamType = 3  ' Subtitle
             codec = LCase(SafeGet(stream, "codec", ""))
+            displayTitle = SafeGet(stream, "displayTitle", "")
+            lang = SafeGet(stream, "language", "Unknown")
+
+            ' Fallback display title for tracks with no metadata
+            if displayTitle = ""
+                displayTitle = lang + " (" + UCase(codec) + ")"
+            end if
+
             subtitleStream = {
                 id: SafeGet(stream, "id", 0)
-                displayTitle: SafeGet(stream, "displayTitle", "")
-                language: SafeGet(stream, "language", "Unknown")
+                displayTitle: displayTitle
+                language: lang
                 languageTag: SafeGet(stream, "languageTag", "")
                 codec: codec
                 forced: SafeGet(stream, "forced", false)
