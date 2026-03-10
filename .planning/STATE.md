@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: planning
-stopped_at: Phase 9 context gathered
-last_updated: "2026-03-10T20:36:28.011Z"
-last_activity: 2026-03-10 -- Completed Phase 8 Auto-play Next Episode
+status: executing
+stopped_at: Phase 9 complete, ready for Phase 10
+last_updated: "2026-03-10T21:52:00.000Z"
+last_activity: 2026-03-10 -- Completed Phase 9 Collections and Playlists
 progress:
   total_phases: 10
   completed_phases: 9
-  total_plans: 17
-  completed_plans: 17
-  percent: 80
+  total_plans: 16
+  completed_plans: 16
+  percent: 90
 ---
 
 # Project State
@@ -21,23 +21,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-10)
 
 **Core value:** Fast, intuitive library browsing and playback on a single personal Plex server
-**Current focus:** Phase 9 Collections and Playlists -- Ready to plan
+**Current focus:** Phase 10 Managed Users -- Ready to discuss/plan
 
 ## Current Position
 
-Phase: 9 of 10 (Collections and Playlists) -- READY TO PLAN
+Phase: 10 of 10 (Managed Users) -- NOT STARTED
 Plan: Not started
-Status: Ready to plan
-Last activity: 2026-03-10 -- Completed Phase 8 Auto-play Next Episode
+Status: Ready to discuss/plan
+Last activity: 2026-03-10 -- Completed Phase 9 Collections and Playlists
 
-Progress: [████████░░] 80%
+Progress: [█████████░] 90%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 14
+- Total plans completed: 16
 - Average duration: 3.1 min
-- Total execution time: 0.72 hours
+- Total execution time: 0.83 hours
 
 **By Phase:**
 
@@ -51,9 +51,10 @@ Progress: [████████░░] 80%
 | 06-audio-and-subtitles | 2 | 6 min | 3.0 min |
 | 07-intro-and-credits-skip | 1 | 3 min | 3.0 min |
 | 08-auto-play-next-episode | 1 | 3 min | 3.0 min |
+| 09-collections-and-playlists | 2 | 8 min | 4.0 min |
 
 **Recent Trend:**
-- Last 5 plans: 06-01 (3 min), 06-02 (3 min), 07-01 (3 min), 08-01 (3 min)
+- Last 5 plans: 07-01 (3 min), 08-01 (3 min), 09-01 (4 min), 09-02 (4 min)
 - Trend: Stable
 
 *Updated after each plan completion*
@@ -109,6 +110,12 @@ Recent decisions affecting current work:
 - [08-01] Countdown replaces skip credits button for TV episodes
 - [08-01] 90% duration fallback when no credits marker exists
 - [08-01] Cross-season auto-play deferred (noNextEpisode for last episode)
+- [09-01] Collections accessed via sidebar "Collections" hub item (not filter bar toggle)
+- [09-01] Playlists in sidebar bottom section before Search/Settings
+- [09-01] Filter bottom sheet suppressed in collections and playlists views
+- [09-02] Playlist sequential playback advances immediately on finish (no countdown)
+- [09-02] Credits overlays suppressed during playlist mode
+- [09-02] PlaylistItem shows grandparentTitle for episodes, "Movie"/"Episode" fallback
 
 ### Pending Todos
 
@@ -120,7 +127,7 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-10T20:36:28.006Z
-Stopped at: Phase 9 context gathered
-Resume file: .planning/phases/09-collections-and-playlists/09-CONTEXT.md
-Resume command: /gsd:discuss-phase 9
+Last session: 2026-03-10T21:52:00.000Z
+Stopped at: Phase 9 complete, ready for Phase 10
+Resume file: .planning/ROADMAP.md
+Resume command: /gsd:discuss-phase 10

@@ -20,7 +20,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 6: Audio and Subtitles** - Track selection with PGS burn-in fallback *(completed 2026-03-10)*
 - [x] **Phase 7: Intro and Credits Skip** - Skip buttons via Plex chapter markers *(completed 2026-03-10)*
 - [x] **Phase 8: Auto-play Next Episode** - End-of-episode countdown and advance *(completed 2026-03-10)*
-- [ ] **Phase 9: Collections and Playlists** - Content organization and sequential playback
+- [x] **Phase 9: Collections and Playlists** - Content organization and sequential playback *(completed 2026-03-10)*
 - [ ] **Phase 10: Managed Users** - User picker, switching, PIN entry
 
 ## Phase Details
@@ -153,8 +153,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 09-01-PLAN.md — Collection browsing, playlist list display, sidebar integration, MainScene routing
-- [ ] 09-02-PLAN.md — PlaylistScreen component with ordered item list and VideoPlayer playlist sequential playback
+- [x] 09-01-PLAN.md — Collection browsing, playlist list display, sidebar integration, MainScene routing
+- [x] 09-02-PLAN.md — PlaylistScreen component with ordered item list and VideoPlayer playlist sequential playback
 
 ### Phase 10: Managed Users
 **Goal**: Household members can switch between managed Plex users without re-authenticating
@@ -184,5 +184,5 @@ Phases execute in numeric order: 1 > 2 > 3 > 4 > 5 > 6 > 7 > 8 > 9 > 10
 | 6. Audio and Subtitles | 2/2 | Complete | 2026-03-10 |
 | 7. Intro and Credits Skip | 1/1 | Complete | 2026-03-10 |
 | 8. Auto-play Next Episode | 1/1 | Complete | 2026-03-10 |
-| 9. Collections and Playlists | 0/2 | Not started | - |
+| 9. Collections and Playlists | 2/2 | Complete | 2026-03-10 |
 | 10. Managed Users | 0/1 | Not started | - |
