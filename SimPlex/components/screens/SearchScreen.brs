@@ -2,7 +2,7 @@ sub init()
     m.keyboard = m.top.findNode("keyboard")
     m.searchQueryLabel = m.top.findNode("searchQueryLabel")
     m.resultsGrid = m.top.findNode("resultsGrid")
-    m.noResultsLabel = m.top.findNode("noResultsLabel")
+    m.emptyState = m.top.findNode("emptyState")
     m.loadingSpinner = m.top.findNode("loadingSpinner")
 
     m.searchQuery = ""
@@ -51,7 +51,7 @@ sub onTextChange(event as Object)
     else
         ' Clear results if query too short
         m.resultsGrid.content = invalid
-        m.noResultsLabel.visible = false
+        m.emptyState.visible = false
     end if
 end sub
 
@@ -63,7 +63,7 @@ end sub
 
 sub performSearch()
     m.loadingSpinner.visible = true
-    m.noResultsLabel.visible = false
+    m.emptyState.visible = false
     m.searchTask.query = m.searchQuery
     m.searchTask.control = "run"
 end sub
@@ -82,14 +82,14 @@ end sub
 sub processSearchResults()
     response = m.searchTask.response
     if response = invalid or response.MediaContainer = invalid
-        m.noResultsLabel.visible = true
+        m.emptyState.visible = true
         return
     end if
 
     ' Search results come in hubs
     hubs = response.MediaContainer.Hub
     if hubs = invalid or hubs.count() = 0
-        m.noResultsLabel.visible = true
+        m.emptyState.visible = true
         return
     end if
 
@@ -129,10 +129,10 @@ sub processSearchResults()
 
     if hasResults
         m.resultsGrid.content = content
-        m.noResultsLabel.visible = false
+        m.emptyState.visible = false
     else
         m.resultsGrid.content = invalid
-        m.noResultsLabel.visible = true
+        m.emptyState.visible = true
     end if
 end sub
 

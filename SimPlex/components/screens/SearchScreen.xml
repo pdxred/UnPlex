@@ -39,14 +39,17 @@
             translation="[700, 200]"
             gridWidth="1140"
         />
-        <Label
-            id="noResultsLabel"
-            translation="[700, 400]"
-            text="No results found"
-            font="font:MediumSystemFont"
-            color="0xA0A0B0FF"
-            visible="false"
-        />
+        <Group id="emptyState" translation="[1270, 440]" visible="false">
+            <Label
+                id="emptyTitle"
+                horizAlign="center"
+                text="No results found"
+                font="font:LargeBoldSystemFont"
+                color="0xFFFFFFFF"
+                width="600"
+                translation="[-300, 0]"
+            />
+        </Group>
         <LoadingSpinner
             id="loadingSpinner"
             translation="[1200, 500]"

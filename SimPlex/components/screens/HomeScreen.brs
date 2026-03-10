@@ -4,6 +4,7 @@ sub init()
     m.filterBar = m.top.findNode("filterBar")
     m.loadingSpinner = m.top.findNode("loadingSpinner")
     m.hubRowList = m.top.findNode("hubRowList")
+    m.emptyState = m.top.findNode("emptyState")
 
     m.currentSectionId = ""
     m.currentOffset = 0
@@ -310,6 +311,7 @@ sub loadLibrary()
     if m.isLoading then return
     m.isLoading = true
     m.loadingSpinner.visible = true
+    m.emptyState.visible = false
 
     c = m.global.constants
     endpoint = "/library/sections/" + m.currentSectionId + "/all"
@@ -419,6 +421,15 @@ sub processApiResponse()
 
     m.posterGrid.content = content
     m.currentOffset = m.currentOffset + metadata.count()
+
+    ' Show empty state if library has zero items on initial load
+    if m.currentOffset = 0 or (m.currentOffset = metadata.count() and metadata.count() = 0)
+        m.emptyState.visible = true
+        m.posterGrid.visible = false
+    else
+        m.emptyState.visible = false
+        m.posterGrid.visible = true
+    end if
 end sub
 
 sub onGridItemSelected(event as Object)

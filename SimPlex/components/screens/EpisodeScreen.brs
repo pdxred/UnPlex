@@ -3,6 +3,7 @@ sub init()
     m.seasonList = m.top.findNode("seasonList")
     m.episodeList = m.top.findNode("episodeList")
     m.loadingSpinner = m.top.findNode("loadingSpinner")
+    m.emptyState = m.top.findNode("emptyState")
 
     m.seasons = []
     m.currentSeasonIndex = 0
@@ -50,6 +51,7 @@ end sub
 
 sub loadEpisodes(seasonKey as String)
     m.loadingSpinner.visible = true
+    m.emptyState.visible = false
     task = CreateObject("roSGNode", "PlexApiTask")
     task.endpoint = "/library/metadata/" + seasonKey + "/children"
     task.params = {}
@@ -88,9 +90,11 @@ sub processSeasons()
 
     metadata = response.MediaContainer.Metadata
     if metadata = invalid or metadata.count() = 0
+        m.emptyState.visible = true
         return
     end if
 
+    m.emptyState.visible = false
     m.seasons = metadata
     seasonTitles = []
     for each season in metadata
@@ -134,6 +138,13 @@ sub processEpisodes()
         metadata = []
     end if
 
+    if metadata.count() = 0
+        m.emptyState.visible = true
+        m.episodeList.content = invalid
+        return
+    end if
+
+    m.emptyState.visible = false
     c = m.global.constants
     content = CreateObject("roSGNode", "ContentNode")
 

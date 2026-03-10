@@ -42,6 +42,27 @@
                 translation="[20, 100]"
             />
         </Group>
+        <Group id="emptyState" translation="[1100, 440]" visible="false">
+            <Label
+                id="emptyTitle"
+                horizAlign="center"
+                text="Nothing here yet"
+                font="font:LargeBoldSystemFont"
+                color="0xFFFFFFFF"
+                width="600"
+                translation="[-300, 0]"
+            />
+            <Label
+                id="emptyMessage"
+                horizAlign="center"
+                text="Add some content to your Plex library to see it here"
+                font="font:MediumSystemFont"
+                color="0xA0A0B0FF"
+                wrap="true"
+                width="600"
+                translation="[-300, 60]"
+            />
+        </Group>
         <LoadingSpinner
             id="loadingSpinner"
             translation="[1100, 540]"

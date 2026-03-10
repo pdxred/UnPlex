@@ -39,7 +39,29 @@
             itemSpacing="[0, 10]"
             drawFocusFeedback="true"
             focusBitmapBlendColor="0xE5A00D80"
+            itemComponentName="EpisodeItem"
         />
+        <Group id="emptyState" translation="[960, 440]" visible="false">
+            <Label
+                id="emptyTitle"
+                horizAlign="center"
+                text="No episodes found"
+                font="font:LargeBoldSystemFont"
+                color="0xFFFFFFFF"
+                width="600"
+                translation="[-300, 0]"
+            />
+            <Label
+                id="emptyMessage"
+                horizAlign="center"
+                text="This season doesn't have any episodes yet"
+                font="font:MediumSystemFont"
+                color="0xA0A0B0FF"
+                wrap="true"
+                width="600"
+                translation="[-300, 60]"
+            />
+        </Group>
         <LoadingSpinner
             id="loadingSpinner"
             translation="[960, 540]"
