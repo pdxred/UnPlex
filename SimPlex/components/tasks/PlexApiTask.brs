@@ -3,7 +3,7 @@ sub init()
 end sub
 
 sub run()
-    m.top.state = "loading"
+    m.top.status = "loading"
 
     endpoint = m.top.endpoint
     params = m.top.params
@@ -53,8 +53,11 @@ sub run()
         end if
     end if
 
+    ' Use async for all requests to get response code
+    port = CreateObject("roMessagePort")
+    url.SetMessagePort(port)
+
     ' Make request based on method
-    response = ""
     if method = "POST"
         ' Add Content-Type header for POST
         url.AddHeader("Content-Type", "application/json")
@@ -64,14 +67,41 @@ sub run()
         if body = invalid then body = {}
         bodyJson = FormatJson(body)
 
-        response = url.PostFromString(bodyJson)
+        if not url.AsyncPostFromString(bodyJson)
+            m.top.error = "Failed to start POST request"
+            m.top.status = "error"
+            return
+        end if
+    else if method = "PUT"
+        ' PUT via method override (Roku doesn't support PUT directly)
+        ' Same pattern as PlexSessionTask
+        url.AddHeader("X-HTTP-Method-Override", "PUT")
+
+        if not url.AsyncPostFromString("")
+            m.top.error = "Failed to start PUT request"
+            m.top.status = "error"
+            return
+        end if
     else
         ' Default to GET
-        response = url.GetToString()
+        if not url.AsyncGetToString()
+            m.top.error = "Failed to start GET request"
+            m.top.status = "error"
+            return
+        end if
     end if
 
-    ' Capture response code
-    responseCode = url.GetResponseCode()
+    ' Wait for response (30 second timeout)
+    msg = wait(30000, port)
+    if msg = invalid
+        m.top.error = "Request timed out"
+        m.top.status = "error"
+        return
+    end if
+
+    ' Get response code and body from message
+    responseCode = msg.GetResponseCode()
+    response = msg.GetString()
     m.top.responseCode = responseCode
 
     ' Check for 401 Unauthorized (token expired/invalid)
@@ -83,15 +113,15 @@ sub run()
         m.global.addFields({ authRequired: true })
         m.global.authRequired = true
         m.top.error = "Authentication required"
-        m.top.state = "authRequired"
+        m.top.status = "authRequired"
         return
     end if
 
-    if response = ""
+    if response = "" or responseCode < 0
         errorMsg = "Request failed: " + url.GetFailureReason()
         LogError("API error: " + errorMsg)
         m.top.error = errorMsg
-        m.top.state = "error"
+        m.top.status = "error"
         return
     end if
 
@@ -101,11 +131,11 @@ sub run()
         ' Some endpoints return XML or empty responses, handle gracefully
         LogError("API error: Invalid JSON response from " + endpoint)
         m.top.error = "Invalid JSON response"
-        m.top.state = "error"
+        m.top.status = "error"
         return
     end if
 
     LogEvent("API complete: " + endpoint)
     m.top.response = json
-    m.top.state = "completed"
+    m.top.status = "completed"
 end sub

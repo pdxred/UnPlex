@@ -41,6 +41,13 @@ sub init()
     m.cachedMediaInfo = invalid
     m.cachedPart = invalid
     m.canDirectPlay = false
+
+    ' Transcode overlay
+    m.transcodingOverlay = m.top.findNode("transcodingOverlay")
+    m.transcodingSpinner = m.top.findNode("transcodingSpinner")
+
+    ' PGS pivot target subtitle ID (set during pivot, checked on completion)
+    m.pendingPgsSubtitleId = 0
 end sub
 
 sub onControlChange(event as Object)
@@ -158,6 +165,9 @@ sub processMediaInfo()
 
     ' Start progress reporting
     m.reportTimer.control = "start"
+
+    ' Check for forced subtitles before updating panel
+    checkForcedSubtitles(content)
 
     ' Update track panel with stream data
     m.trackPanel.audioStreams = m.audioStreams
@@ -315,10 +325,44 @@ function buildTranscodeUrl() as String
     return url
 end function
 
+' Build transcode URL with subtitle burn-in for PGS subtitles
+function buildTranscodeUrlWithSubtitles(subtitleStreamID as Integer, offsetMs as Integer) as String
+    serverUri = GetServerUri()
+    token = GetAuthToken()
+
+    url = serverUri + "/video/:/transcode/universal/start.m3u8"
+    url = url + "?path=" + UrlEncode(m.top.mediaKey)
+    url = url + "&mediaIndex=0"
+    url = url + "&partIndex=0"
+    url = url + "&protocol=hls"
+    url = url + "&directPlay=0"
+    url = url + "&directStream=1"
+    url = url + "&videoQuality=100"
+    url = url + "&maxVideoBitrate=20000"
+    url = url + "&videoResolution=1920x1080"
+    url = url + "&subtitleStreamID=" + subtitleStreamID.ToStr()
+    url = url + "&subtitles=burn"
+    url = url + "&offset=" + Int(offsetMs / 1000).ToStr()
+    url = url + "&X-Plex-Token=" + token
+
+    return url
+end function
+
 sub onVideoStateChange(event as Object)
     state = event.getData()
 
     if state = "playing"
+        ' Handle transcode pivot completion
+        if m.isTranscodePivotInProgress
+            m.transcodingOverlay.visible = false
+            m.transcodingSpinner.visible = false
+            m.isTranscodePivotInProgress = false
+
+            ' Persist the track selection
+            persistTrackSelection(m.selectedAudioId, m.selectedSubtitleId)
+            return
+        end if
+
         if m.seekPending and m.top.startOffset > 0
             m.video.seek = m.top.startOffset / 1000  ' Convert ms to seconds
             m.seekPending = false
@@ -329,6 +373,15 @@ sub onVideoStateChange(event as Object)
         m.reportTimer.control = "stop"
         m.top.playbackComplete = true
     else if state = "error"
+        ' Handle transcode pivot failure
+        if m.isTranscodePivotInProgress
+            m.transcodingOverlay.visible = false
+            m.transcodingSpinner.visible = false
+            m.isTranscodePivotInProgress = false
+            revertFromTranscodePivot()
+            return
+        end if
+
         m.reportTimer.control = "stop"
         errorInfo = m.video.errorMsg
         showError("Playback error: " + errorInfo)
@@ -417,18 +470,30 @@ sub handleAudioTrackChange(streamId as Integer)
             m.video.audioTrack = i.ToStr()
             m.selectedAudioId = streamId
             m.trackPanel.selectedAudioId = streamId
+
+            ' Persist track preference
+            persistTrackSelection(streamId, m.selectedSubtitleId)
             exit for
         end if
     end for
 end sub
 
 sub handleTextSubtitleChange(streamId as Integer)
+    ' If currently transcoding (PGS burn-in), switch back to direct play
+    if m.isTranscoding
+        switchFromTranscodeToDirectPlay(streamId)
+        return
+    end if
+
     if streamId = 0
         ' Turn off subtitles
         m.video.subtitleTrack = ""
         m.video.enableSubtitle = false
         m.selectedSubtitleId = 0
         m.trackPanel.selectedSubtitleId = 0
+
+        ' Persist track preference
+        persistTrackSelection(m.selectedAudioId, 0)
         return
     end if
 
@@ -452,22 +517,168 @@ sub handleTextSubtitleChange(streamId as Integer)
 
             m.selectedSubtitleId = streamId
             m.trackPanel.selectedSubtitleId = streamId
+
+            ' Persist track preference
+            persistTrackSelection(m.selectedAudioId, streamId)
             exit for
         end if
     end for
 end sub
 
 sub handlePgsSubtitleRequest(streamId as Integer)
-    ' Signal PGS request for Plan 02 to handle via transcode pivot
-    ' Store the request so Plan 02 can observe pgsRequested field
-    m.top.pgsRequested = {
-        streamId: streamId
-        position: m.currentPosition
-    }
+    ' Guard against rapid PGS switching
+    if m.isTranscodePivotInProgress then return
 
-    ' Update panel selection optimistically (Plan 02 will revert on failure)
+    m.isTranscodePivotInProgress = true
+    m.pendingPgsSubtitleId = streamId
+
+    ' Store current state for revert on failure
+    currentContent = m.video.content
+    m.previousPlaybackState = {
+        url: ""
+        streamFormat: ""
+        position: m.currentPosition
+        audioId: m.selectedAudioId
+        subtitleId: m.selectedSubtitleId
+        wasTranscoding: m.isTranscoding
+    }
+    if currentContent <> invalid
+        m.previousPlaybackState.url = currentContent.url
+        m.previousPlaybackState.streamFormat = currentContent.streamFormat
+    end if
+
+    ' Record position before stopping
+    offsetMs = 0
+    if m.currentPosition <> invalid
+        offsetMs = m.currentPosition
+    end if
+
+    ' Stop current playback
+    m.video.control = "stop"
+
+    ' Show "Switching subtitles..." overlay
+    m.transcodingOverlay.visible = true
+    m.transcodingSpinner.visible = true
+
+    ' Build transcode URL with subtitle burn-in
+    playUrl = buildTranscodeUrlWithSubtitles(streamId, offsetMs)
+
+    ' Create new content node with HLS transcode
+    content = CreateObject("roSGNode", "ContentNode")
+    content.url = playUrl
+    content.streamFormat = "hls"
+    content.title = m.top.itemTitle
+
+    ' Start playback with transcode
+    m.video.content = content
+    m.video.control = "play"
+    m.isTranscoding = true
+
+    ' Update selection state
     m.selectedSubtitleId = streamId
     m.trackPanel.selectedSubtitleId = streamId
+
+    ' Close the panel
+    m.pausedForPanel = false  ' Don't resume — we're restarting
+    m.trackPanel.visible = false
+end sub
+
+' Revert to previous playback state after PGS transcode failure
+sub revertFromTranscodePivot()
+    ' Show error toast
+    dialog = CreateObject("roSGNode", "StandardMessageDialog")
+    dialog.title = "Subtitle Unavailable"
+    dialog.message = ["Could not load this subtitle track. Reverting to previous settings."]
+    dialog.buttons = ["OK"]
+    m.top.getScene().dialog = dialog
+
+    if m.previousPlaybackState <> invalid
+        ' Restore previous subtitle selection
+        m.selectedSubtitleId = m.previousPlaybackState.subtitleId
+        m.trackPanel.selectedSubtitleId = m.previousPlaybackState.subtitleId
+        m.isTranscoding = m.previousPlaybackState.wasTranscoding
+
+        ' Rebuild previous content
+        content = CreateObject("roSGNode", "ContentNode")
+        content.url = m.previousPlaybackState.url
+        content.streamFormat = m.previousPlaybackState.streamFormat
+        content.title = m.top.itemTitle
+
+        m.video.content = content
+        m.video.control = "play"
+
+        ' Seek to previous position
+        if m.previousPlaybackState.position <> invalid and m.previousPlaybackState.position > 0
+            m.seekPending = true
+            m.top.startOffset = m.previousPlaybackState.position
+        end if
+    end if
+
+    m.previousPlaybackState = invalid
+end sub
+
+' Switch back from PGS transcode to direct play (when selecting SRT or Off while transcoding)
+sub switchFromTranscodeToDirectPlay(subtitleStreamId as Integer)
+    if not m.isTranscoding then return
+    if m.isTranscodePivotInProgress then return
+
+    m.isTranscodePivotInProgress = true
+
+    ' Record current position
+    offsetMs = 0
+    if m.currentPosition <> invalid
+        offsetMs = m.currentPosition
+    end if
+
+    ' Stop transcode playback
+    m.video.control = "stop"
+
+    ' Show overlay during switch
+    m.transcodingOverlay.visible = true
+    m.transcodingSpinner.visible = true
+
+    ' Rebuild direct play URL from cached media info
+    if m.cachedPart <> invalid and m.canDirectPlay
+        playUrl = BuildPlexUrl(m.cachedPart.key)
+        streamFormat = getStreamFormat(SafeGet(m.cachedPart, "container", "mp4"))
+    else
+        playUrl = buildTranscodeUrl()
+        streamFormat = "hls"
+    end if
+
+    content = CreateObject("roSGNode", "ContentNode")
+    content.url = playUrl
+    content.streamFormat = streamFormat
+    content.title = m.top.itemTitle
+
+    ' Set up sidecar subtitle if selecting SRT
+    if subtitleStreamId > 0
+        for each stream in m.subtitleStreams
+            if stream.id = subtitleStreamId and not stream.isBitmap
+                sidecarUrl = buildSidecarUrl(subtitleStreamId)
+                content.subtitleTracks = [{
+                    TrackName: "sidecar_" + subtitleStreamId.ToStr()
+                    Language: stream.languageTag
+                    Url: sidecarUrl
+                }]
+                exit for
+            end if
+        end for
+    end if
+
+    m.video.content = content
+    m.video.control = "play"
+    m.isTranscoding = false
+
+    ' Seek to current position
+    if offsetMs > 0
+        m.seekPending = true
+        m.top.startOffset = offsetMs
+    end if
+
+    ' Update selection
+    m.selectedSubtitleId = subtitleStreamId
+    m.trackPanel.selectedSubtitleId = subtitleStreamId
 end sub
 
 ' Panel visibility change — manage pause/resume
@@ -490,6 +701,78 @@ sub onPanelVisibleChange(event as Object)
         m.video.setFocus(true)
     end if
 end sub
+
+' ========== Track Persistence ==========
+
+' Persist track selection to Plex server via PUT /library/parts/{id}
+' Fire-and-forget — no UI impact on success/failure
+sub persistTrackSelection(audioStreamId as Integer, subtitleStreamId as Integer)
+    if m.partId = 0 then return
+
+    task = CreateObject("roSGNode", "PlexApiTask")
+    task.endpoint = "/library/parts/" + m.partId.ToStr()
+    task.method = "PUT"
+
+    params = {}
+    if audioStreamId > 0
+        params["audioStreamID"] = audioStreamId.ToStr()
+    end if
+    if subtitleStreamId > 0
+        params["subtitleStreamID"] = subtitleStreamId.ToStr()
+    else
+        params["subtitleStreamID"] = "0"
+    end if
+
+    task.params = params
+    task.control = "run"
+    ' Fire and forget — per established scrobble pattern
+end sub
+
+' ========== Forced Subtitle Auto-Enable ==========
+
+' Check if forced subtitles should auto-enable based on audio language vs device locale
+sub checkForcedSubtitles(content as Object)
+    ' Find selected audio track's language
+    audioLangTag = ""
+    for each stream in m.audioStreams
+        if stream.selected
+            audioLangTag = stream.languageTag
+            exit for
+        end if
+    end for
+
+    ' Get device locale (e.g., "en_US")
+    di = CreateObject("roDeviceInfo")
+    locale = di.GetCurrentLocale()
+    deviceLang = Left(locale, 2)  ' Extract 2-letter language code
+
+    ' If audio language matches device language, no forced sub needed
+    if audioLangTag <> "" and Left(audioLangTag, 2) = deviceLang
+        return
+    end if
+
+    ' Search for a forced subtitle track matching device language
+    for each stream in m.subtitleStreams
+        if stream.forced and Left(stream.languageTag, 2) = deviceLang
+            ' Found a matching forced subtitle — auto-enable
+            if not stream.isBitmap
+                ' Text subtitle — apply sidecar
+                sidecarUrl = buildSidecarUrl(stream.id)
+                content.subtitleTracks = [{
+                    TrackName: "sidecar_" + stream.id.ToStr()
+                    Language: stream.languageTag
+                    Url: sidecarUrl
+                }]
+                m.selectedSubtitleId = stream.id
+            end if
+            ' PGS forced subtitles would need transcode — skip auto-enable for initial load
+            ' (User can manually select PGS track from panel)
+            exit for
+        end if
+    end for
+end sub
+
+' ========== Key Event Handling ==========
 
 function onKeyEvent(key as String, press as Boolean) as Boolean
     if not press then return false
