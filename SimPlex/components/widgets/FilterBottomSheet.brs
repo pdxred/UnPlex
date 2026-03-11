@@ -295,8 +295,9 @@ sub emitFilterState()
     m.top.filterState = m.currentFilterState
 end sub
 
-sub onVisibleChange(event as Object)
-    if m.top.visible = true
+sub onShowSheetChange(event as Object)
+    if event.getData() = true
+        m.top.visible = true
         openSheet()
     else
         if m.isOpen

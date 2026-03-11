@@ -11,6 +11,6 @@
     <field id="successfulUri" type="string" />
     <field id="connectionType" type="string" />
     <field id="error" type="string" />
-    <field id="state" type="string" value="idle" />
+    <field id="status" type="string" value="idle" />
   </interface>
 </component>

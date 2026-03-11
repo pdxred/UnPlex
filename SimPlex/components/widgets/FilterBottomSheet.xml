@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component name="FilterBottomSheet" extends="Group">
     <interface>
-        <field id="visible" type="boolean" onChange="onVisibleChange" value="false" />
+        <field id="showSheet" type="boolean" onChange="onShowSheetChange" value="false" />
         <field id="sectionId" type="string" onChange="onSectionIdChange" />
         <field id="sectionType" type="string" value="1" />
         <field id="filterState" type="assocarray" alwaysNotify="true" />

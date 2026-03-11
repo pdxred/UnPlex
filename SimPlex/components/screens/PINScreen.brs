@@ -3,11 +3,11 @@ sub init()
     m.pinCodeLabel = m.top.findNode("pinCodeLabel")
     m.statusLabel = m.top.findNode("statusLabel")
     m.errorLabel = m.top.findNode("errorLabel")
-    m.spinner = m.top.findNode("spinner")
+    m.loadingIndicator = m.top.findNode("loadingIndicator")
 
     ' Create auth task
     m.authTask = CreateObject("roSGNode", "PlexAuthTask")
-    m.authTask.observeField("state", "onAuthStateChange")
+    m.authTask.observeField("status", "onAuthStateChange")
 
     ' Create poll timer (2 second interval)
     m.pollTimer = CreateObject("roSGNode", "Timer")
@@ -19,6 +19,8 @@ sub init()
     m.currentPinId = ""
     m.pinExpiresAt = ""
 
+    m.isAuthenticated = false
+
     ' Start the PIN request flow
     startPinRequest()
 end sub
@@ -29,8 +31,7 @@ sub startPinRequest()
     m.authTask.control = "run"
 
     ' Show loading state
-    m.spinner.visible = true
-    m.spinner.control = "start"
+    m.loadingIndicator.visible = true
     m.statusLabel.text = "Requesting PIN..."
     m.errorLabel.visible = false
 end sub
@@ -47,8 +48,7 @@ sub onAuthStateChange(event as Object)
 
         ' Update UI
         m.statusLabel.text = "Waiting for authorization..."
-        m.spinner.visible = true
-        m.spinner.control = "start"
+        m.loadingIndicator.visible = true
         m.errorLabel.visible = false
 
         ' Start polling
@@ -62,21 +62,25 @@ sub onAuthStateChange(event as Object)
     else if state = "authenticated"
         ' Stop polling
         m.pollTimer.control = "stop"
+        m.isAuthenticated = true
         LogEvent("PIN authentication successful")
 
         ' Update UI
         m.statusLabel.text = "Success! Loading servers..."
-        m.spinner.visible = true
-        m.spinner.control = "start"
+        m.loadingIndicator.visible = true
 
-        ' Fetch server list
+        ' Create a fresh task for resource fetch (reusing stopped tasks is unreliable)
+        m.authTask.control = "stop"
+        m.authTask.unobserveField("status")
+        m.authTask = CreateObject("roSGNode", "PlexAuthTask")
+        m.authTask.authToken = GetAuthToken()
+        m.authTask.observeField("status", "onAuthStateChange")
         m.authTask.action = "fetchResources"
         m.authTask.control = "run"
 
     else if state = "serversReady"
-        ' Stop spinner
-        m.spinner.control = "stop"
-        m.spinner.visible = false
+        ' Hide loading indicator
+        m.loadingIndicator.visible = false
 
         ' Pass data up to parent
         m.top.servers = m.authTask.servers
@@ -87,8 +91,7 @@ sub onAuthStateChange(event as Object)
     else if state = "error"
         ' Stop polling and show error
         m.pollTimer.control = "stop"
-        m.spinner.control = "stop"
-        m.spinner.visible = false
+        m.loadingIndicator.visible = false
 
         m.errorLabel.text = m.authTask.error
         m.errorLabel.visible = true
@@ -128,6 +131,9 @@ sub checkPinExpiration()
 end sub
 
 sub onPollTimer(event as Object)
+    ' Don't poll if already authenticated (prevents race with fetchResources)
+    if m.isAuthenticated then return
+
     ' Poll the PIN status
     if m.currentPinId <> ""
         m.authTask.action = "checkPin"

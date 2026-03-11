@@ -138,7 +138,7 @@ sub onPollTimer(event as Object)
 end sub
 
 sub discoverServers()
-    m.loadingSpinner.visible = true
+    m.loadingSpinner.showSpinner = true
     m.serverStatus.visible = true
     m.serverStatus.text = "Discovering servers..."
 
@@ -158,10 +158,10 @@ sub onDiscoverTaskStateChange(event as Object)
     state = event.getData()
 
     if state = "completed"
-        m.loadingSpinner.visible = false
+        m.loadingSpinner.showSpinner = false
         processServerList()
     else if state = "error"
-        m.loadingSpinner.visible = false
+        m.loadingSpinner.showSpinner = false
         m.serverStatus.text = "Error discovering servers: " + m.discoverTask.error
     end if
 end sub

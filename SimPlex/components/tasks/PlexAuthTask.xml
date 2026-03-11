@@ -8,10 +8,10 @@
         <field id="expiresAt" type="string" />
         <!-- ISO 8601 timestamp of PIN expiration -->
         <field id="authToken" type="string" />
-        <field id="servers" type="assocarray" />
+        <field id="servers" type="array" />
         <!-- Array of server objects after fetchResources -->
         <field id="error" type="string" />
-        <field id="state" type="string" value="idle" />
+        <field id="status" type="string" value="idle" />
         <!-- "idle", "loading", "pinReady", "authenticated", "waiting", "serversReady", "refreshing", "error" -->
     </interface>
     <script type="text/brightscript" uri="pkg:/source/utils.brs" />

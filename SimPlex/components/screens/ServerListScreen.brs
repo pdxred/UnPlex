@@ -54,7 +54,7 @@ sub selectServer(index as Integer)
     m.top.selectedServer = server
 
     ' Store server clientId for future reconnection
-    sec = CreateObject("roRegistrySection", "PlexClassic")
+    sec = CreateObject("roRegistrySection", "SimPlex")
     sec.Write("serverClientId", server.clientId)
     sec.Flush()
 
@@ -78,7 +78,7 @@ sub startConnectionTest(server as Object)
     m.connectionTask = CreateObject("roSGNode", "ServerConnectionTask")
     m.connectionTask.connections = server.connections
     m.connectionTask.authToken = m.top.authToken
-    m.connectionTask.observeField("state", "onConnectionStateChange")
+    m.connectionTask.observeField("status", "onConnectionStateChange")
     m.connectionTask.control = "run"
 end sub
 

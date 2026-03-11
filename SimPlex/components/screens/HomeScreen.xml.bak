@@ -95,6 +95,11 @@
                 buttons="[&quot;Retry&quot;]"
             />
         </Group>
+        <LoadingSpinner
+            id="loadingSpinner"
+            translation="[1100, 540]"
+            visible="false"
+        />
         <Group id="filterBottomSheetContainer" />
     </children>
 </component>

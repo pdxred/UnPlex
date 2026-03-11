@@ -4,7 +4,7 @@
         <field id="query" type="string" />
         <field id="response" type="assocarray" />
         <field id="error" type="string" />
-        <field id="state" type="string" value="idle" />
+        <field id="status" type="string" value="idle" />
     </interface>
     <script type="text/brightscript" uri="pkg:/source/utils.brs" />
     <script type="text/brightscript" uri="pkg:/source/constants.brs" />

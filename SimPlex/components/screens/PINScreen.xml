@@ -4,7 +4,7 @@
         <field id="state" type="string" value="idle" />
         <!-- "idle", "loading", "pinReady", "authenticated", "cancelled", "error" -->
         <field id="authToken" type="string" />
-        <field id="servers" type="assocarray" />
+        <field id="servers" type="array" />
     </interface>
 
     <script type="text/brightscript" uri="pkg:/source/utils.brs" />
@@ -46,11 +46,17 @@
                 font="font:LargeSystemFont"
                 color="0xE5A00DFF" />
 
-            <!-- Loading Spinner -->
-            <BusySpinner
-                id="spinner"
-                translation="[-40, 260]"
-                poster="pkg:/images/spinner.png"
+            <!-- Loading indicator -->
+            <Label
+                id="loadingIndicator"
+                text="..."
+                translation="[-50, 240]"
+                width="100"
+                height="60"
+                horizAlign="center"
+                vertAlign="center"
+                font="font:LargeBoldSystemFont"
+                color="0xE5A00DFF"
                 visible="false" />
 
             <!-- Status text -->

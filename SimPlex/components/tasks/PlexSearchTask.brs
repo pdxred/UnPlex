@@ -3,12 +3,12 @@ sub init()
 end sub
 
 sub run()
-    m.top.state = "loading"
+    m.top.status = "loading"
 
     query = m.top.query
     if query = "" or query = invalid
         m.top.error = "No search query provided"
-        m.top.state = "error"
+        m.top.status = "error"
         return
     end if
 
@@ -34,7 +34,7 @@ sub run()
 
     if response = ""
         m.top.error = "Search failed: " + url.GetFailureReason()
-        m.top.state = "error"
+        m.top.status = "error"
         return
     end if
 
@@ -42,10 +42,10 @@ sub run()
     json = ParseJson(response)
     if json = invalid
         m.top.error = "Invalid search response"
-        m.top.state = "error"
+        m.top.status = "error"
         return
     end if
 
     m.top.response = json
-    m.top.state = "completed"
+    m.top.status = "completed"
 end sub

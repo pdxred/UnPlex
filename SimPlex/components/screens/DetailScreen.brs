@@ -51,7 +51,7 @@ sub onRatingKeyChange(event as Object)
 end sub
 
 sub loadMetadata(ratingKey as String)
-    m.loadingSpinner.visible = true
+    m.loadingSpinner.showSpinner = true
     m.retryGroup.visible = false
 
     endpoint = "/library/metadata/" + ratingKey
@@ -68,12 +68,12 @@ end sub
 sub onApiTaskStateChange(event as Object)
     state = event.getData()
     if state = "completed"
-        m.loadingSpinner.visible = false
+        m.loadingSpinner.showSpinner = false
         m.retryCount = 0
         m.retryGroup.visible = false
         processMetadata()
     else if state = "error"
-        m.loadingSpinner.visible = false
+        m.loadingSpinner.showSpinner = false
         if m.metadataTask.responseCode < 0
             if m.retryCount = 0
                 m.retryCount = 1
@@ -381,7 +381,7 @@ end sub
 
 sub retryLastRequest()
     if m.retryContext = invalid then return
-    m.loadingSpinner.visible = true
+    m.loadingSpinner.showSpinner = true
 
     task = CreateObject("roSGNode", "PlexApiTask")
     task.endpoint = m.retryContext.endpoint
@@ -419,12 +419,20 @@ sub onErrorDialogClosed(event as Object)
 end sub
 
 sub showInlineRetry()
+    m.poster.visible = false
+    m.top.findNode("metadataGroup").visible = false
+    m.top.findNode("progressGroup").visible = false
+    m.buttonGroup.visible = false
     m.retryGroup.visible = true
     m.retryButton.setFocus(true)
 end sub
 
 sub onRetryButtonSelected(event as Object)
     m.retryGroup.visible = false
+    m.poster.visible = true
+    m.top.findNode("metadataGroup").visible = true
+    m.top.findNode("progressGroup").visible = true
+    m.buttonGroup.visible = true
     retryLastRequest()
 end sub
 

@@ -6,7 +6,7 @@
   <script type="text/brightscript" uri="pkg:/components/screens/ServerListScreen.brs" />
 
   <interface>
-    <field id="servers" type="assocarray" />
+    <field id="servers" type="array" />
     <field id="authToken" type="string" />
     <field id="selectedServer" type="assocarray" />
     <field id="serverUri" type="string" />
@@ -44,13 +44,18 @@
       focusedColor="0xE5A00DFF"
       focusBitmapBlendColor="0xE5A00DFF" />
 
-    <!-- Loading Spinner -->
-    <BusySpinner
+    <!-- Loading Indicator -->
+    <Label
       id="spinner"
-      translation="[1300, 500]"
-      visible="false"
-      clockwise="true"
-      poster="pkg:/images/spinner.png" />
+      text="..."
+      translation="[1280, 480]"
+      width="80"
+      height="60"
+      horizAlign="center"
+      vertAlign="center"
+      font="font:LargeBoldSystemFont"
+      color="0xE5A00DFF"
+      visible="false" />
 
     <!-- Status Label -->
     <Label

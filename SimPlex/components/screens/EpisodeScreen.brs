@@ -50,7 +50,7 @@ sub onRatingKeyChange(event as Object)
 end sub
 
 sub loadSeasons(ratingKey as String)
-    m.loadingSpinner.visible = true
+    m.loadingSpinner.showSpinner = true
     m.retryGroup.visible = false
 
     endpoint = "/library/metadata/" + ratingKey + "/children"
@@ -65,7 +65,7 @@ sub loadSeasons(ratingKey as String)
 end sub
 
 sub loadEpisodes(seasonKey as String)
-    m.loadingSpinner.visible = true
+    m.loadingSpinner.showSpinner = true
     m.emptyState.visible = false
     m.retryGroup.visible = false
 
@@ -83,12 +83,12 @@ end sub
 sub onSeasonsTaskStateChange(event as Object)
     state = event.getData()
     if state = "completed"
-        m.loadingSpinner.visible = false
+        m.loadingSpinner.showSpinner = false
         m.retryCount = 0
         m.retryGroup.visible = false
         processSeasons()
     else if state = "error"
-        m.loadingSpinner.visible = false
+        m.loadingSpinner.showSpinner = false
         currentTask = m.seasonsTask
         if currentTask.responseCode < 0
             if m.retryCount = 0
@@ -113,12 +113,12 @@ end sub
 sub onEpisodesTaskStateChange(event as Object)
     state = event.getData()
     if state = "completed"
-        m.loadingSpinner.visible = false
+        m.loadingSpinner.showSpinner = false
         m.retryCount = 0
         m.retryGroup.visible = false
         processEpisodes()
     else if state = "error"
-        m.loadingSpinner.visible = false
+        m.loadingSpinner.showSpinner = false
         currentTask = m.episodesTask
         if currentTask.responseCode < 0
             if m.retryCount = 0
@@ -441,7 +441,7 @@ end sub
 
 sub retryLastRequest()
     if m.retryContext = invalid then return
-    m.loadingSpinner.visible = true
+    m.loadingSpinner.showSpinner = true
 
     task = CreateObject("roSGNode", "PlexApiTask")
     task.endpoint = m.retryContext.endpoint
@@ -488,6 +488,7 @@ sub onErrorDialogClosed(event as Object)
 end sub
 
 sub showInlineRetry()
+    m.seasonList.visible = false
     m.episodeList.visible = false
     m.emptyState.visible = false
     m.retryGroup.visible = true
@@ -496,6 +497,7 @@ end sub
 
 sub onRetryButtonSelected(event as Object)
     m.retryGroup.visible = false
+    m.seasonList.visible = true
     m.episodeList.visible = true
     retryLastRequest()
 end sub

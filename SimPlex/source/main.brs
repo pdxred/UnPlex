@@ -10,11 +10,19 @@ sub Main(args as Dynamic)
         scene.launchArgs = args
     end if
 
+    ' Observe close field to exit app
+    scene.observeField("close", m.port)
+
     while true
         msg = wait(0, m.port)
         msgType = type(msg)
         if msgType = "roSGScreenEvent"
             if msg.isScreenClosed() then return
+        else if msgType = "roSGNodeEvent"
+            if msg.getField() = "close" and msg.getData() = true
+                screen.close()
+                return
+            end if
         end if
     end while
 end sub

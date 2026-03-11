@@ -4,6 +4,7 @@
         <field id="launchArgs" type="assocarray" />
         <field id="currentScreen" type="string" value="" />
         <field id="showSignOut" type="boolean" value="false" />
+        <field id="close" type="boolean" value="false" />
     </interface>
 
     <script type="text/brightscript" uri="pkg:/source/utils.brs" />

@@ -72,7 +72,7 @@ sub onDebounceTimer(event as Object)
 end sub
 
 sub performSearch()
-    m.loadingSpinner.visible = true
+    m.loadingSpinner.showSpinner = true
     m.emptyState.visible = false
     m.retryGroup.visible = false
 
@@ -88,12 +88,12 @@ end sub
 sub onSearchTaskStateChange(event as Object)
     state = event.getData()
     if state = "completed"
-        m.loadingSpinner.visible = false
+        m.loadingSpinner.showSpinner = false
         m.retryCount = 0
         m.retryGroup.visible = false
         processSearchResults()
     else if state = "error"
-        m.loadingSpinner.visible = false
+        m.loadingSpinner.showSpinner = false
         ' Search uses PlexSearchTask which may not have responseCode, treat all as HTTP errors
         if m.retryCount = 0
             m.retryCount = 1
@@ -177,7 +177,7 @@ end sub
 
 sub retryLastSearch()
     if m.retryContext = invalid then return
-    m.loadingSpinner.visible = true
+    m.loadingSpinner.showSpinner = true
 
     m.searchTask = CreateObject("roSGNode", "PlexSearchTask")
     m.searchTask.observeField("status", "onSearchTaskStateChange")

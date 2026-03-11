@@ -5,7 +5,7 @@
         <field id="subtitleStreams" type="array" onChange="onSubtitleStreamsChange" />
         <field id="selectedAudioId" type="integer" value="0" onChange="onSelectedAudioIdChange" />
         <field id="selectedSubtitleId" type="integer" value="0" onChange="onSelectedSubtitleIdChange" />
-        <field id="visible" type="boolean" value="false" onChange="onVisibleChange" />
+        <field id="showPanel" type="boolean" value="false" onChange="onShowPanelChange" />
         <field id="trackChanged" type="assocarray" alwaysNotify="true" />
     </interface>
 

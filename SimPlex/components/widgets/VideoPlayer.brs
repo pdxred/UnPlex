@@ -685,7 +685,7 @@ sub handlePgsSubtitleRequest(streamId as Integer)
 
     ' Close the panel
     m.pausedForPanel = false  ' Don't resume — we're restarting
-    m.trackPanel.visible = false
+    m.trackPanel.showPanel = false
 end sub
 
 ' Revert to previous playback state after PGS transcode failure
@@ -917,27 +917,27 @@ sub checkMarkers()
     if m.currentPosition = invalid then return
     if m.isTranscodePivotInProgress then return
 
-    pos = m.currentPosition
+    currentPos = m.currentPosition
     inIntro = false
     inCredits = false
 
     ' Check intro marker range
     if m.introMarker <> invalid
-        if pos >= m.introMarker.startMs and pos < m.introMarker.endMs
+        if currentPos >= m.introMarker.startMs and currentPos < m.introMarker.endMs
             inIntro = true
         end if
     end if
 
     ' Check credits marker range
     if m.creditsMarker <> invalid
-        if pos >= m.creditsMarker.startMs and pos < m.creditsMarker.endMs
+        if currentPos >= m.creditsMarker.startMs and currentPos < m.creditsMarker.endMs
             inCredits = true
         end if
     end if
 
     ' Fallback: 90% of duration for auto-play when no credits marker
     if not inCredits and m.creditsMarker = invalid and m.duration > 0
-        if pos >= m.duration * 0.9
+        if currentPos >= m.duration * 0.9
             inCredits = true
         end if
     end if
@@ -986,7 +986,7 @@ sub showSkipButton(markerType as String)
     m.skipButtonVisible = true
 
     ' Focus management: only take focus if track panel is not open
-    if not m.trackPanel.visible
+    if not m.trackPanel.showPanel
         m.skipButton.setFocus(true)
         m.skipButtonFocused = true
         m.skipButtonFocus.color = m.global.constants.FOCUS_RING
@@ -1136,7 +1136,7 @@ sub showAutoPlayOverlay()
     m.countdownActive = true
 
     ' Focus management
-    if not m.trackPanel.visible
+    if not m.trackPanel.showPanel
         m.autoPlayOverlay.setFocus(true)
         m.autoPlayFocused = true
         m.autoPlayFocusBorder.color = m.global.constants.FOCUS_RING
@@ -1292,13 +1292,13 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
     end if
 
     ' If track panel is visible, let it handle keys
-    if m.trackPanel.visible
+    if m.trackPanel.showPanel
         return false
     end if
 
     if key = "options"
         ' Toggle track selection panel
-        m.trackPanel.visible = not m.trackPanel.visible
+        m.trackPanel.showPanel = not m.trackPanel.showPanel
         return true
     else if key = "back"
         stopPlayback()

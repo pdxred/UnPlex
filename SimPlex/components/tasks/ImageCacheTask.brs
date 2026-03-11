@@ -3,11 +3,11 @@ sub init()
 end sub
 
 sub run()
-    m.top.state = "loading"
+    m.top.status = "loading"
 
     urls = m.top.imageUrls
     if urls = invalid or urls.count() = 0
-        m.top.state = "completed"
+        m.top.status = "completed"
         return
     end if
 
@@ -34,5 +34,5 @@ sub run()
         m.top.completed = completed
     end for
 
-    m.top.state = "completed"
+    m.top.status = "completed"
 end sub

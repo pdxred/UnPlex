@@ -136,10 +136,11 @@ sub repositionSubtitleSection()
     m.subtitleList.translation = [0, subtitleY + 66]
 end sub
 
-sub onVisibleChange(event as Object)
+sub onShowPanelChange(event as Object)
     isVisible = event.getData()
 
     if isVisible
+        m.top.visible = true
         ' Slide in from right
         m.slideInterpolator.keyValue = [1920.0, 1480.0]
         m.slideAnimation.control = "start"
@@ -151,6 +152,7 @@ sub onVisibleChange(event as Object)
         ' Slide out to right
         m.slideInterpolator.keyValue = [1480.0, 1920.0]
         m.slideAnimation.control = "start"
+        m.top.visible = false
     end if
 end sub
 

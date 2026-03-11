@@ -14,7 +14,7 @@ sub run()
 end sub
 
 sub requestPin()
-    m.top.state = "loading"
+    m.top.status = "loading"
 
     url = CreateObject("roUrlTransfer")
     url.SetCertificatesFile("common:/certs/ca-bundle.crt")
@@ -30,12 +30,29 @@ sub requestPin()
     ' POST body
     url.AddHeader("Content-Type", "application/x-www-form-urlencoded")
 
-    ' Make the request
-    response = url.PostFromString("strong=true")
+    ' Use async POST to get response body
+    port = CreateObject("roMessagePort")
+    url.SetMessagePort(port)
+    if not url.AsyncPostFromString("strong=false")
+        m.top.error = "Failed to start PIN request"
+        m.top.status = "error"
+        return
+    end if
 
-    if response = ""
-        m.top.error = "Failed to contact plex.tv: " + url.GetFailureReason()
-        m.top.state = "error"
+    ' Wait for response
+    msg = wait(10000, port)
+    if msg = invalid
+        m.top.error = "PIN request timed out"
+        m.top.status = "error"
+        return
+    end if
+
+    responseCode = msg.GetResponseCode()
+    response = msg.GetString()
+
+    if responseCode < 200 or responseCode >= 300
+        m.top.error = "Failed to contact plex.tv: HTTP " + responseCode.ToStr()
+        m.top.status = "error"
         return
     end if
 
@@ -43,7 +60,7 @@ sub requestPin()
     json = ParseJson(response)
     if json = invalid
         m.top.error = "Invalid response from plex.tv"
-        m.top.state = "error"
+        m.top.status = "error"
         return
     end if
 
@@ -53,10 +70,10 @@ sub requestPin()
         m.top.pinCode = json.code
         m.top.expiresAt = SafeGet(json, "expiresAt", "")
         LogEvent("PIN requested: " + m.top.pinCode)
-        m.top.state = "pinReady"
+        m.top.status = "pinReady"
     else
         m.top.error = "Missing pin data in response"
-        m.top.state = "error"
+        m.top.status = "error"
     end if
 end sub
 
@@ -64,7 +81,7 @@ sub checkPin()
     pinId = m.top.pinId
     if pinId = "" or pinId = invalid
         m.top.error = "No PIN ID provided"
-        m.top.state = "error"
+        m.top.status = "error"
         return
     end if
 
@@ -84,7 +101,7 @@ sub checkPin()
 
     if response = ""
         m.top.error = "Failed to check pin: " + url.GetFailureReason()
-        m.top.state = "error"
+        m.top.status = "error"
         return
     end if
 
@@ -92,7 +109,7 @@ sub checkPin()
     json = ParseJson(response)
     if json = invalid
         m.top.error = "Invalid response from plex.tv"
-        m.top.state = "error"
+        m.top.status = "error"
         return
     end if
 
@@ -102,7 +119,7 @@ sub checkPin()
     ' Check if PIN expired
     if SafeGet(json, "authToken", "") = "" and SafeGet(json, "expired", false) = true
         LogEvent("PIN expired, signaling refresh")
-        m.top.state = "refreshing"
+        m.top.status = "refreshing"
         return
     end if
 
@@ -110,17 +127,17 @@ sub checkPin()
     if json.authToken <> invalid and json.authToken <> ""
         m.top.authToken = json.authToken
         SetAuthToken(json.authToken)
-        m.top.state = "authenticated"
+        m.top.status = "authenticated"
     else if json.expiresAt <> invalid
         ' Still waiting
-        m.top.state = "waiting"
+        m.top.status = "waiting"
     else
-        m.top.state = "waiting"
+        m.top.status = "waiting"
     end if
 end sub
 
 sub fetchResources()
-    m.top.state = "loading"
+    m.top.status = "loading"
     LogEvent("Fetching server resources")
 
     url = CreateObject("roUrlTransfer")
@@ -134,33 +151,61 @@ sub fetchResources()
         url.AddHeader(key, headers[key])
     end for
 
-    response = url.GetToString()
+    ' Use async request with timeout to avoid hanging forever
+    port = CreateObject("roMessagePort")
+    url.SetMessagePort(port)
+    if not url.AsyncGetToString()
+        m.top.error = "Failed to start server fetch"
+        m.top.status = "error"
+        return
+    end if
+
+    msg = wait(15000, port)
+    if msg = invalid
+        m.top.error = "Server fetch timed out"
+        m.top.status = "error"
+        return
+    end if
+
+    response = msg.GetString()
+
+    if msg.GetResponseCode() < 200 or msg.GetResponseCode() >= 300
+        m.top.error = "Failed to fetch servers: HTTP " + msg.GetResponseCode().ToStr()
+        m.top.status = "error"
+        return
+    end if
 
     if response = ""
-        m.top.error = "Failed to fetch servers: " + url.GetFailureReason()
-        m.top.state = "error"
+        m.top.error = "Empty response from plex.tv"
+        m.top.status = "error"
         return
     end if
 
     json = ParseJson(response)
     if json = invalid
         m.top.error = "Invalid server response"
-        m.top.state = "error"
+        m.top.status = "error"
         return
     end if
 
     m.top.servers = parseServerList(json)
     LogEvent("Found " + m.top.servers.count().ToStr() + " server(s)")
-    m.top.state = "serversReady"
+    m.top.status = "serversReady"
 end sub
 
 function parseServerList(json as Object) as Object
     servers = []
-    devices = SafeGet(json, "MediaContainer", invalid)
-    if devices = invalid then devices = json  ' Handle v2 API format
 
-    deviceList = SafeGet(devices, "Device", [])
-    if type(deviceList) <> "roArray" then deviceList = []
+    ' v2 API returns direct array of resources
+    deviceList = []
+    if type(json) = "roArray"
+        deviceList = json
+    else
+        ' Fallback for older API formats
+        devices = SafeGet(json, "MediaContainer", json)
+        deviceList = SafeGet(devices, "Device", [])
+        if type(deviceList) <> "roArray" then deviceList = []
+    end if
 
     for each device in deviceList
         provides = SafeGet(device, "provides", "")
@@ -170,7 +215,7 @@ function parseServerList(json as Object) as Object
                 name: SafeGet(device, "name", "Unknown Server")
                 clientId: SafeGet(device, "clientIdentifier", "")
                 version: SafeGet(device, "productVersion", "")
-                connections: parseConnections(SafeGet(device, "Connection", []))
+                connections: parseConnections(SafeGet(device, "connections", []))
             }
             servers.push(serverInfo)
         end if
@@ -192,8 +237,20 @@ function parseConnections(connArray as Object) as Object
             protocol: SafeGet(conn, "protocol", "http")
         }
 
-        isLocal = SafeGet(conn, "local", "0") = "1" or SafeGet(conn, "local", 0) = 1
-        isRelay = SafeGet(conn, "relay", "0") = "1" or SafeGet(conn, "relay", 0) = 1
+        ' v2 API returns boolean, older APIs may return string/int
+        localVal = SafeGet(conn, "local", false)
+        if type(localVal) = "Boolean"
+            isLocal = localVal
+        else
+            isLocal = (localVal = "1" or localVal = 1 or localVal = true)
+        end if
+
+        relayVal = SafeGet(conn, "relay", false)
+        if type(relayVal) = "Boolean"
+            isRelay = relayVal
+        else
+            isRelay = (relayVal = "1" or relayVal = 1 or relayVal = true)
+        end if
 
         if isLocal
             result.local.push(connInfo)
