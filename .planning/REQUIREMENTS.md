@@ -9,8 +9,8 @@ Requirements for v1.1 Polish & Navigation. Each maps to roadmap phases.
 
 ### Crash Safety & Foundation
 
-- [ ] **SAFE-01**: BusySpinner SIGSEGV root cause confirmed and resolved (safe loading states across all screens)
-- [ ] **SAFE-02**: Orphaned files deleted (normalizers.brs, capabilities.brs)
+- [x] **SAFE-01**: BusySpinner SIGSEGV root cause confirmed and resolved (safe loading states across all screens)
+- [x] **SAFE-02**: Orphaned files deleted (normalizers.brs, capabilities.brs)
 - [ ] **SAFE-03**: Utility code cleanup (extract common helpers, remove dead code patterns)
 
 ### Bug Fixes
@@ -85,8 +85,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SAFE-01 | Phase 11 | Pending |
-| SAFE-02 | Phase 11 | Pending |
+| SAFE-01 | Phase 11 | Complete |
+| SAFE-02 | Phase 11 | Complete |
 | SAFE-03 | Phase 11 | Pending |
 | FIX-07 | Phase 11 | Pending |
 | FIX-01 | Phase 12 | Pending |

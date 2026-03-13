@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Polish & Navigation
-status: Ready to plan
-stopped_at: null
-last_updated: "2026-03-13T00:00:00.000Z"
-last_activity: 2026-03-13 -- v1.1 roadmap created (7 phases, 24 requirements mapped)
+status: planning
+stopped_at: Completed 11-crash-safety-and-foundation plan 01 (11-01-PLAN.md)
+last_updated: "2026-03-13T19:12:46.832Z"
+last_activity: 2026-03-13 — v1.1 roadmap created, 24 requirements mapped across 7 phases
 progress:
   total_phases: 7
   completed_phases: 0
-  total_plans: 12
-  completed_plans: 0
+  total_plans: 2
+  completed_plans: 1
   percent: 0
 ---
 
@@ -46,6 +46,7 @@ Progress: [░░░░░░░░░░] 0%
 | - | - | - | - |
 
 *Updated after each plan completion*
+| Phase 11-crash-safety-and-foundation P01 | 18 | 2 tasks | 19 files |
 
 ## Accumulated Context
 
@@ -57,6 +58,8 @@ Recent decisions affecting current work:
 - [v1.1 roadmap]: BusySpinner SIGSEGV must be resolved before any new screen work — Phase 11 gates all subsequent phases
 - [v1.1 roadmap]: TV show navigation enhances existing EpisodeScreen (no split into three screens) to avoid breaking VideoPlayer context fields
 - [v1.1 roadmap]: Server switching is removed entirely (not overhauled) — single-server scope per PROJECT.md
+- [Phase 11-crash-safety-and-foundation]: BusySpinner native Roku SceneGraph component causes firmware SIGSEGV ~3s after init — never use it; use Label+Rectangle overlay instead
+- [Phase 11-crash-safety-and-foundation]: LoadingSpinner uses 300ms delay Timer to prevent flash-of-spinner on fast loads
 
 ### Pending Todos
 
@@ -69,6 +72,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-13
-Stopped at: Roadmap created. Next action: /gsd:plan-phase 11
+Last session: 2026-03-13T19:12:46.828Z
+Stopped at: Completed 11-crash-safety-and-foundation plan 01 (11-01-PLAN.md)
 Resume command: /gsd:plan-phase 11
