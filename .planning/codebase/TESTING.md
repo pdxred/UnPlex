@@ -1,158 +1,358 @@
 # Testing Patterns
 
-**Analysis Date:** 2026-03-08
+**Analysis Date:** 2026-03-13
 
 ## Test Framework
 
 **Runner:**
-- None detected. No test framework is configured or present in this project.
-
-**Assertion Library:**
-- None
+- BrighterScript compiler (`bsc`) included in `package.json` as `brighterscript@^0.70.3`
+- Roku deployment via `roku-deploy@^3.16.1`
+- No automated test framework installed (no Jest, Vitest, etc.)
 
 **Run Commands:**
 ```bash
-# No test commands available
-# No package.json, Makefile, or test configuration files exist
+npm run build              # Compile BrightScript (bsc)
+npm run deploy            # Compile and deploy to Roku device
+npm run lint              # Type-check without emitting (bsc --noEmit)
 ```
+
+**Build Configuration:**
+- `bsconfig.json` specifies compilation targets
+- `rootDir: "SimPlex"` points to app source directory
+- `stagingDir: "out/staging"` where compiled output goes
+- Diagnostic filters suppress codes 1105 (missing return), 1045 (shadowed vars), 1140 (unused vars)
+- Source maps enabled for debugging
 
 ## Test File Organization
 
-**Location:**
-- No test files exist anywhere in the codebase
-- No `*.test.*`, `*.spec.*`, or `*_test.*` files found
-- No `tests/`, `test/`, `__tests__/`, or `spec/` directories exist
+**Status:** No automated test suite present
 
-**Naming:**
-- Not established
+This is a native Roku app written in BrightScript. Roku apps do not have standard unit testing frameworks. Testing is primarily:
+1. Manual UAT (User Acceptance Testing) on actual Roku devices
+2. Local development build-and-deploy cycle
+3. Field testing on real hardware
 
-## Test Structure
+**Why no automated tests:**
+- BrightScript is interpreted on Roku OS only (can't run on desktop/CI)
+- No official Roku test framework
+- Third-party frameworks exist but require custom setups
+- Project uses manual UAT documented in `.planning/` phase UAT reports
 
-**No tests exist.** The project has zero automated test coverage.
+**Location of UAT documentation:**
+- `.planning/phases/*/UAT.md` - Phase-level test results and observed issues
+- `.planning/v1.0-MILESTONE-AUDIT.md` - Milestone completion audit
+- `.claude/projects/*/memory/` - Session notes on fixes applied
 
-## BrightScript Testing Options
+## Manual Testing Approach
 
-BrightScript/Roku testing is a specialized domain. The primary testing frameworks available for this platform are:
+**Build → Deploy → Test Cycle:**
 
-**Unit Testing:**
-- [roku-test-automation](https://github.com/nicholasgasior/roku-test-automation) - Roku unit test framework
-- [rooibos](https://github.com/georgejecook/rooibos) - BrightScript testing framework (most popular)
-  - Provides `@describe`, `@it`, `@expect` annotations
-  - Supports mocking, stubbing, parameterized tests
-  - Integrates with VS Code via BrighterScript
+1. **Build phase:**
+```bash
+npm run build              # Validates syntax, type hints
+```
 
-**Integration/E2E Testing:**
-- [Roku Automated Channel Testing](https://developer.roku.com/docs/developer-program/dev-tools/automated-channel-testing.md) - Official Roku tool
-  - Uses Roku's External Control Protocol (ECP)
-  - Controls device remotely for UI testing
-  - Robot Framework based
+2. **Deploy phase:**
+```bash
+npm run deploy             # Pushes to Roku device in developer mode
+```
 
-## What Should Be Tested
+3. **Manual test:**
+- Tester navigates app on Roku
+- Verifies expected behavior
+- Documents issues in UAT report
 
-**Priority areas if tests are added:**
+**Test Environments:**
+- Development Roku device (192.168.x.x in developer mode)
+- Physical Roku hardware (FHD 1920x1080 resolution)
+- Network conditions (LAN vs relay connectivity)
 
-**High Priority - Pure logic functions (unit-testable):**
-- `SafeGet()` and `SafeGetMetadata()` in `SimPlex/source/utils.brs` - null safety logic
-- `FormatTime()` and `PadZero()` in `SimPlex/source/utils.brs` - time formatting
-- `BuildPlexUrl()` and `BuildPosterUrl()` in `SimPlex/source/utils.brs` - URL construction
-- `GetPlexHeaders()` in `SimPlex/source/utils.brs` - header building
-- `ParseServerCapabilities()`, `HasCapability()`, `MeetsMinVersion()` in `SimPlex/source/capabilities.brs` - version parsing and comparison
-- All normalizer functions in `SimPlex/source/normalizers.brs` - JSON to ContentNode conversion
+## Verification Patterns (Manual)
 
-**Medium Priority - Component logic:**
-- `checkDirectPlay()` in `SimPlex/components/widgets/VideoPlayer.brs` - codec compatibility detection
-- `getStreamFormat()` in `SimPlex/components/widgets/VideoPlayer.brs` - container format mapping
-- `parseServerList()` and `parseConnections()` in `SimPlex/components/tasks/PlexAuthTask.brs` - server discovery parsing
-- ratingKey type coercion logic (duplicated across multiple files)
+**Regression Testing Checklist (implicit, from code comments):**
 
-**Lower Priority - Integration/E2E:**
-- Screen navigation flow (push/pop screen stack)
-- Authentication flow (PIN request, polling, server discovery)
-- Library browsing with pagination
-- Search with debounce
-- Playback start/stop/resume
+In components and screens, known crash/issue workarounds indicate tested failure modes:
 
-## Mocking
+```brightscript
+' From HomeScreen.brs, line 7:
+m.loadingSpinner = invalid ' LoadingSpinner removed - causes firmware SIGSEGV crash
 
-**Framework:** Not applicable (no tests exist)
+' From SearchScreen.brs, line 7:
+m.loadingSpinner = invalid ' LoadingSpinner causes firmware SIGSEGV crashes on Roku
 
-**What Would Need Mocking:**
-- `roUrlTransfer` - HTTP requests (all API calls)
-- `roRegistrySection` - Persistent storage (auth tokens, server URI)
-- `roDeviceInfo` - Device information (model, OS version, UUID)
-- `CreateObject("roSGNode", ...)` - SceneGraph node creation
-- `m.global` - Global node state
+' From DetailScreen.brs, line 9:
+m.loadingSpinner = invalid ' BusySpinner causes firmware SIGSEGV crashes on Roku
+```
+
+**Testing issues discovered and fixed:**
+- LoadingSpinner/BusySpinner components crash on certain Roku firmware versions
+- Workaround: Set `m.loadingSpinner = invalid` to disable spinner in multiple screens
+- Documented in multiple files indicating cross-screen validation
+
+**Task Node HTTP Testing:**
+
+Task nodes tested for:
+- HTTP timeout handling: 30-second timeout in `PlexApiTask.run()`
+- Response code validation: Checks `responseCode < 0`, `responseCode = 401`, `responseCode >= 200/< 300`
+- JSON parse failures: Graceful null return on invalid JSON
+- Empty response handling: Expected for scrobble/timeline endpoints
+
+Example pattern from `PlexApiTask.brs`:
+```brightscript
+' Wait for response (30 second timeout)
+msg = wait(30000, port)
+if msg = invalid
+    m.top.error = "Request timed out"
+    m.top.status = "error"
+    return
+end if
+
+' Check for 401 Unauthorized
+if responseCode = 401
+    LogError("401 Unauthorized - authentication required")
+    SetAuthToken("")
+    m.global.authRequired = true  ' Signal screens to handle
+    return
+end if
+```
+
+## Mocking Strategy (Not Applicable)
+
+**Why no mocking:**
+- No automated test runner means no mock libraries
+- Manual UAT tests against real Plex servers
+- Network failures tested via actual server downtime or network disconnect
+
+**Integration Testing (Manual):**
+
+Real servers tested for:
+- Authentication flow: PIN code → auth token validation
+- Server discovery: Fetch servers from plex.tv
+- Connection testing: Test both local and relay URIs
+- API endpoints: Browse libraries, fetch metadata, report progress
+- Server reconnect: Detect offline → online transitions
+
+**Network Scenarios Tested (per code logic):**
+
+1. **No credentials:** Shows PIN screen
+2. **Expired token:** 401 response triggers auth reset
+3. **Server unreachable:** Displays "Server Unreachable" dialog with retry options
+4. **Slow network:** 30-second timeout prevents infinite hangs
+5. **Empty API responses:** Scrobble/timeline endpoints return empty 200s (handled gracefully)
+6. **Invalid JSON:** Null check prevents crashes
+
+## Error Testing Patterns
+
+**Manual error scenarios tested (evident from error handling code):**
+
+```brightscript
+' From PlexApiTask: Error code validation
+if responseCode < 0
+    errorMsg = "Request failed: " + url.GetFailureReason()
+    LogError("API error: " + errorMsg)
+    m.top.error = errorMsg
+    m.top.status = "error"
+    return
+end if
+
+' Empty response validation
+if response = "" and responseCode >= 200 and responseCode < 300
+    m.top.status = "completed"  ' Success (expected for some endpoints)
+else if response = ""
+    LogError("Empty response (HTTP " + responseCode.ToStr() + ")")
+    m.top.status = "error"  ' Unexpected empty response
+end if
+```
+
+**Test scenarios implied by code:**
+- Valid responses (parsed JSON → status="completed")
+- Empty success responses (HTTP 200 with no body → status="completed")
+- Empty error responses (HTTP non-2xx with no body → status="error")
+- Malformed JSON (parse fails → status="error")
+- Network timeouts (wait() returns invalid → status="error")
+- Authentication failures (401 response → status="authRequired")
 
 ## Coverage
 
-**Requirements:** None enforced
-**Current Coverage:** 0% - no tests exist
+**No automated coverage measurement**
 
-## Recommended Test Setup
+Manual UAT documents what's been tested:
+- `.planning/v1.0-MILESTONE-AUDIT.md` - Phase checklist of features verified
+- `.planning/phases/*/UAT.md` - Per-phase test results
 
-If adding tests to this project, use **rooibos** (the standard BrightScript test framework):
+**Critical paths verified (from phase completion records):**
 
-**Installation:**
-- Requires BrighterScript compiler (`npm install brighterscript`)
-- Add rooibos via `npm install rooibos-roku`
-- Configure in `bsconfig.json`
+Per git log and UAT files:
+- Phase 10: User switching (last completed phase)
+  - Managed user picker UI
+  - PIN entry validation
+  - Token management per user
+  - Auth flow and state persistence
 
-**Example test pattern (rooibos style):**
+- Phase 9: Playback foundation (completed)
+  - Video playback start/resume
+  - Progress reporting
+  - Track selection
+
+- Earlier phases: Library navigation, search, detail screens (all marked complete)
+
+**Untested areas (gaps):**
+- No unit test coverage for helpers (SafeGet, FormatTime, BuildPlexUrl, etc.)
+- No systematic test of all HTTP error codes
+- Limited edge-case testing (malformed library responses, extreme pagination, etc.)
+- No performance testing (memory usage, startup time, grid rendering speed)
+
+## Integration Points Tested (Manual)
+
+**Plex API:**
+- PIN authentication via plex.tv
+- Server discovery (resources endpoint)
+- Library browsing with pagination
+- Metadata fetch (detail screens)
+- Playback progress reporting
+- Search queries
+
+**Local Storage:**
+- Registry save/load (auth tokens, pinned libraries, user settings)
+- Persistent state across app restart
+
+**SceneGraph Components:**
+- Field observer callbacks (tested via screen transitions)
+- Focus management (tested via remote navigation)
+- Key event routing (tested via back/play/pause buttons)
+
+## Common Testing (Manual) Patterns
+
+**Observable/Event Testing:**
+
 ```brightscript
-'@describe SafeGet utility
-'@it returns default when obj is invalid
-function test_SafeGet_invalid_obj()
-    result = SafeGet(invalid, "field", "default")
-    m.assertEqual(result, "default")
-end function
+' Set up observer for state change
+task.observeField("status", "onTaskStateChange")
 
-'@it returns field value when present
-function test_SafeGet_valid_field()
-    obj = { name: "test" }
-    result = SafeGet(obj, "name", "default")
-    m.assertEqual(result, "test")
-end function
+' Trigger task (manual test watches Roku screen for result)
+task.control = "run"
 
-'@it returns default when field missing
-function test_SafeGet_missing_field()
-    obj = { name: "test" }
-    result = SafeGet(obj, "missing", "fallback")
-    m.assertEqual(result, "fallback")
-end function
+' Handler checks state
+sub onTaskStateChange(event as Object)
+    state = event.getData()
+    if state = "completed"
+        ' Verify response displayed correctly
+        ' (manual UAT: did the grid populate? are posters visible?)
+    end if
+end sub
 ```
 
-**Example for FormatTime:**
-```brightscript
-'@describe FormatTime
-'@it formats milliseconds to MM:SS
-function test_FormatTime_minutes()
-    result = FormatTime(125000)
-    m.assertEqual(result, "2:05")
-end function
+**Focus Testing (Manual):**
 
-'@it formats milliseconds to HH:MM:SS when over an hour
-function test_FormatTime_hours()
-    result = FormatTime(3725000)
-    m.assertEqual(result, "1:02:05")
-end function
+```brightscript
+' Code ensures focus is set on component receives focus
+sub onFocusChange(event as Object)
+    if m.top.isInFocusChain() and m.top.focusedChild = invalid
+        m.grid.setFocus(true)
+    end if
+end sub
+
+' Manual test: press Up/Down/Left/Right, verify grid scrolls
+' Manual test: press Back, verify focus returns to previous screen
 ```
 
-## Manual Testing
+**Error Recovery Testing (Manual):**
 
-**Current testing approach is entirely manual:**
+From MainScene:
+```brightscript
+' Test: Server goes offline during playback
+' Expected: onServerUnreachable triggered
+' Manual verify: Dialog appears with "Try Again" / "Server List"
 
-1. Side-load to Roku device in developer mode:
+sub onServerUnreachable(event as Object)
+    if event.getData() <> true then return
+    m.global.serverUnreachable = false  ' Reset flag
+    testServerConnectivity()  ' Silent test
+end sub
+
+' Manual test: Click "Try Again"
+' Expected: Reconnect attempt shown
+' Manual test: Click "Server List"
+' Expected: Navigate to server selection screen
+```
+
+## UAT Report Structure
+
+**Phase UAT documents (at `.planning/phases/*/UAT.md`):**
+- Test environment (Roku model, firmware version, network)
+- Test matrix (features/scenarios tested)
+- Pass/Fail status per scenario
+- Issues found (bugs, crashes, UX problems)
+- Recommendations (priority fixes)
+
+**Example from memory (Phase 10 - User Switching):**
+```
+Tested:
+✓ User picker displays all users
+✓ PIN entry for managed user
+✓ Token storage per user
+✓ Auth flow on user switch
+✓ Sidebar refreshes after switch
+
+Issues:
+✗ Focus not restored after user switch (FIXED)
+✗ Home screen crashes on 401 after expired token (FIXED)
+```
+
+## Best Practices for Adding Tests (Manual)
+
+**If adding new features:**
+
+1. **Build and deploy to device:**
    ```bash
-   cd SimPlex && zip -r ../SimPlex.zip manifest source components images
-   # Upload to http://{roku-ip}:8060
+   npm run build && npm run deploy
    ```
 
-2. Use Roku developer console for debug output:
-   - `telnet {roku-ip} 8085` for BrightScript debug console
-   - `print` statements (via `LogEvent`/`LogError`) visible in console
+2. **Manual test on Roku:**
+   - Navigate to new feature
+   - Verify normal case works
+   - Try error case (server offline, malformed data, timeout)
+   - Check UI displays correctly (no cutoff, correct colors, proper focus)
 
-3. No CI/CD pipeline exists - no automated build or test steps
+3. **Document in phase UAT:**
+   - Add scenario to `.planning/phases/XX-PHASE-NAME/UAT.md`
+   - Record pass/fail
+   - Note any issues discovered
+
+4. **Fix and re-test:**
+   - Make code change
+   - Rebuild and redeploy
+   - Re-verify on device
+
+## Diagnostics
+
+**Logging for debugging:**
+
+Use `LogEvent()` and `LogError()` to track execution:
+
+```brightscript
+' In task node:
+LogEvent("API request: GET /library/sections")
+m.top.status = "loading"
+' ... make request ...
+LogEvent("API complete: /library/sections")
+m.top.status = "completed"
+
+' In screen:
+LogEvent("HomeScreen init: finding nodes")
+LogEvent("HomeScreen init: setting up observers")
+```
+
+**View Roku logs:**
+- Connect Roku to network
+- SSH into device or use Roku IDE
+- Tail telnet output to see print() statements (which LogEvent/LogError emit)
+
+**Build validation without deploy:**
+```bash
+npm run lint              # Syntax/type check only, no device needed
+```
 
 ---
 
-*Testing analysis: 2026-03-08*
+*Testing analysis: 2026-03-13*

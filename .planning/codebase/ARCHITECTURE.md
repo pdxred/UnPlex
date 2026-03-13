@@ -1,195 +1,242 @@
 # Architecture
 
-**Analysis Date:** 2026-03-08
+**Analysis Date:** 2026-03-13
 
 ## Pattern Overview
 
-**Overall:** Component-based MVC with Observer Pattern and Background Task Threading
+**Overall:** SceneGraph Component-Based Architecture with Task-Driven Async Communication
 
 **Key Characteristics:**
-- Roku SceneGraph component model: each UI element is an XML layout + BrightScript logic pair
-- Strict render-thread / task-thread separation: all HTTP I/O runs in Task nodes
-- Observer-based communication between layers (field observers replace callbacks/events)
-- Screen stack navigation managed by a central scene controller (`MainScene`)
-- Shared utility functions injected via `<script>` includes (no module system)
+- **Component-based UI**: Each screen and widget is a SceneGraph component (XML interface + BrightScript logic)
+- **Task-driven architecture**: All HTTP requests run in separate Task nodes (background threads) - never on render thread
+- **Observer pattern**: Field observers enable loose coupling between components and background tasks
+- **Screen stack management**: MainScene manages a navigation stack of Screen components with focus preservation
+- **Global state propagation**: `m.global` node disseminates authentication, server connectivity, and data updates across the app
+- **Data transformation layer**: Normalizers convert Plex API JSON responses into ContentNode trees for UI binding
 
 ## Layers
 
-**Entry Point (Bootstrap):**
-- Purpose: Create the SceneGraph screen, wire the message loop, pass launch args
-- Location: `SimPlex/source/main.brs`
-- Contains: `Main()` subroutine, message port loop, screen close handling
-- Depends on: Roku SDK (`roSGScreen`, `roMessagePort`)
-- Used by: Roku runtime (called on channel launch)
-
-**Scene Controller (Navigation & Routing):**
-- Purpose: Manage screen lifecycle, screen stack, navigation, auth routing
-- Location: `SimPlex/components/MainScene.brs`, `SimPlex/components/MainScene.xml`
-- Contains: Screen factory methods (`showHomeScreen`, `showDetailScreen`, etc.), push/pop stack, `onItemSelected` router, auth flow orchestration, exit dialog
-- Depends on: All screen components, `utils.brs`, `constants.brs`, `logger.brs`
-- Used by: `main.brs` (creates the scene), screens (via `itemSelected`/`navigateBack` fields)
-
-**Screens (Views):**
-- Purpose: Full-screen UI views, each responsible for one user-facing feature
+**Presentation Layer (Screens):**
+- Purpose: Full-screen views that manage complex user interactions and coordinate multiple widgets
 - Location: `SimPlex/components/screens/`
-- Contains:
-  - `HomeScreen` - Library browsing with sidebar + poster grid + filter bar
-  - `DetailScreen` - Item metadata display, play/resume/mark-watched actions
-  - `EpisodeScreen` - Season/episode browser for TV shows
-  - `SearchScreen` - Keyboard input with debounced search results
-  - `PINScreen` - plex.tv PIN-based authentication flow
-  - `ServerListScreen` - Server selection after authentication
-  - `SettingsScreen` - Switch server, sign out
-- Depends on: Widget components, Task nodes, `utils.brs`, `constants.brs`
-- Used by: `MainScene` (creates and pushes onto screen stack)
+- Contains: Screen components (HomeScreen, DetailScreen, SearchScreen, etc.) that extend `Group` or `Scene`
+- Depends on: Utility functions, constants, Task nodes for API calls, child widgets
+- Used by: MainScene via screen stack management
 
-**Widgets (Reusable UI Components):**
-- Purpose: Shared UI building blocks composed into screens
+**Widget Layer (Reusable Components):**
+- Purpose: Reusable UI components for grids, sidebars, dialogs, and media controls
 - Location: `SimPlex/components/widgets/`
-- Contains:
-  - `Sidebar` - Library navigation list with hubs and settings links
-  - `PosterGrid` - Paginated grid of poster items with infinite scroll
-  - `PosterGridItem` - Individual poster cell renderer
-  - `EpisodeItem` - Episode list item renderer
-  - `FilterBar` - Library filter controls
-  - `LoadingSpinner` - Loading indicator
-  - `VideoPlayer` - Playback with direct play/transcode, progress reporting, scrobble
-  - `MediaRow` - Horizontal media row
-  - `KeyboardDialog` - Text input dialog
-- Depends on: `constants.brs`, `utils.brs`
-- Used by: Screen components
+- Contains: Focused components like PosterGrid, Sidebar, VideoPlayer, FilterBar, TrackSelectionPanel
+- Depends on: Constants for styling, parent screen logic via field observers
+- Used by: Screens that compose multiple widgets for complex UIs
 
-**Tasks (Background I/O):**
-- Purpose: Run HTTP requests off the render thread to avoid rendezvous crashes
+**Task Layer (Background Threading):**
+- Purpose: Isolated HTTP request handling to prevent render thread blocking
 - Location: `SimPlex/components/tasks/`
-- Contains:
-  - `PlexApiTask` - General-purpose PMS REST client (GET/POST, auth headers, JSON parse, 401 handling)
-  - `PlexAuthTask` - plex.tv PIN auth flow (request PIN, poll, fetch resources/servers)
-  - `PlexSearchTask` - Search endpoint with URL encoding
-  - `PlexSessionTask` - Playback timeline/progress reporting (PUT via POST + method override)
-  - `ServerConnectionTask` - Test server connections (local -> remote -> relay priority)
-  - `ImageCacheTask` - Prefetch poster images to warm Roku's image cache
-- Depends on: `utils.brs`, `constants.brs`, `logger.brs`
-- Used by: Screens and widgets (created via `CreateObject("roSGNode", "TaskName")`)
+- Contains: Task nodes (PlexApiTask, PlexAuthTask, PlexSearchTask, PlexSessionTask, ServerConnectionTask, ImageCacheTask)
+- Depends on: Utility functions for URL building, header construction, JSON parsing
+- Used by: Screens and widgets observe task fields (endpoint, status, response) to trigger UI updates
 
-**Shared Utilities (Cross-cutting):**
-- Purpose: Helper functions available to all components via script include
+**Utilities Layer (Shared Code):**
+- Purpose: Cross-cutting functions for auth management, URL building, data transformation, logging
 - Location: `SimPlex/source/`
 - Contains:
-  - `utils.brs` - Auth token CRUD, Plex header construction, URL building, time formatting, `SafeGet`/`SafeGetMetadata` for safe property access
-  - `constants.brs` - `GetConstants()` returning colors, layout sizes, API URLs, pagination config
-  - `logger.brs` - `LogEvent()` and `LogError()` with ISO timestamps to `print`
-  - `normalizers.brs` - JSON-to-ContentNode converters (`NormalizeMovieList`, `NormalizeShowList`, `NormalizeSeasonList`, `NormalizeEpisodeList`, `NormalizeOnDeck`)
-  - `capabilities.brs` - Parse PMS version, feature flag queries (`HasCapability`, `MeetsMinVersion`)
+  - `main.brs`: Entry point, creates screen, runs event loop
+  - `utils.brs`: Auth token/server URI storage (registry), Plex header generation, URL builders, safe field access
+  - `constants.brs`: Colors, layout dimensions, API endpoints, Plex product metadata
+  - `logger.brs`: Log/LogError/LogEvent functions
+  - `normalizers.brs`: JSON-to-ContentNode transformers (movie lists, episodes, on-deck, etc.)
+  - `capabilities.brs`: Device capability detection
+- Depends on: Roku SceneGraph APIs
+- Used by: All screens, widgets, and tasks
+
+**Root Coordinator:**
+- Purpose: Screen navigation, auth flow, global state management
+- Location: `SimPlex/components/MainScene.brs`
+- Contains: Screen stack, focus management, auth check, server connection handling
+- Depends on: Utility functions, Task nodes for single-server auto-connect
+- Used by: main.brs
 
 ## Data Flow
 
-**Library Browsing (Home Screen):**
+**Authentication Flow:**
 
-1. `Sidebar` fetches `/library/sections` via `PlexApiTask`, renders library list
-2. User selects library -> `Sidebar.selectedLibrary` field fires -> `HomeScreen.onLibrarySelected()`
-3. `HomeScreen` builds paginated request (`/library/sections/{id}/all` + filters) -> sets `PlexApiTask.endpoint` + `params` -> `control = "run"`
-4. `PlexApiTask` runs on background thread: builds URL via `BuildPlexUrl()`, adds `GetPlexHeaders()`, makes async HTTP request, parses JSON
-5. Task sets `status = "completed"` -> observer fires `HomeScreen.onApiTaskStateChange()` -> `processApiResponse()`
-6. `HomeScreen` builds `ContentNode` tree from JSON metadata, sets `PosterGrid.content`
-7. `PosterGrid` renders items; on scroll near bottom, fires `loadMore` -> triggers next page fetch
+1. MainScene.init() calls `checkAuthAndRoute()` - checks stored credentials
+2. If no token/server: Show PINScreen
+3. PINScreen spawns PlexAuthTask (PIN polling) → on success, get servers from plex.tv
+4. Multiple servers: Show ServerListScreen with ServerConnectionTask validation
+5. Single server: Auto-connect with ServerConnectionTask
+6. On success: Save serverUri/authToken to registry, show HomeScreen
+7. If auth token expires (401): Global `authRequired` signal triggers PINScreen again
 
-**Authentication:**
+**Screen Navigation:**
 
-1. `MainScene.checkAuthAndRoute()` reads registry for stored `authToken` + `serverUri`
-2. If missing: `showPINScreen()` -> `PINScreen` creates `PlexAuthTask` with action `"requestPin"`
-3. `PlexAuthTask` POSTs to `plex.tv/api/v2/pins` -> returns PIN code + ID
-4. `PINScreen` displays code, starts 2-second poll timer -> each tick runs `PlexAuthTask` with action `"checkPin"`
-5. When user authorizes at plex.tv/link: `authToken` appears in poll response -> stored via `SetAuthToken()`
-6. `PlexAuthTask` action `"fetchResources"` -> fetches server list from `plex.tv/api/v2/resources`
-7. If multiple servers: `MainScene` shows `ServerListScreen`; if single: auto-connects via `ServerConnectionTask`
-8. `ServerConnectionTask` tests connections in priority order (local -> remote -> relay) with timeouts
-9. Successful URI stored via `SetServerUri()` -> `MainScene.showHomeScreen()`
+1. Screens push/pop from MainScene.screenStack array
+2. Each screen maintains its UI state and component references
+3. Back button pops current screen, restores focus to previous screen's saved focus position
+4. DetailScreen → play → VideoPlayer modal overlay
+5. HomeScreen → sidebar "Collections" → show collection grid in same screen
 
-**Playback:**
+**Data Fetch Pattern (HomeScreen Library Browsing):**
 
-1. User selects item in grid -> `HomeScreen.onGridItemSelected()` fires `itemSelected` with `action: "detail"`
-2. `MainScene.onItemSelected()` routes to `showDetailScreen(ratingKey, itemType)`
-3. `DetailScreen` fetches `/library/metadata/{ratingKey}` via `PlexApiTask`
-4. User presses Play -> `DetailScreen.startPlayback()` creates `VideoPlayer` widget, appends to scene
-5. `VideoPlayer.loadMedia()` fetches media metadata -> `processMediaInfo()` checks codec support via `checkDirectPlay()`
-6. Direct play: builds URL from `part.key` + token; Transcode: builds HLS URL via `buildTranscodeUrl()`
-7. Sets `roVideo.content` ContentNode with URL + streamFormat -> `control = "play"`
-8. `PlexSessionTask` reports progress every 10 seconds via PUT to `/:/timeline`
-9. On finish: `scrobble()` marks watched, fires `playbackComplete` -> parent removes player
+1. User selects library from Sidebar → `onLibrarySelected()` event
+2. Screen creates PlexApiTask with endpoint="/library/sections/{id}/all", params={start: 0, size: 50}
+3. Task.control="run" → task runs async in background
+4. Task observes "status" field → "loading", "success", "error"
+5. On "success": Task has response field with raw JSON
+6. Screen calls normalizer (e.g., `NormalizeMovieList(rawJson)`) → ContentNode tree
+7. Bind ContentNode to PosterGrid.content
+8. PosterGrid displays items
+9. User scrolls → onLoadMore event → fetch next 50 items
+10. Paginate with X-Plex-Container-Start and X-Plex-Container-Size headers
+
+**Watch State Update Propagation:**
+
+1. DetailScreen plays video, reports progress via PlexSessionTask
+2. When user marks watched/unwatched: PlexApiTask scrobble/unscrobble endpoint
+3. DetailScreen posts `m.global.watchStateUpdate = { ratingKey, watched, viewOffset }`
+4. HomeScreen and EpisodeScreen observe watchStateUpdate
+5. Screens update poster badge nodes in-place (visual feedback immediately)
+6. No need to re-fetch entire grid
+
+**Server Reconnection:**
+
+1. Any task gets 401 or connection error
+2. Task posts `m.global.authRequired = true`
+3. MainScene observes → shows PINScreen
+4. OR task posts `m.global.serverUnreachable = true`
+5. MainScene observes → screens can show retry buttons
+6. User fixes server, global `serverReconnected = true` triggers refresh
 
 **State Management:**
-- Persistent state: `roRegistrySection("SimPlex")` stores `authToken`, `serverUri`, `serverClientId`, `deviceId`
-- Session state: Component-scoped `m.*` variables (e.g., `m.screenStack`, `m.currentSectionId`, `m.isLoading`)
-- Global state: `m.global` node fields for `authRequired` signal (cross-component 401 handling)
-- UI state: ContentNode trees bound to grid/list components
+
+- **Registry persistence**: Auth tokens, server URI, user name, pinned libraries stored in `roRegistrySection("SimPlex")`
+- **Global node fields**: Auth state, server reachability, data update signals (watch state, hub refresh, sidebar refresh)
+- **Screen-local state**: Each screen maintains its own state for current library, filters, sort, focus position, scroll offset
+- **Widget-local state**: PosterGrid tracks selection, FilterBar tracks applied filters, Sidebar tracks pinned libraries
 
 ## Key Abstractions
 
-**Screen Stack:**
-- Purpose: Manage navigation history with focus preservation
-- Implementation: `m.screenStack` (array) + `m.focusStack` (array) in `SimPlex/components/MainScene.brs`
-- Pattern: `pushScreen()` hides current, appends new, saves deep-focused child; `popScreen()` removes current, restores previous visibility and focus
-- All screens share interface fields: `itemSelected` (assocarray, alwaysNotify) and `navigateBack` (boolean, alwaysNotify)
-
 **Task Node Pattern:**
-- Purpose: Background HTTP execution with status-based observer communication
-- Examples: `SimPlex/components/tasks/PlexApiTask.xml`, `SimPlex/components/tasks/PlexSearchTask.xml`
-- Pattern: Set input fields (`endpoint`, `params`) -> set `control = "run"` -> observe `status` field for `"completed"` / `"error"` -> read `response` / `error` fields
+- Purpose: Encapsulate async HTTP logic away from render thread
+- Examples: `PlexApiTask.brs`, `PlexAuthTask.brs`, `PlexSessionTask.brs`
+- Pattern: Task reads input fields (endpoint, params, body), sets status field to "loading", makes HTTP request, sets response/error fields, sets status to "success"/"error". Caller observes status field to react.
+
+**Normalizer Functions:**
+- Purpose: Transform Plex API response JSON into SceneGraph ContentNode trees for UI binding
+- Examples: `NormalizeMovieList()`, `NormalizeEpisodeList()`, `NormalizeOnDeck()`
+- Pattern: Accept raw JSON array from API response, iterate items, create ContentNode children with standardized field names (id, title, posterUrl, itemType, watched, etc.), return root ContentNode
 
 **ContentNode Trees:**
-- Purpose: Data binding between API responses and SceneGraph list/grid components
-- Examples: Used in `SimPlex/components/screens/HomeScreen.brs` (processApiResponse), `SimPlex/source/normalizers.brs`
-- Pattern: Create root `ContentNode`, add children with `addFields({...})`, assign to component's `.content` field
+- Purpose: Hierarchical data binding for grids and lists
+- Used by: PosterGrid (content field), RowList (content field for hub rows)
+- Pattern: Each node has children nodes; PosterGrid iterates children and binds to individual PosterGridItem components
 
-**Safe Property Access:**
-- Purpose: Prevent crashes from malformed/partial API responses
-- Implementation: `SafeGet(obj, field, default)` and `SafeGetMetadata(response)` in `SimPlex/source/utils.brs`
-- Pattern: All API response access uses `SafeGet()` for null-safe property reads
+**Observer Pattern:**
+- Purpose: Decouple async operations from UI updates
+- Pattern: Screen creates task, calls `task.observeField("status", "onTaskStatusChange")`, sets task.control="run"; callback invoked when field changes
+- Example: `m.posterGrid.observeField("itemSelected", "onGridItemSelected")` triggers navigation to DetailScreen
+
+**Registry Wrapper Functions:**
+- Purpose: Abstract `roRegistrySection` access for auth and config persistence
+- Examples: `GetAuthToken()`, `SetAuthToken()`, `GetPinnedLibraries()`, `SetPinnedLibraries()`
+- Pattern: Functions use `CreateObject("roRegistrySection", "SimPlex")`, Read/Write/Delete, Flush()
+
+**Safe Field Access:**
+- Purpose: Prevent crashes on malformed Plex API responses (missing fields, null values)
+- Functions: `SafeGet(obj, field, default)`, `SafeGetMetadata(response)`
+- Pattern: Check if object is valid, check if field exists, return default if missing
 
 ## Entry Points
 
-**Application Launch:**
-- Location: `SimPlex/source/main.brs` -> `Main(args)`
-- Triggers: Roku runtime launches channel
-- Responsibilities: Create `roSGScreen`, instantiate `MainScene`, pass deep-link args, run message loop
+**Application Entry Point:**
+- Location: `SimPlex/source/main.brs`
+- Triggers: User launches SimPlex from Roku home
+- Responsibilities:
+  1. Create roSGScreen and message port
+  2. Create MainScene component
+  3. Pass launch args (deep-linking support)
+  4. Observe MainScene.close field
+  5. Enter event loop: wait for screen close or node events
 
-**Scene Initialization:**
-- Location: `SimPlex/components/MainScene.brs` -> `init()`
-- Triggers: `screen.CreateScene("MainScene")` in `main.brs`
-- Responsibilities: Set up global fields, check auth, route to PIN screen or home screen
+**Authentication Entry Point:**
+- Location: `SimPlex/components/MainScene.brs`, `checkAuthAndRoute()` function
+- Triggers: App launch or auth token expiration (401 response)
+- Responsibilities:
+  1. Check stored auth token and server URI
+  2. If missing: Show PINScreen
+  3. If present: Validate server is reachable (ServerConnectionTask)
+  4. On success: Navigate to HomeScreen
 
-**Navigation Router:**
-- Location: `SimPlex/components/MainScene.brs` -> `onItemSelected(event)`
-- Triggers: Any screen setting its `itemSelected` field
-- Responsibilities: Parse action type and route to appropriate `show*Screen()` method
+**Navigation Entry Point:**
+- Location: `SimPlex/components/MainScene.brs`, screen manager functions (`showHomeScreen()`, `showDetailScreen()`, etc.)
+- Triggers: User navigates between screens (sidebar selection, grid item selection, back button)
+- Responsibilities:
+  1. Create screen component node with initial data (ratingKey, itemType, etc.)
+  2. Attach field observers to screen for child events (itemSelected, navigateBack, authRequired)
+  3. Push screen to stack, set MainScene.currentScreen for debugging
+  4. Set initial focus if needed
 
-**Remote Key Handler:**
-- Location: `onKeyEvent(key, press)` function in every screen and widget `.brs` file
-- Triggers: Roku remote button presses (propagates through focus chain)
-- Responsibilities: Handle navigation (back), focus movement (left/right/up/down), playback controls
+**Widget Entry Points:**
+- Sidebar.init(): Loads library list, builds nav content, sets up selection observers
+- PosterGrid.init(): Sets up grid rendering and selection observers
+- VideoPlayer.init(): Initializes video node, session tracking, playback controls
+- FilterBar.init(): Builds filter options, sets up filter change observers
 
 ## Error Handling
 
-**Strategy:** Defensive checks with user-facing error dialogs and structured logging
+**Strategy:** Defensive response handling at task level, global state signaling for auth/connection errors, inline retry buttons
 
 **Patterns:**
-- **401 Unauthorized Global Handler:** `PlexApiTask` detects 401 responses -> clears stored token -> sets `m.global.authRequired = true` -> `MainScene` observes this and routes to `PINScreen` (`SimPlex/components/tasks/PlexApiTask.brs` lines 98-108, `SimPlex/components/MainScene.brs` lines 129-139)
-- **Task Error Status:** All tasks set `status = "error"` and populate `error` field with descriptive message; screens observe status and show `StandardMessageDialog`
-- **Safe Property Access:** `SafeGet()` prevents `invalid` crashes from missing JSON fields (`SimPlex/source/utils.brs` lines 113-118)
-- **Error Dialogs:** Standard pattern using `CreateObject("roSGNode", "StandardMessageDialog")` with title, message array, and OK button
-- **Request Timeouts:** `PlexApiTask` uses 30-second timeout; `ServerConnectionTask` uses 3-second (local) / 5-second (remote) timeouts
+
+**HTTP Error Responses:**
+- Task checks HTTP response code
+- 401 (Unauthorized): Post `m.global.authRequired = true` → MainScene shows PINScreen
+- 5xx or connection timeout: Post task.error with message, set status to "error"
+- Empty 200 response: Task treats as success and returns `{}`
+
+**Malformed API Response:**
+- `SafeGet()` used throughout to prevent crashes on missing fields
+- `SafeGetMetadata()` safely accesses nested MediaContainer.Metadata structure
+- Normalizers handle invalid input arrays, return empty ContentNode
+
+**UI-Level Error Handling:**
+- Screens observe task.status field: "loading", "success", "error"
+- On error: Show inline error message or retry button
+- HomeScreen has retry button for failed library loads
+- SettingsScreen has retry for failed user switch
+
+**Server Unreachability:**
+- Tasks catch connection errors, post `m.global.serverUnreachable = true`
+- MainScene observes, can trigger reconnect workflow
+- Screens can show "Checking server..." spinner during reconnect
 
 ## Cross-Cutting Concerns
 
-**Logging:** `LogEvent()` and `LogError()` in `SimPlex/source/logger.brs` -> prints to Roku debug console with ISO 8601 timestamps. Two levels only: EVENT (milestones) and ERROR (problems). Included in all tasks and screens via `<script>` tag.
+**Logging:**
+- Framework: `roDeviceInfo().PrintDebugMessage()` via console; print statements visible in Roku telnet debug
+- Patterns: `LogEvent()` for key milestones (auth success, screen push, API calls), `LogError()` for failures
+- Files affected: `SimPlex/source/logger.brs`
+- Usage: All screens and tasks call LogEvent/LogError to trace execution
 
-**Validation:** Defensive null checks throughout. `SafeGet()` for all associative array access from API responses. Type-checking for `ratingKey` (can be string or integer from Plex API) occurs in multiple screens.
+**Validation:**
+- No explicit input validation layer; Plex API responses are trusted
+- Safe field access (`SafeGet()`) prevents crashes on unexpected response structure
+- ItemType validation occurs in normalizers (movie/show/episode/etc.)
+- Playback transcode validation in VideoPlayer (direct play vs. transcode mode)
 
-**Authentication:** Centralized in `SimPlex/source/utils.brs` (`GetAuthToken`, `SetAuthToken`, `GetServerUri`, `SetServerUri`, `ClearAuthData`). All API requests include `X-Plex-Token` and standard `X-Plex-*` headers via `GetPlexHeaders()`. Global 401 observer pattern enables any task to trigger re-authentication.
+**Authentication:**
+- Tokens stored in registry (persistent across app restarts)
+- Every Plex API request includes `X-Plex-Token` header via `GetPlexHeaders()`
+- 401 response triggers re-authentication (PINScreen)
+- Admin token stored separately from user token (supports user switching)
 
-**Persistence:** `roRegistrySection("SimPlex")` with explicit `.Flush()` after every write. Keys: `authToken`, `serverUri`, `serverClientId`, `deviceId`.
+**Configuration:**
+- Layout constants cached in `m.global.constants` for all components
+- Plex product metadata (PLEX_PRODUCT, PLEX_VERSION, PLEX_PLATFORM) in constants
+- Device info (model, OS version, friendly name) retrieved at header-building time
+- No external config files; all settings in manifest and registry
 
 ---
 
-*Architecture analysis: 2026-03-08*
+*Architecture analysis: 2026-03-13*

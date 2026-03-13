@@ -1,195 +1,414 @@
 # Codebase Concerns
 
-**Analysis Date:** 2026-03-08
+**Analysis Date:** 2026-03-13
 
-## Tech Debt
+## Critical Issues
 
-**Incomplete rename from PlexClassic to SimPlex:**
-- Issue: The project was renamed from "PlexClassic" to "SimPlex" but several references to the old name remain scattered through the codebase.
-- Files:
-  - `SimPlex/components/MainScene.brs` (line 296): Exit dialog says `"Exit PlexClassic?"`
-  - `SimPlex/components/widgets/Sidebar.xml` (line 17): Header text reads `"PlexClassic"`
-  - `SimPlex/components/screens/SettingsScreen.brs` (line 85): Uses `roRegistrySection("PlexClassic")` instead of `"SimPlex"`
-  - `SimPlex/images/README.txt` (line 1): Says `"PlexClassic Image Assets"`
-- Impact: The SettingsScreen bug is critical -- it reads/writes to the wrong registry section (`"PlexClassic"`) while all other code uses `"SimPlex"`. This means the SettingsScreen `signOut()` function deletes credentials from the wrong registry section, so signing out from Settings does NOT actually clear the real auth data. The user appears signed out but the app will still use the old credentials on next launch.
-- Fix approach: Global find-and-replace of `PlexClassic` with `SimPlex`. The registry section mismatch in `SettingsScreen.brs` is the highest priority fix.
+### SIGSEGV Firmware Crash on HomeScreen Init
 
-**Duplicated ratingKey type-coercion logic:**
-- Issue: The pattern for ensuring `ratingKey` is a string (checking type, calling `.ToStr()`) is copy-pasted verbatim in at least 5 locations.
-- Files:
-  - `SimPlex/components/screens/HomeScreen.brs` (lines 158-165)
-  - `SimPlex/components/screens/EpisodeScreen.brs` (lines 136-143, 105-112, 188-195, 241-248)
-  - `SimPlex/components/screens/SearchScreen.brs` (lines 104-111)
-  - `SimPlex/components/screens/DetailScreen.brs` (lines 255-262, has its own `getRatingKeyString()` function)
-- Impact: Code duplication increases maintenance burden. `DetailScreen.brs` already extracted a `getRatingKeyString()` helper, but it is not shared with other screens.
-- Fix approach: Move `getRatingKeyString()` to `SimPlex/source/utils.brs` as a shared utility and replace all inline occurrences.
+**Issue:** HomeScreen causes native firmware crash (signal 11) when sideloaded to Roku device. Not a BrightScript error but a native Roku OS crash.
 
-**Unused normalizers module:**
-- Issue: `SimPlex/source/normalizers.brs` defines `NormalizeMovieList()`, `NormalizeShowList()`, `NormalizeSeasonList()`, `NormalizeEpisodeList()`, and `NormalizeOnDeck()` functions, but none of these are called anywhere in the codebase. Each screen manually creates ContentNode trees from raw JSON instead.
-- Files: `SimPlex/source/normalizers.brs` (131 lines)
-- Impact: Dead code that creates confusion about the intended architecture. The normalizers use `SafeGet()` for robust field access, but the screen implementations inline their own field-checking logic instead.
-- Fix approach: Either adopt normalizers in all screens (replacing manual ContentNode construction in `HomeScreen.brs`, `EpisodeScreen.brs`, `SearchScreen.brs`) or delete the file. Adopting normalizers would also fix the duplicated ratingKey coercion issue.
+**Files:** `SimPlex/components/screens/HomeScreen.brs`, `SimPlex/components/screens/HomeScreen.xml`, `SimPlex/components/screens/DetailScreen.brs`
 
-**Capabilities module parsed but never queried at runtime:**
-- Issue: `SimPlex/source/capabilities.brs` provides `ParseServerCapabilities()` and `HasCapability()` functions, but no code ever calls them. Server capabilities are never fetched or stored.
-- Files: `SimPlex/source/capabilities.brs` (97 lines)
-- Impact: Features like intro/credits skip markers cannot be conditionally shown or hidden. The capability infrastructure exists but is not wired up.
-- Fix approach: Fetch server capabilities during `ServerConnectionTask` connection flow and store in `m.global`. Use `HasCapability()` checks in `VideoPlayer.brs` to show skip buttons when supported.
+**Root Cause:** Bisection identified that `LoadingSpinner` component with `BusySpinner` widget is the culprit. Additionally, a `visible` field in LoadingSpinner, FilterBottomSheet, and TrackSelectionPanel interfaces shadowed the built-in Node.visible property causing field conflicts.
 
-**Repeated `showError()` function across screens:**
-- Issue: An identical `showError()` function is defined in 5 different screen files. Each creates a `StandardMessageDialog` with the same pattern.
-- Files:
-  - `SimPlex/components/screens/HomeScreen.brs` (lines 216-222)
-  - `SimPlex/components/screens/DetailScreen.brs` (lines 272-278)
-  - `SimPlex/components/screens/EpisodeScreen.brs` (lines 253-259)
-  - `SimPlex/components/screens/SearchScreen.brs` (lines 152-158)
-  - `SimPlex/components/widgets/VideoPlayer.brs` (lines 259-265)
-- Impact: Minor -- code duplication but functionally correct.
-- Fix approach: Extract to `SimPlex/source/utils.brs` or create a shared dialog utility component.
+**Current Mitigation:**
+- LoadingSpinner removed from HomeScreen (line 7: `m.loadingSpinner = invalid`)
+- DetailScreen has same mitigation (line 10)
+- BusySpinner references renamed to `showSpinner`, `showSheet`, `showPanel` in all 7 screen files (37 total references updated)
+- HomeScreen.brs and HomeScreen.xml in diagnostic state with `.bak` backup files saved
 
-**`GetConstants()` creates a new associative array on every call:**
-- Issue: `GetConstants()` in `SimPlex/source/constants.brs` allocates a new `roAssociativeArray` every time it is called. It is called frequently (every screen init, every key event in VideoPlayer, every poster URL build, etc.).
-- Files: `SimPlex/source/constants.brs`
-- Impact: Minor memory churn. On low-end Roku devices this adds unnecessary garbage collection pressure.
-- Fix approach: Cache the constants object in `m.global` during app init, or use a module-scoped variable pattern.
+**Scaling Impact:** Blocks full HomeScreen functionality and hub row rendering until resolved
 
-## Known Bugs
-
-**SettingsScreen signOut uses wrong registry section:**
-- Symptoms: Signing out from the Settings screen does not actually clear authentication. On next launch, the app reconnects with old credentials.
-- Files: `SimPlex/components/screens/SettingsScreen.brs` (line 85)
-- Trigger: Navigate to Settings > Sign Out.
-- Workaround: The `ClearAuthData()` function in `SimPlex/source/utils.brs` (line 40) uses the correct `"SimPlex"` section. The `signOut()` in `MainScene.brs` (line 150) calls `ClearAuthData()` correctly via the `showSignOut` field.
-- Fix: Replace `CreateObject("roRegistrySection", "PlexClassic")` with `ClearAuthData()` call in `SettingsScreen.brs`.
-
-**SettingsScreen server connection test callback never fires:**
-- Symptoms: When discovering servers from SettingsScreen, the connection test result handler `onConnectionTestComplete()` is defined (line 220) but never wired up as an observer. After the API task completes, `onApiTaskStateChange()` fires but does not route to `onConnectionTestComplete()`.
-- Files: `SimPlex/components/screens/SettingsScreen.brs` (lines 192-233)
-- Trigger: Settings > Switch Server, then select a server with multiple connections.
-- Workaround: None -- server switching from Settings is likely broken.
-- Fix: The `onApiTaskStateChange()` handler needs to differentiate between server discovery responses and connection test responses (using a flag or separate task), and call `onConnectionTestComplete()` accordingly.
-
-**VideoPlayer `errorMsg` field may not exist:**
-- Symptoms: Potential crash when a video playback error occurs. Line 212 accesses `m.video.errorMsg` but the Roku `Video` node's error information is in `errorCode` and `errorStr`, not `errorMsg`.
-- Files: `SimPlex/components/widgets/VideoPlayer.brs` (line 212)
-- Trigger: Any video playback error (network timeout, unsupported codec, etc.).
-- Workaround: None.
-- Fix: Replace `m.video.errorMsg` with `m.video.errorStr` or a concatenation of `m.video.errorCode.ToStr() + ": " + m.video.errorStr`.
-
-**PlexSearchTask and PlexAuthTask.checkPin use synchronous HTTP:**
-- Symptoms: If the PMS or plex.tv is slow to respond, the task thread blocks with no timeout control for `GetToString()`.
-- Files:
-  - `SimPlex/components/tasks/PlexSearchTask.brs` (line 33): `url.GetToString()`
-  - `SimPlex/components/tasks/PlexAuthTask.brs` (line 100): `url.GetToString()` in `checkPin()`
-  - `SimPlex/components/tasks/PlexAuthTask.brs` (line 154): `url.GetToString()` in `fetchResources()`
-- Trigger: Slow network or unresponsive server.
-- Workaround: Task threads do not block the render thread, but the task cannot be cancelled while waiting.
-- Fix: Use `AsyncGetToString()` with `wait(timeout, port)` pattern as done in `PlexApiTask.brs` (line 77-89).
-
-## Security Considerations
-
-**Auth token passed in URL query parameters:**
-- Risk: The Plex auth token is appended to URLs as `X-Plex-Token={token}` query parameter. This means tokens appear in server access logs and could be leaked through referrer headers or cached URL strings.
-- Files:
-  - `SimPlex/source/utils.brs` (line 71): `BuildPlexUrl()` appends token to URL
-  - `SimPlex/components/widgets/VideoPlayer.brs` (line 192): Transcode URL includes token in query
-  - `SimPlex/components/tasks/PlexSessionTask.brs` (line 20): Timeline URL includes token in query
-- Current mitigation: This is the standard Plex API approach; all official Plex clients do this. HTTPS encrypts the full URL in transit.
-- Recommendations: Consider using `X-Plex-Token` as a header instead of a query parameter where the API supports it (all endpoints except direct media playback URLs).
-
-**No validation of server TLS certificates beyond system CA bundle:**
-- Risk: The app uses `common:/certs/ca-bundle.crt` (Roku's built-in CA bundle) which is standard practice. However, there is no certificate pinning for plex.tv connections.
-- Files: All task files that create `roUrlTransfer` objects.
-- Current mitigation: Standard TLS validation via system CA bundle.
-- Recommendations: Low priority. Certificate pinning for plex.tv would add security but is unusual for Roku apps.
-
-## Performance Bottlenecks
-
-**ImageCacheTask downloads images sequentially:**
-- Problem: The image cache task fetches all images one-by-one in a `for each` loop using synchronous `GetToString()`.
-- Files: `SimPlex/components/tasks/ImageCacheTask.brs` (lines 15-34)
-- Cause: Each image URL is fetched synchronously before moving to the next. For a page of 50 posters, this means 50 sequential HTTP requests.
-- Improvement path: Use `AsyncGetToString()` with a pool of concurrent requests (3-5 parallel downloads). Alternatively, rely on Roku's built-in image caching by setting poster URLs directly on `Poster` nodes (Roku fetches and caches images automatically).
-
-**No pagination for On Deck and Recently Added:**
-- Problem: `loadOnDeck()` and `loadRecentlyAdded()` in `HomeScreen.brs` fetch without pagination parameters, which means the server returns a default-sized result set. For large libraries this may return hundreds of items.
-- Files: `SimPlex/components/screens/HomeScreen.brs` (lines 92-114)
-- Cause: No `X-Plex-Container-Size` parameter is set for these endpoints.
-- Improvement path: Add `X-Plex-Container-Size` parameter (e.g., 50) to these requests.
-
-**Sidebar reloads libraries on every HomeScreen creation:**
-- Problem: Each time the HomeScreen is pushed onto the screen stack, the Sidebar re-fetches `/library/sections`. Library sections rarely change during a session.
-- Files: `SimPlex/components/widgets/Sidebar.brs` (line 32): `loadLibraries()` called in `init()`
-- Cause: No caching of library section data.
-- Improvement path: Store library sections in `m.global` and only refresh on explicit user action or after a timeout.
-
-## Fragile Areas
-
-**Screen stack focus restoration:**
-- Files: `SimPlex/components/MainScene.brs` (lines 229-270)
-- Why fragile: `getDeepFocusedChild()` recursively traverses the focus chain to save the deepest focused node. When a screen is popped, it restores focus to that saved node. If the saved node was removed or its parent hierarchy changed while the screen was hidden, `setFocus(true)` on the stale reference could fail silently (focus goes nowhere) or cause unexpected behavior.
-- Safe modification: Always test screen stack navigation after changing any screen's child node structure. Ensure cleanup functions remove observers before nodes are freed.
-- Test coverage: No automated tests exist.
-
-**Single shared API task per screen:**
-- Files:
-  - `SimPlex/components/screens/HomeScreen.brs` (line 14): One `m.apiTask`
-  - `SimPlex/components/screens/EpisodeScreen.brs` (line 12): One `m.apiTask` with `requestId` to multiplex
-  - `SimPlex/components/screens/SettingsScreen.brs` (lines 14-19): Two tasks but `onApiTaskStateChange` conflates server discovery and connection test responses
-- Why fragile: If a user triggers a second API request before the first completes, the task's fields (endpoint, params) are overwritten. The `m.isLoading` guard in `HomeScreen.brs` mitigates this for library loads, but rapid sidebar navigation could still cause race conditions.
-- Safe modification: Create new task instances for each request, or use a request queue pattern.
-- Test coverage: No automated tests exist.
-
-**VideoPlayer lifecycle management:**
-- Files:
-  - `SimPlex/components/screens/DetailScreen.brs` (lines 206-231)
-  - `SimPlex/components/screens/EpisodeScreen.brs` (lines 215-251)
-- Why fragile: The VideoPlayer is appended directly to the scene root (`m.top.getScene().appendChild`) rather than pushed onto the screen stack. This bypasses the screen stack's cleanup and focus management. If playback errors occur during the `removeChild` operation, or if the user navigates away while the player is initializing, `m.player` could become an orphaned node.
-- Safe modification: Consider integrating VideoPlayer into the screen stack, or ensure robust null-checking and cleanup in all error paths.
-- Test coverage: No automated tests exist.
-
-## Missing Critical Features
-
-**No auto-play next episode:**
-- Problem: After an episode finishes playing, there is no countdown or automatic transition to the next episode.
-- Files: `SimPlex/components/screens/EpisodeScreen.brs` (line 235): `' TODO: Auto-play next episode with countdown`
-- Blocks: Binge-watching workflow requires manual episode selection after each episode ends.
-
-**No subtitle selection UI:**
-- Problem: The transcode URL sets `subtitles=auto` but there is no user-facing control to select subtitle tracks or toggle subtitles on/off.
-- Files: `SimPlex/components/widgets/VideoPlayer.brs` (line 191)
-- Blocks: Users who need specific subtitle tracks or want to disable subtitles cannot do so.
-
-**No audio track selection:**
-- Problem: Multi-audio media always plays the default audio track with no way to switch.
-- Files: `SimPlex/components/widgets/VideoPlayer.brs`
-- Blocks: Users with multi-language media cannot select their preferred audio track.
-
-**No music library support:**
-- Problem: The Sidebar shows music libraries (type `"artist"`) but there is no playback or browsing UI for music content. Selecting a music library loads items into the poster grid but clicking an artist would try to show a DetailScreen, which is designed for movies/shows.
-- Files: `SimPlex/components/widgets/Sidebar.brs` (lines 90-91)
-- Blocks: Music libraries appear in the UI but are non-functional.
-
-**No error recovery or retry mechanism:**
-- Problem: When API requests fail, an error dialog is shown but there is no retry button or automatic retry logic. The user must navigate back and try again.
-- Files: All screen files that call `showError()`.
-- Blocks: Transient network errors require full re-navigation to recover.
-
-## Test Coverage Gaps
-
-**No automated tests exist:**
-- What's not tested: The entire codebase has zero automated tests. BrightScript does not have a standard testing framework, but community tools like `rooibos` exist for Roku SceneGraph testing.
-- Files: All files in `SimPlex/`
-- Risk: Any code change could introduce regressions with no automated detection. The fragile areas identified above (screen stack, focus management, API task multiplexing) are especially risky to modify without tests.
-- Priority: Medium -- manual testing on a physical Roku device is the current approach, but this is slow and error-prone for regression detection.
-
-## Dependencies at Risk
-
-**Plex API stability:**
-- Risk: The app depends on undocumented or semi-documented Plex Media Server REST API endpoints. Plex can change these APIs without notice in server updates.
-- Impact: Server updates could break library browsing, playback, or authentication.
-- Migration plan: Monitor Plex changelog for API changes. The auth flow uses the documented v2 PIN API which is more stable than the library browsing endpoints.
+**Safe Modification:**
+1. Test if issue persists with current visible field renames
+2. If LoadingSpinner still causes crash, replace with simple rotating Poster or ASCII spinner (no BusySpinner)
+3. If animations cause crash, create them dynamically at runtime instead of in XML
+4. Once crash fixed, restore HomeScreen from `.bak` files and re-add all task logic
 
 ---
 
-*Concerns audit: 2026-03-08*
+## Unsatisfied Requirements (v1.0 Milestone)
+
+### Auto-Play Next Episode Not Wired
+
+**Issue:** Auto-play countdown never triggers. EpisodeScreen and DetailScreen never set `parentRatingKey` and `grandparentRatingKey` on VideoPlayer node.
+
+**Requirements:** PLAY-12, PLAY-13
+
+**Files:** `SimPlex/components/screens/EpisodeScreen.brs` (line 465: TODO comment), `SimPlex/components/screens/DetailScreen.brs`, `SimPlex/components/widgets/VideoPlayer.brs` (line 967 checks `grandparentRatingKey`)
+
+**Evidence:** VideoPlayer.brs line 967-969 checks if `m.top.grandparentRatingKey` is empty - always true because callers never set it. Auto-play logic at VideoPlayer.brs line 965-981 unreachable.
+
+**Impact:**
+- Skip intro/credits → Auto-play next flow completely broken
+- End-of-episode flow breaks into main screen instead of starting next episode
+- Affects end-to-end flow: "Hub Row → Resume → Skip Intro → Auto-play"
+
+**Fix Approach:** Both `EpisodeScreen.startPlayback()` and `DetailScreen.startPlayback()` must set these fields before starting playback:
+```brightscript
+m.player.parentRatingKey = seasonRatingKey
+m.player.grandparentRatingKey = showRatingKey
+m.player.episodeIndex = episodeNumber
+m.player.seasonIndex = seasonNumber
+```
+
+---
+
+### Watch State Not Propagated to Parent Screens
+
+**Issue:** Marking watched/unwatched on DetailScreen doesn't propagate to parent grid/hub rows. DetailScreen has `watchStateChanged` field but parent screens never observe it.
+
+**Requirements:** PLAY-04, PLAY-05
+
+**Files:** `SimPlex/components/screens/DetailScreen.brs`, `SimPlex/components/screens/HomeScreen.brs`
+
+**Evidence:** Stale UI on back navigation - grid items still show unwatched state after marking watched on detail screen
+
+**Impact:** User confusion - watched status inconsistency until auto-refresh (2 minute timer)
+
+**Fix Approach:** HomeScreen must observe `watchStateChanged` field from child DetailScreen and update grid/hub row UI immediately on back navigation
+
+---
+
+## Orphaned Code
+
+### Unused Source Files
+
+**Files:** `SimPlex/source/normalizers.brs`, `SimPlex/source/capabilities.brs`
+
+**What's Unused:**
+- `normalizers.brs` - 5 functions (NormalizeMovieList, NormalizeShowList, NormalizeSeasonList, NormalizeEpisodeList, NormalizeOnDeck) never imported or called anywhere in codebase
+- `capabilities.brs` - 4 functions (ParseServerCapabilities, HasCapability, GetMinVersionForFeature, MeetsMinVersion) never imported or called anywhere
+
+**Risk:**
+- Dead code increases maintenance burden
+- No verification that these functions work (never executed)
+- Creates confusion about available utilities
+
+**Fix Approach:** Either integrate into active code paths or remove entirely. If server capabilities feature needed in future, rebuild rather than rely on untested code.
+
+---
+
+## UX Gaps
+
+### Collections Require Library Selection First
+
+**Issue:** Collections cannot be browsed without first selecting a library. No feedback when user clicks Collections from sidebar.
+
+**Files:** `SimPlex/components/screens/HomeScreen.brs` (line 59-60: collections view state), `SimPlex/components/widgets/Sidebar.brs`
+
+**Evidence:** Collections view requires `collectionRatingKey` to be populated first; sidebar has no "browse all collections" action, only library-specific collection browsing
+
+**Impact:** Collections appear in sidebar but aren't directly accessible - UX dead-end
+
+**Improvement Path:**
+1. Add "All Collections" action to sidebar that doesn't require library selection
+2. Load top-level collections list from `/library/collections`
+3. Show collections grid without library context
+
+---
+
+### Continue Watching Routes to Detail Instead of Direct Playback
+
+**Issue:** Continue Watching (On Deck) items route to DetailScreen instead of starting playback directly.
+
+**Files:** `SimPlex/components/screens/HomeScreen.brs` (startPlaybackFromHub flow)
+
+**Evidence:** Gap documented in v1.0 milestone audit as deliberate interim decision never revisited
+
+**Impact:** Extra click required for resume playback - friction in primary use case
+
+**Improvement Path:** Distinguish between "resume" items (go straight to playback) and "new" items (go to detail). Use `viewOffset > 0` to signal resume vs fresh start.
+
+---
+
+## Tech Debt
+
+### No Pagination Limits on Large Libraries
+
+**Issue:** While pagination headers (`X-Plex-Container-Start`, `X-Plex-Container-Size`) are implemented, there's no protection against unbounded library fetches.
+
+**Files:** `SimPlex/components/screens/HomeScreen.brs` (560-561, 790-791, 904-905), `SimPlex/components/tasks/PlexApiTask.brs`
+
+**Risk:** Users with 10,000+ item libraries could cause memory spikes or timeout on initial browse
+
+**Current Approach:** PAGE_SIZE = 50 (from constants), but no maximum total fetch or lazy-load boundary
+
+**Improvement Path:** Implement "stop loading after 5 pages" logic with "Load More" button for large libraries
+
+---
+
+### HomeScreen Complexity
+
+**Issue:** HomeScreen.brs is 1,685 lines (largest component). Contains mixed concerns: hub loading, library browsing, filter/sort logic, grid management, screen stacking.
+
+**Files:** `SimPlex/components/screens/HomeScreen.brs`
+
+**Risk:**
+- Hard to debug (bisection required 4 test iterations)
+- Single-point-of-failure for app startup
+- Difficult to test individual features in isolation
+
+**Fragile Areas:**
+- Hub refresh timer lifecycle (line 87-91)
+- Focus delegation chain (multiple screens, sidebar, filters)
+- Filter bottom sheet creation on-demand
+
+**Safe Modification Path:**
+1. Extract hub-specific logic to HubScreenState module
+2. Extract filter/sort logic to FilterScreenState module
+3. Keep HomeScreen as orchestrator only
+4. Add comprehensive logging at state transition boundaries
+
+---
+
+### VideoPlayer Complexity
+
+**Issue:** VideoPlayer.brs is 1,365 lines. Contains playback, seeking, track selection, intro/credits skip, auto-play, transcoding, and session reporting logic.
+
+**Files:** `SimPlex/components/widgets/VideoPlayer.brs`
+
+**Risk:** Same as HomeScreen - high complexity makes bugs hard to isolate
+
+**Fragile Areas:**
+- Transcode pivot logic (isTranscodePivotInProgress state machine)
+- Auto-play countdown timer and rounding (multiple timer interactions)
+- Skip button appearance/focus during playback
+- Session reporting with 10-second flush logic
+
+**Test Coverage Gap:** Transcode pivot workflow never tested in UAT (Phase 6 verification missing)
+
+---
+
+## Missing Verification
+
+### Phases 6-10 Never Tested in UAT
+
+**Issues:**
+- Phase 6 (Audio/Subtitles) - marked "likely satisfied" but never verified
+- Phase 7 (Intro/Credits Skip) - marked "likely satisfied" but never verified
+- Phase 8 (Auto-play Next) - marked "unsatisfied" due to wiring gap
+- Phase 9 (Collections/Playlists) - marked "likely satisfied" but never verified
+- Phase 10 (Managed Users) - marked "likely satisfied" but never verified
+
+**Files:** `.planning/v1.0-MILESTONE-AUDIT.md` (lines 173-179)
+
+**Impact:** Unknown count of silent bugs in 50% of v1.0 features
+
+**Verification Path:** Create comprehensive UAT test cases for each phase that weren't covered in Phase 4 verification
+
+---
+
+## Error Handling Gaps
+
+### No Graceful Recovery from Network Errors
+
+**Issue:** If PMS becomes unreachable mid-session, app doesn't provide user-facing recovery UI (only retry button on specific screens).
+
+**Files:** All task nodes (`SimPlex/components/tasks/*.brs`), HomeScreen error handling
+
+**Current Approach:** Global `serverReconnected` signal observed by screens, but no active reconnection retry loop
+
+**Risk:** Users see stuck/frozen UI until manually restarting app
+
+**Improvement Path:** Implement exponential backoff retry for failed API calls with visual countdown
+
+---
+
+## Performance Concerns
+
+### No Image Cache Cleanup
+
+**Issue:** ImageCacheTask prefetches poster images but there's no cache eviction policy.
+
+**Files:** `SimPlex/components/tasks/ImageCacheTask.brs`
+
+**Risk:** Devices with low storage could fill temp cache over extended sessions
+
+**Current Approach:** Cache to `/tmp/` but no TTL or size limit
+
+**Improvement Path:**
+1. Implement 24-hour TTL on cached images
+2. Add 500MB size limit with LRU eviction
+3. Clear cache on app exit
+
+---
+
+### Hub Refresh Every 2 Minutes
+
+**Issue:** HomeScreen refreshes hub rows every 120 seconds (line 88) regardless of visibility or user activity.
+
+**Files:** `SimPlex/components/screens/HomeScreen.brs` (87-91)
+
+**Impact:** Network traffic and battery drain on idle screen
+
+**Improvement Path:**
+1. Pause timer when screen not in focus
+2. Allow user configuration (30 sec to 10 min interval)
+3. Manual refresh button instead of forced auto-refresh
+
+---
+
+## Security Considerations
+
+### Tokens Stored in Registry Without Encryption
+
+**Issue:** Auth tokens stored in plain text in Roku registry via `roRegistrySection`.
+
+**Files:** `SimPlex/source/utils.brs` (lines 14-24, 39-50)
+
+**Risk:** If registry is compromised or device stolen, attacker gains access to user's Plex library and all shared libraries
+
+**Current Mitigation:** Roku devices are typically in trusted home network, registry access requires physical device
+
+**Recommendation:** This is acceptable for a side-loaded Roku app but document this risk clearly
+
+**Long-term Improvement:** Request Roku provide encrypted registry or request users disable this device in their Plex account when decommissioning
+
+---
+
+### X-Plex-Token Exposed in URLs
+
+**Issue:** Auth token passed as URL query parameter in some calls.
+
+**Files:** `SimPlex/source/utils.brs` (line 145: BuildPlexUrl includes token in URL)
+
+**Risk:** Tokens logged in server logs, browser history, etc.
+
+**Mitigation:** HTTPS used for all connections, but token still visible in logs
+
+**Recommendation:** Implement X-Plex-Token header for all requests instead of query parameter
+
+---
+
+## Scaling Limits
+
+### Fixed Grid Dimensions
+
+**Issue:** Layout hardcoded to FHD 1920x1080. No support for HD or 4K devices.
+
+**Files:** All XML components, `SimPlex/source/constants.brs`
+
+**Constants:**
+- SIDEBAR_WIDTH: 280 (fixed)
+- POSTER_WIDTH: 240 (fixed)
+- POSTER_HEIGHT: 360 (fixed)
+- GRID_COLUMNS: 6 (fixed)
+
+**Impact:** UI may be undersized on 4K displays, oversized on HD
+
+**Scaling Path:** Detect display resolution at runtime and adjust constants
+
+---
+
+### No Offline Support
+
+**Issue:** App requires PMS connection for all operations. No caching or offline browsing.
+
+**Risk:** Users cannot browse library if network is slow or temporarily down
+
+**Improvement Path:** Cache library metadata and allow read-only offline browsing (playback still requires stream)
+
+---
+
+## Dependencies at Risk
+
+### Roku OS Compatibility
+
+**Issue:** BusySpinner widget causes native firmware crash - indication that Roku compatibility layer needs review.
+
+**Risk:** Future Roku OS updates could break more components
+
+**Mitigation Strategy:**
+1. Test on latest Roku firmware (currently targeting Roku 9+)
+2. Maintain compatibility layer for UI components
+3. Monitor Roku forums for component deprecations
+
+---
+
+### Plex API Stability
+
+**Issue:** Direct dependency on Plex Media Server API endpoints. No versioning strategy or compatibility shim.
+
+**Files:** All task nodes call specific endpoints (`/library/sections`, `/library/sections/{id}/all`, `/hubs/search`, etc.)
+
+**Risk:** PMS API change breaks app across all installations
+
+**Mitigation:** SafeGet() function provides defensive parsing, but no endpoint versioning
+
+**Improvement Path:** Create API client abstraction layer that can detect server version and adapt endpoint calls
+
+---
+
+## Test Coverage Gaps
+
+### No Unit Tests for BrightScript Code
+
+**Issue:** Entire codebase is untested except for manual UAT of Phases 1-5.
+
+**Files:** All `.brs` files
+
+**Risk:** Regressions go undetected until manual UAT
+
+**Barrier:** Roku testing frameworks are limited (no standard Jest/vitest equivalent)
+
+**Improvement Path:**
+1. Use bsc (Roku compiler) for syntax validation
+2. Extract testable functions to utils (SafeGet, FormatTime, etc.)
+3. Create simple BrightScript test harness for core utilities
+
+---
+
+### No Transcode Pivot Testing
+
+**Issue:** Transcode pivot workflow (Phase 6) implemented but never executed in UAT.
+
+**Files:** `SimPlex/components/widgets/VideoPlayer.brs` (transcode state machine: lines 44-46, 1181-1234)
+
+**Fragile Areas:**
+- Pivot trigger detection (subtitle type change during playback)
+- State coordination between old and new video nodes
+- Session reporting continuity across pivot
+
+**Risk:** Silent failures during PGS subtitle selection
+
+**Improvement Path:** Create scripted test case with transcoded PGS file, verify seamless pivot
+
+---
+
+### No Auto-Play Next Testing
+
+**Issue:** Auto-play feature (Phase 8) not testable due to wiring gap. Can't verify countdown UI, audio cues, or skip behavior.
+
+**Files:** `SimPlex/components/widgets/VideoPlayer.brs` (lines 965-981, auto-play trigger)
+
+**Verification Path:** Once wiring fixed, test:
+1. Countdown appears at 90% of episode duration
+2. Sound cue plays
+3. Skip button allows cancellation
+4. Auto-skip moves to next episode
+5. User can resume countdown from Settings
+
+---
+
+## Breaking Changes Risk
+
+### Manifest Version Constraints
+
+**Issue:** No version negotiation with PMS. App assumes certain API behavior without checking server version.
+
+**Files:** `SimPlex/manifest` (version: auto-incremented on each build)
+
+**Risk:** Older PMS versions (pre-1.30) don't have intro/credits markers but code doesn't detect this
+
+**Current Mitigation:** capabilities.brs has version detection but it's never called (orphaned code)
+
+**Improvement Path:**
+1. Call ParseServerCapabilities on server connect
+2. Store capabilities in m.global
+3. Conditionally show UI features based on capabilities
+
+---
+
+*Concerns audit: 2026-03-13*

@@ -1,200 +1,254 @@
 # Codebase Structure
 
-**Analysis Date:** 2026-03-08
+**Analysis Date:** 2026-03-13
 
 ## Directory Layout
 
 ```
-SimPlex/                            # Repo root
-├── .claude/                        # Claude Code configuration (agents, commands, hooks)
-├── .planning/                      # GSD planning documents
-│   ├── codebase/                   # Codebase analysis docs (this file)
-│   └── STATE.md                    # Project state tracking
-├── CLAUDE.md                       # Project instructions for Claude Code
-└── SimPlex/                        # Roku channel package root (zipped for sideload)
-    ├── manifest                    # Roku app manifest (version, icons, resolution)
-    ├── source/                     # Shared BrightScript source files
-    │   ├── main.brs               # App entry point and message loop
-    │   ├── utils.brs              # Auth, URL builders, safe access helpers
-    │   ├── constants.brs          # Colors, sizes, API URLs, pagination config
-    │   ├── logger.brs             # LogEvent() / LogError() console logging
-    │   ├── normalizers.brs        # JSON-to-ContentNode converters
-    │   └── capabilities.brs       # PMS version parsing and feature flags
-    ├── components/                 # SceneGraph components (XML + BRS pairs)
-    │   ├── MainScene.xml          # Root scene layout (background + screenContainer)
-    │   ├── MainScene.brs          # Screen stack, navigation, auth routing
-    │   ├── screens/               # Full-screen views
-    │   │   ├── HomeScreen.xml/.brs        # Library browsing (sidebar + grid + filters)
-    │   │   ├── DetailScreen.xml/.brs      # Item detail (poster, metadata, play buttons)
-    │   │   ├── EpisodeScreen.xml/.brs     # Season/episode browser for TV shows
-    │   │   ├── SearchScreen.xml/.brs      # Keyboard + debounced search results
-    │   │   ├── PINScreen.xml/.brs         # plex.tv PIN auth flow
-    │   │   ├── ServerListScreen.xml/.brs  # Server selection after auth
-    │   │   └── SettingsScreen.xml/.brs    # Switch server, sign out
-    │   ├── widgets/               # Reusable UI components
-    │   │   ├── Sidebar.xml/.brs           # Left nav: libraries, hubs, settings
-    │   │   ├── PosterGrid.xml/.brs        # Paginated poster grid with infinite scroll
-    │   │   ├── PosterGridItem.xml/.brs    # Individual poster cell renderer
-    │   │   ├── EpisodeItem.xml/.brs       # Episode list item renderer
-    │   │   ├── FilterBar.xml/.brs         # Library filter controls
-    │   │   ├── VideoPlayer.xml/.brs       # Playback: direct play/transcode, progress
-    │   │   ├── LoadingSpinner.xml/.brs    # Loading indicator animation
-    │   │   ├── MediaRow.xml/.brs          # Horizontal media row
-    │   │   └── KeyboardDialog.xml/.brs    # Text input dialog
-    │   └── tasks/                 # Background Task nodes (HTTP I/O)
-    │       ├── PlexApiTask.xml/.brs       # General PMS REST client
-    │       ├── PlexAuthTask.xml/.brs      # PIN auth + server discovery
-    │       ├── PlexSearchTask.xml/.brs    # Search endpoint
-    │       ├── PlexSessionTask.xml/.brs   # Playback progress reporting
-    │       ├── ServerConnectionTask.xml/.brs  # Connection testing (local/remote/relay)
-    │       └── ImageCacheTask.xml/.brs    # Poster image prefetching
-    └── images/                    # Static assets
-        ├── icon_focus_fhd.png     # Channel icon (focused state)
-        ├── icon_side_fhd.png      # Channel icon (side panel)
-        ├── splash_fhd.jpg         # Splash screen (1920x1080)
-        └── README.txt             # Image asset notes
+SimPlex/
+├── manifest                 # Roku app metadata (version, icons, splash)
+├── source/                  # BrightScript utilities and entry point
+│   ├── main.brs            # Entry point - creates screen and event loop
+│   ├── utils.brs           # Auth, URL building, safe field access, Plex headers
+│   ├── constants.brs       # Layout, colors, API metadata
+│   ├── logger.brs          # LogEvent/LogError functions
+│   ├── normalizers.brs     # JSON → ContentNode transformers
+│   └── capabilities.brs    # Device capability detection
+├── components/
+│   ├── MainScene.brs/.xml  # Root scene, screen stack management, auth flow
+│   ├── screens/            # Full-screen views
+│   │   ├── HomeScreen.brs/.xml           # Library browsing with sidebar + grid + hubs
+│   │   ├── DetailScreen.brs/.xml         # Item metadata + play button
+│   │   ├── EpisodeScreen.brs/.xml        # Episode list for a show
+│   │   ├── SearchScreen.brs/.xml         # Search input + results grid
+│   │   ├── PlaylistScreen.brs/.xml       # Playlist item browsing
+│   │   ├── SettingsScreen.brs/.xml       # User/server/library management
+│   │   ├── PINScreen.brs/.xml            # OAuth PIN auth flow
+│   │   ├── UserPickerScreen.brs/.xml     # User selection modal
+│   │   └── ServerListScreen.brs/.xml     # Server discovery and selection
+│   ├── widgets/            # Reusable components
+│   │   ├── Sidebar.brs/.xml              # Library + nav list (MarkupList)
+│   │   ├── SidebarNavItem.brs/.xml       # Custom MarkupList item for Sidebar
+│   │   ├── PosterGrid.brs/.xml           # Grid of movie/show posters
+│   │   ├── PosterGridItem.brs/.xml       # Single poster + progress badge
+│   │   ├── VideoPlayer.brs/.xml          # Video playback + skip markers + auto-play
+│   │   ├── TrackSelectionPanel.brs/.xml  # Audio/subtitle track selection
+│   │   ├── FilterBar.brs/.xml            # Genre/sort filter controls
+│   │   ├── FilterBottomSheet.brs/.xml    # Filter options modal
+│   │   ├── EpisodeItem.brs/.xml          # Single episode in list
+│   │   ├── MediaRow.brs/.xml             # Hub row with media items
+│   │   ├── PlaylistItem.brs/.xml         # Single playlist in list
+│   │   ├── UserAvatarItem.brs/.xml       # User avatar + name
+│   │   ├── LibrarySettingItem.brs/.xml   # Pinned library in settings (MarkupList item)
+│   │   ├── KeyboardDialog.brs/.xml       # Soft keyboard for text input
+│   │   ├── LoadingSpinner.brs/.xml       # Loading animation
+│   │   ├── AlphaNav.brs/.xml             # Alphabetic jump nav (A-Z)
+│   │   └── [other widgets]
+│   └── tasks/              # Background HTTP request nodes
+│       ├── PlexApiTask.brs/.xml          # General library/metadata API calls
+│       ├── PlexAuthTask.brs/.xml         # PIN polling + plex.tv auth
+│       ├── PlexSearchTask.brs/.xml       # Search query with debouncing
+│       ├── PlexSessionTask.brs/.xml      # Playback progress reporting
+│       ├── ServerConnectionTask.brs/.xml # Server URI validation
+│       └── ImageCacheTask.brs/.xml       # Poster image prefetching
+└── images/
+    ├── icon_focus_fhd.png       # Focus remote guide icon (1920x1080)
+    ├── icon_side_fhd.png        # Side remote guide icon (1920x1080)
+    ├── icon_focus_hd.png        # Focus remote guide icon (1280x720) - fallback
+    ├── icon_side_hd.png         # Side remote guide icon (1280x720) - fallback
+    └── splash_fhd.jpg           # Launch splash screen (1920x1080, 1.5s display)
 ```
 
 ## Directory Purposes
 
-**`SimPlex/source/`:**
-- Purpose: Shared BrightScript functions available to all components
-- Contains: Utility functions, constants, logging, data normalizers
-- Key files: `utils.brs` (most heavily used - auth, URLs, SafeGet), `constants.brs` (all magic numbers)
-- Inclusion: Files are included in components via `<script type="text/brightscript" uri="pkg:/source/filename.brs" />` tags in XML
+**source/**
+- Purpose: Shared utilities, entry point, and application-wide constants
+- Contains: Main loop, auth management, API helpers, logging, data transformers
+- Key files:
+  - `main.brs`: App initialization and event loop
+  - `utils.brs`: Registry access (auth tokens, server URI, pinned libraries), Plex header generation, URL builders, safe field access patterns
+  - `constants.brs`: Colors (0xRRGGBBAA hex), layout dimensions (sidebar width 340, poster 240x360), Plex API metadata
+  - `logger.brs`: Log/LogError/LogEvent utility functions
+  - `normalizers.brs`: Converts Plex API JSON responses (movie lists, episodes, on-deck, etc.) to ContentNode trees
 
-**`SimPlex/components/screens/`:**
-- Purpose: Full-screen views that occupy the entire display
-- Contains: Paired .xml (layout + interface) and .brs (logic) files
-- Key pattern: Every screen exposes `itemSelected` (assocarray) and `navigateBack` (boolean) interface fields for MainScene to observe
+**components/screens/**
+- Purpose: Full-screen views for major user flows
+- Contains: Screen components that extend `Group` or `Scene`, manage multiple widgets, handle complex navigation
+- Screens manage their own state (currentLibraryId, filters, focusPosition, etc.)
+- Each screen observes child widget events (itemSelected, filterChanged, etc.) and coordinates MainScene navigation
 
-**`SimPlex/components/widgets/`:**
-- Purpose: Reusable UI building blocks composed into screens
-- Contains: Paired .xml/.brs files for each widget
-- Key pattern: Widgets communicate upward via observable interface fields, receive data via content fields
+**components/widgets/**
+- Purpose: Reusable UI components composed into screens
+- Contains: Focused components like grids, lists, sidebars, dialogs, media controls
+- Widgets communicate upward to parent screen via field observers (itemSelected, filterChanged, etc.)
+- Examples:
+  - `PosterGrid` + `PosterGridItem`: Grid of movies/shows with optional progress badges
+  - `Sidebar` + `SidebarNavItem`: Navigation sidebar with library list and action items (Home, Settings, etc.)
+  - `VideoPlayer`: Full-screen video playback with skip markers, track selection, auto-play
+  - `FilterBar` + `FilterBottomSheet`: Genre/sort filter controls with modal filter options
 
-**`SimPlex/components/tasks/`:**
-- Purpose: Background-threaded HTTP I/O (required by Roku to avoid render thread crashes)
-- Contains: Paired .xml/.brs files for each task type
-- Key pattern: Set input fields -> `control = "run"` -> observe `status` for completion
+**components/tasks/**
+- Purpose: Background HTTP request handling (never on render thread)
+- Contains: Task nodes that read input fields, perform async HTTP work, write output to status/response/error fields
+- All Plex API calls go through tasks (PlexApiTask, PlexAuthTask, etc.)
+- Task pattern: Set control="run" to trigger execution, observe status field ("loading" → "success"/"error")
 
-**`SimPlex/images/`:**
-- Purpose: Static image assets required by manifest and UI
-- Contains: Channel icons, splash screen
-- Generated: No
-- Committed: Yes
+**images/**
+- Purpose: Roku app assets (icons, splash screen)
+- FHD (1920x1080): Primary resolution for modern Roku devices
+- HD (1280x720): Fallback for older Roku devices
+- Splash: 1920x1080 JPG, displays for `splash_min_time` (1500ms per manifest)
+
+**manifest**
+- Purpose: Roku app metadata and configuration
+- Contains: App title, version (major.minor.build), icon/splash URIs, feature flags (input launch, RSG version)
 
 ## Key File Locations
 
 **Entry Points:**
-- `SimPlex/source/main.brs`: App bootstrap - creates screen, message loop, passes launch args
-- `SimPlex/components/MainScene.brs`: Scene controller - auth check, screen routing, navigation stack
-- `SimPlex/manifest`: Roku app metadata (version, resolution, icons)
+- `SimPlex/source/main.brs`: Application entry point - creates roSGScreen, instantiates MainScene, runs event loop
+- `SimPlex/components/MainScene.brs`: Root coordinator - manages screen stack, auth flow, global state
+- `SimPlex/source/constants.brs`: Cached in `m.global.constants` at MainScene.init() for all components to access
 
 **Configuration:**
-- `SimPlex/source/constants.brs`: All app constants (colors, layout dimensions, API URLs, pagination size)
-- `SimPlex/manifest`: App version (`major_version`, `minor_version`, `build_version`), resolution (`ui_resolutions=fhd`), SceneGraph version (`rsg_version=1.3`)
+- `SimPlex/manifest`: App version, icons, splash screen, feature flags
+- `SimPlex/source/constants.brs`: Colors, layout dimensions, Plex API metadata
+- `SimPlex/source/utils.brs`: Registry functions for persistent auth and library settings
 
 **Core Logic:**
-- `SimPlex/source/utils.brs`: Auth token CRUD, Plex header builder, URL constructors, safe property access
-- `SimPlex/source/normalizers.brs`: Plex JSON to ContentNode conversion (movies, shows, seasons, episodes, on-deck)
-- `SimPlex/source/capabilities.brs`: PMS version parsing and feature flag checking
-- `SimPlex/components/tasks/PlexApiTask.brs`: Central HTTP client (GET/POST, headers, JSON parsing, 401 handling)
-- `SimPlex/components/widgets/VideoPlayer.brs`: Playback logic (direct play detection, transcoding, progress reporting)
+- `SimPlex/components/screens/HomeScreen.brs`: Library browsing, hub display, sidebar interaction, filtering
+- `SimPlex/components/screens/DetailScreen.brs`: Item metadata display, playback button, mark watched
+- `SimPlex/components/screens/PINScreen.brs`: OAuth PIN polling and server discovery
+- `SimPlex/components/MainScene.brs`: Screen navigation, auth state management, global field coordination
 
-**Screen Logic:**
-- `SimPlex/components/screens/HomeScreen.brs`: Library browsing, pagination, filter application
-- `SimPlex/components/screens/DetailScreen.brs`: Metadata display, play/resume/watched actions
-- `SimPlex/components/screens/PINScreen.brs`: Authentication flow with polling timer
+**Utilities:**
+- `SimPlex/source/utils.brs`: Auth token/server URI persistence, URL builders, header generation, safe field access
+- `SimPlex/source/normalizers.brs`: JSON to ContentNode transformers
+- `SimPlex/source/logger.brs`: Logging functions
 
-**Testing:**
-- No test files exist. No test framework is configured.
+**Testing & Debugging:**
+- No dedicated test directory; Roku development uses device-based testing
+- Logs printed to console (visible via telnet debug console on Roku)
+- Per `CLAUDE.md`: Use LogEvent for key milestones, LogError for failures
 
 ## Naming Conventions
 
 **Files:**
-- PascalCase for all component files: `HomeScreen.brs`, `PlexApiTask.xml`, `PosterGrid.brs`
-- lowercase for source utility files: `main.brs`, `utils.brs`, `constants.brs`, `logger.brs`, `normalizers.brs`, `capabilities.brs`
-- Every SceneGraph component has exactly two files: `ComponentName.xml` (layout) + `ComponentName.brs` (logic)
+- PascalCase for component names: `DetailScreen.brs`, `PosterGrid.brs`, `MainScene.brs`
+- camelCase for utility files: `main.brs`, `utils.brs`, `constants.brs`, `logger.brs`, `normalizers.brs`
+- XML paired with BrightScript: `DetailScreen.xml` + `DetailScreen.brs` in same directory
 
 **Directories:**
-- lowercase plural for category directories: `screens/`, `widgets/`, `tasks/`, `images/`
-- PascalCase for the channel package directory: `SimPlex/`
+- lowercase plurals: `screens/`, `widgets/`, `tasks/`, `components/`, `source/`, `images/`
 
-**Components:**
-- Screens: `{Feature}Screen` (e.g., `HomeScreen`, `DetailScreen`, `PINScreen`)
-- Widgets: Descriptive noun (e.g., `Sidebar`, `PosterGrid`, `VideoPlayer`, `LoadingSpinner`)
-- Tasks: `{Service}{Purpose}Task` (e.g., `PlexApiTask`, `PlexAuthTask`, `ServerConnectionTask`)
+**Function Names:**
+- camelCase: `GetAuthToken()`, `SetServerUri()`, `BuildPlexUrl()`, `NormalizeMovieList()`
+- Event handlers prefixed with `on`: `onLibrarySelected()`, `onItemSelected()`, `onTaskStateChange()`
+- Init functions: `init()` (called by SceneGraph automatically)
+- Logic functions: `show*Screen()`, `load*Data()`, `build*Content()`
 
-**Functions:**
-- PascalCase for global utility functions: `GetAuthToken()`, `BuildPlexUrl()`, `SafeGet()`, `FormatTime()`
-- camelCase for component-scoped functions: `loadLibrary()`, `processApiResponse()`, `onItemSelected()`
-- Prefix `on` for observer callbacks: `onApiTaskStateChange()`, `onLibrarySelected()`, `onKeyEvent()`
-- Prefix `show` for screen factory methods in MainScene: `showHomeScreen()`, `showDetailScreen()`
+**Variables (BrightScript):**
+- camelCase: `m.posterGrid`, `m.currentLibraryId`, `m.isLoading`, `m.screenStack`
+- m-scope: Component instance state (`m.top` = root node, `m.global` = global node)
+- Temporary locals: `endpoint`, `url`, `response`, `server`
 
-**Variables:**
-- camelCase for local/member variables: `m.screenStack`, `m.currentSectionId`, `m.apiTask`
-- UPPER_SNAKE_CASE for constants within `GetConstants()`: `BG_PRIMARY`, `POSTER_WIDTH`, `PAGE_SIZE`
+**Constants (constants.brs):**
+- SCREAMING_SNAKE_CASE: `SIDEBAR_WIDTH`, `BG_PRIMARY`, `ACCENT`, `PLEX_PRODUCT`
+- Hex colors: `0xRRGGBBAA` format (e.g., `0xF3B125FF` = Plex gold)
 
-**Interface Fields (XML):**
-- camelCase: `itemSelected`, `navigateBack`, `ratingKey`, `authToken`, `status`
+**ContentNode Fields:**
+- Snake_case for standard fields: `id`, `title`, `posterUrl`, `itemType`, `watched`, `viewOffset`, `ratingKey`
+- Plex type mapping: `itemType: "movie"`, `itemType: "show"`, `itemType: "episode"`, `itemType: "playlist"`
 
 ## Where to Add New Code
 
-**New Screen:**
-- Create paired files: `SimPlex/components/screens/{Feature}Screen.xml` and `SimPlex/components/screens/{Feature}Screen.brs`
-- XML must extend `Group`, include interface fields `itemSelected` (assocarray, alwaysNotify) and `navigateBack` (boolean, alwaysNotify)
-- Include shared scripts: `<script uri="pkg:/source/utils.brs" />`, `<script uri="pkg:/source/constants.brs" />`
-- Add `show{Feature}Screen()` method to `SimPlex/components/MainScene.brs`
-- Add routing case to `onItemSelected()` in `SimPlex/components/MainScene.brs`
-- Add subtype check to `popScreen()` for `currentScreen` name update
+**New Screen (e.g., Collections Grid):**
+1. Create component: `SimPlex/components/screens/CollectionsScreen.brs` and `.xml`
+2. Extend `Group` or `Scene` in XML
+3. Define interface fields (e.g., `collectionRatingKey`, `itemSelected`, `navigateBack`)
+4. Link scripts: `<script>` tags for utils.brs, constants.brs, logger.brs, CollectionsScreen.brs
+5. Add init() function, set up node references and observers
+6. Add selection handlers that set `itemSelected` field (observed by MainScene)
+7. In MainScene.brs, add `showCollectionsScreen()` function and call from appropriate trigger
+8. Add to screen stack: `pushScreen(screen)` in MainScene
 
-**New Widget:**
-- Create paired files: `SimPlex/components/widgets/{WidgetName}.xml` and `SimPlex/components/widgets/{WidgetName}.brs`
-- XML must extend `Group` (or a built-in SceneGraph component)
-- Define `<interface>` fields for data input and event output
-- Include in parent screen's XML as a child element
+**New Widget (e.g., Custom Grid Component):**
+1. Create component: `SimPlex/components/widgets/CustomGrid.brs` and `.xml`
+2. Extend `Group` in XML
+3. Define interface fields for input (e.g., `content`, `selectedIndex`) and output (e.g., `itemSelected`)
+4. Add init(), set up MarkupGrid or RowList, add observers
+5. Implement focus and selection logic
+6. Use from screen: `<CustomGrid id="grid" />`, reference with `m.top.findNode("grid")`
+7. Observe output fields in parent screen: `m.grid.observeField("itemSelected", "onGridItemSelected")`
 
-**New Task (Background HTTP):**
-- Create paired files: `SimPlex/components/tasks/{Name}Task.xml` and `SimPlex/components/tasks/{Name}Task.brs`
-- XML must extend `Task`
-- Define interface fields: at minimum `status` (string), `error` (string), plus inputs/outputs
-- BRS must set `m.top.functionName = "run"` in `init()` and implement `run()` sub
-- Include `pkg:/source/utils.brs`, `pkg:/source/constants.brs`, `pkg:/source/logger.brs` via script tags
-- Always use `url.SetCertificatesFile("common:/certs/ca-bundle.crt")` and `url.InitClientCertificates()`
-- Always add Plex headers via `GetPlexHeaders()`
+**New Task (e.g., Custom API Endpoint):**
+1. Create component: `SimPlex/components/tasks/CustomTask.brs` and `.xml`
+2. Extend `Task` in XML
+3. In BrightScript:
+   - Set `m.top.functionName = "run"` in init()
+   - Read input fields from `m.top` (e.g., `m.top.endpoint`)
+   - Set `m.top.status = "loading"` at start
+   - Make HTTP request (create roUrlTransfer, set headers, etc.)
+   - On completion, set `m.top.response` or `m.top.error` and `m.top.status = "success"/"error"`
+4. From screen:
+   ```brightscript
+   task = CreateObject("roSGNode", "CustomTask")
+   task.endpoint = "/some/path"
+   task.observeField("status", "onTaskStatus")
+   task.control = "run"
+   ```
 
-**New Utility Function:**
-- Add to `SimPlex/source/utils.brs` for auth/URL/data helpers
-- Add to `SimPlex/source/normalizers.brs` for new Plex JSON-to-ContentNode converters
-- Add to `SimPlex/source/capabilities.brs` for server feature detection
-- New utility category: create `SimPlex/source/{category}.brs` and include via `<script>` tag in components that need it
+**New Utility Function (e.g., Auth Helper):**
+1. Add to `SimPlex/source/utils.brs`:
+   ```brightscript
+   function NewHelper(param as String) as String
+       ' Implementation
+   end function
+   ```
+2. Include in any screen/widget via: `<script type="text/brightscript" uri="pkg:/source/utils.brs" />`
+3. Call as: `NewHelper("value")`
 
 **New Constant:**
-- Add to the return object in `GetConstants()` in `SimPlex/source/constants.brs`
+1. Add to `SimPlex/source/constants.brs` inside `GetConstants()` function return object
+2. Access via `m.global.constants.NEW_CONSTANT` (cached in MainScene.init())
+3. Or call `GetConstants()` for edge cases
 
-**New Image Asset:**
-- Place in `SimPlex/images/`
-- Reference as `pkg:/images/filename.ext` in XML or BrightScript
+**New Normalizer (e.g., Playlist List):**
+1. Add function to `SimPlex/source/normalizers.brs`:
+   ```brightscript
+   function NormalizePlaylistList(jsonArray as Object) as Object
+       content = CreateObject("roSGNode", "ContentNode")
+       for each item in jsonArray
+           node = content.createChild("ContentNode")
+           node.addFields({
+               id: SafeGet(item, "ratingKey", "")
+               title: SafeGet(item, "title", "Unknown")
+               ' ... other fields
+           })
+       end for
+       return content
+   end function
+   ```
+2. Call from screen after task.response: `contentTree = NormalizePlaylistList(response.MediaContainer.Metadata)`
 
 ## Special Directories
 
-**`.planning/`:**
-- Purpose: GSD planning and codebase analysis documents
-- Generated: By Claude Code agents
-- Committed: Yes
+**node_modules/**
+- Purpose: NPM dependencies (if project uses npm for build tooling)
+- Generated: Yes (output of `npm install`)
+- Committed: No (added to .gitignore)
+- Note: Not used at runtime; Roku apps are pure BrightScript/SceneGraph
 
-**`.claude/`:**
-- Purpose: Claude Code configuration (agents, commands, hooks, settings)
-- Generated: By GSD framework
-- Committed: Yes
+**images/**
+- Purpose: App assets (icons, splash screen)
+- Generated: No (source assets)
+- Committed: Yes (required for app package)
 
-**`SimPlex/` (inner):**
-- Purpose: The deployable Roku channel package
-- Generated: No (source code)
-- Committed: Yes
-- Note: This entire directory is zipped for sideloading: `cd SimPlex && zip -r ../SimPlex.zip manifest source components images`
+**manifest**
+- Purpose: Roku app metadata file (not a directory)
+- Generated: No (source file)
+- Committed: Yes (required for app package)
 
 ---
 
-*Structure analysis: 2026-03-08*
+*Structure analysis: 2026-03-13*

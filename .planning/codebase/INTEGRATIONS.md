@@ -1,164 +1,183 @@
 # External Integrations
 
-**Analysis Date:** 2026-03-08
+**Analysis Date:** 2026-03-13
 
 ## APIs & External Services
 
-**plex.tv Authentication API (v2):**
-- Purpose: PIN-based OAuth authentication and server discovery
-- Task: `SimPlex/components/tasks/PlexAuthTask.brs`
-- Base URL: `https://plex.tv`
-- Auth: PIN code flow (no API key required to initiate; auth token returned after user links at plex.tv/link)
-- Endpoints used:
-  - `POST /api/v2/pins` (body: `strong=false`) - Request a PIN code for user to enter at plex.tv/link
-  - `GET /api/v2/pins/{id}` - Poll for auth token after user enters PIN
-  - `GET /api/v2/resources?includeHttps=1&includeRelay=1` - Discover user's Plex Media Servers (with token header)
+**Plex Media Server (PMS):**
+- Local HTTP(S) server discovery and API endpoint
+- SDK/Client: `roUrlTransfer` (built-in Roku)
+- Auth: X-Plex-Token (stored in registry)
+- Base URL: Retrieved from server discovery and stored in registry
 
-**Plex Media Server REST API:**
-- Purpose: Library browsing, metadata, search, playback, progress tracking
-- Task: `SimPlex/components/tasks/PlexApiTask.brs` (general), `SimPlex/components/tasks/PlexSearchTask.brs` (search), `SimPlex/components/tasks/PlexSessionTask.brs` (progress)
-- Base URL: Dynamic, stored in registry as `serverUri` (e.g., `https://192.168.1.x:32400`)
-- Auth: `X-Plex-Token` query parameter on every request
-- Response format: JSON (`Accept: application/json` header)
-- Endpoints used:
-  - `GET /library/sections` - List libraries
-  - `GET /library/sections/{id}/all` - Browse library contents (paginated: `X-Plex-Container-Start`, `X-Plex-Container-Size=50`)
-  - `GET /library/metadata/{ratingKey}` - Item detail metadata
-  - `GET /library/metadata/{ratingKey}/children` - Seasons/episodes for a show
-  - `GET /library/onDeck` - Continue watching items
-  - `GET /hubs/search?query={term}&limit=20` - Search across library
-  - `GET /photo/:/transcode?width={w}&height={h}&url={path}` - Resized poster images
-  - `PUT /:/timeline?ratingKey={id}&state={state}&time={ms}&duration={ms}` - Playback progress reporting (via POST with `X-HTTP-Method-Override: PUT`)
-  - `GET /:/scrobble?identifier=com.plexapp.plugins.library&key={ratingKey}` - Mark item as watched
-  - `GET /` - Server root for capabilities/version detection
-
-**Plex Transcoding (via PMS):**
-- Purpose: Video transcoding for incompatible formats
-- URL pattern: `{serverUri}/video/:/transcode/universal/start.m3u8`
-- Parameters: `path`, `protocol=hls`, `directPlay=0`, `directStream=1`, `videoQuality=100`, `maxVideoBitrate=20000`, `videoResolution=1920x1080`, `subtitles=auto`
-- Implementation: `SimPlex/components/widgets/VideoPlayer.brs` function `buildTranscodeUrl()`
-
-## Required X-Plex Headers
-
-Every API request includes these headers via `GetPlexHeaders()` in `SimPlex/source/utils.brs`:
-- `X-Plex-Product`: `"SimPlex"`
-- `X-Plex-Version`: `"1.0.0"`
-- `X-Plex-Client-Identifier`: Persistent UUID (generated once, stored in registry)
-- `X-Plex-Platform`: `"Roku"`
-- `X-Plex-Platform-Version`: Roku OS version from `roDeviceInfo`
-- `X-Plex-Device`: Model display name from `roDeviceInfo`
-- `X-Plex-Device-Name`: Friendly device name from `roDeviceInfo`
-- `Accept`: `"application/json"`
-
-## Data Storage
-
-**Databases:**
-- None. No database system.
-
-**Persistent Storage:**
-- Roku Registry (`roRegistrySection("SimPlex")`) - Key-value store on the Roku device
-  - Keys stored:
-    - `authToken` - Plex authentication token (read/write via `SimPlex/source/utils.brs` `GetAuthToken()`/`SetAuthToken()`)
-    - `serverUri` - Selected Plex server URI (read/write via `GetServerUri()`/`SetServerUri()`)
-    - `deviceId` - Persistent device UUID for Plex client identification (generated once via `GetDeviceId()`)
-    - `serverClientId` - Selected server's client identifier (written in `SimPlex/components/MainScene.brs`)
-  - All writes followed by `.Flush()` call
-
-**File Storage:**
-- Local filesystem only (`pkg:/images/` for bundled static assets)
-- No cloud file storage
-
-**Caching:**
-- Roku's built-in image cache (poster images fetched via `ImageCacheTask` are cached by the platform)
-- Implementation: `SimPlex/components/tasks/ImageCacheTask.brs` - prefetches images by GETting them, relying on Roku's internal cache
-- No explicit cache management or TTL
+**Plex.tv (plex.tv):**
+- External authentication and server discovery service
+- SDK/Client: `roUrlTransfer` (built-in Roku)
+- Endpoints:
+  - `POST https://plex.tv/api/v2/pins` - Request PIN for OAuth flow
+  - `GET https://plex.tv/api/v2/pins/{id}` - Poll for auth token
+  - `GET https://plex.tv/api/v2/resources?includeHttps=1&includeRelay=1` - Discover servers
 
 ## Authentication & Identity
 
 **Auth Provider:**
-- plex.tv PIN-based OAuth flow (custom implementation)
-  - Implementation: `SimPlex/components/tasks/PlexAuthTask.brs` and `SimPlex/components/screens/PINScreen.brs`
-  - Flow:
-    1. App requests PIN from `POST https://plex.tv/api/v2/pins` (strong=false for 4-char code)
-    2. User enters code at `https://plex.tv/link` on another device
-    3. App polls `GET https://plex.tv/api/v2/pins/{id}` until `authToken` is present or PIN expires
-    4. Auth token stored in Roku registry
-    5. Server discovery via `GET https://plex.tv/api/v2/resources`
-  - Token expiry: handled by 401 response detection in `PlexApiTask.brs` (lines 98-108), triggers global `authRequired` flag
-  - Sign-out: `ClearAuthData()` in `SimPlex/source/utils.brs` deletes token, server URI, and server client ID
+- Plex Account (plex.tv)
+- Implementation: PIN-based OAuth flow
+  - User requests PIN via `PlexAuthTask` → `POST /api/v2/pins`
+  - User enters code at plex.tv/link in web browser
+  - App polls endpoint via `PlexAuthTask` → `GET /api/v2/pins/{id}`
+  - Returns `authToken` when user completes auth
+  - Token stored in registry for persistent sessions
 
-**Server Connection:**
-- `SimPlex/components/tasks/ServerConnectionTask.brs` tests connections in priority order: local (3s timeout) > remote (5s timeout) > relay (5s timeout)
-- Connection selection stored as `serverUri` in registry
-- 401 responses from any API call trigger automatic re-authentication via `m.global.authRequired` observer in `SimPlex/components/MainScene.brs`
+**Token Storage:**
+- Auth Token: User's Plex account token (stored in `roRegistrySection("SimPlex")`)
+- Admin Token: Server owner's token (stored separately, allows managed user switching)
+- Device ID: Unique client identifier generated on first run (stored persistently)
 
-## Monitoring & Observability
+**Multi-user Support:**
+- Active user name tracked in registry
+- Admin token separate from active user token
+- User switching with optional PIN entry (for managed users)
 
-**Error Tracking:**
-- None. No external error tracking service.
+## Data Storage
 
-**Logs:**
-- Console `print` statements via `SimPlex/source/logger.brs`
-- Two levels: `LogEvent()` (key milestones) and `LogError()` (problems)
-- Format: `[ISO-timestamp] [LEVEL] message`
-- Viewable via Roku developer console (telnet to port 8085 on device)
+**Databases:**
+- No external database
+- Local registry: `roRegistrySection("SimPlex")` - Roku's built-in key-value storage
 
-## CI/CD & Deployment
+**Persistent Data:**
+- Device ID (auto-generated UUID)
+- Auth tokens (user and admin)
+- Server URI and connection details
+- Active user name
+- Pinned library configuration
+- Sidebar library configuration
 
-**Hosting:**
-- Side-loaded directly to Roku device via HTTP upload
-- Not published to Roku Channel Store
+**File Storage:**
+- Local filesystem only - app package includes manifest, source code, images
+- No cloud storage or external file APIs used
 
-**CI Pipeline:**
-- None detected. No GitHub Actions, no CI configuration files.
+**Caching:**
+- Image cache: Built-in Roku image caching (HTTP cache headers from PMS)
+- No external caching layer
 
-**Build Process:**
-- Manual: `cd SimPlex && zip -r ../SimPlex.zip manifest source components images`
-- Upload zip to `http://{roku-ip}:8060` via browser or curl
+## Content Discovery
 
-## Environment Configuration
+**Library Browsing:**
+- Endpoint: `{serverUri}/library/sections` - List available libraries
+- Endpoint: `{serverUri}/library/sections/{id}/all` - Browse library contents
+- Pagination: `X-Plex-Container-Start` and `X-Plex-Container-Size=50`
+- Implementation: `PlexApiTask`
 
-**Required env vars:**
-- None. Roku apps do not use environment variables.
+**Search:**
+- Endpoint: `{serverUri}/hubs/search?query={term}&limit=20`
+- Implementation: `PlexSearchTask`
+- Debouncing: Handled by UI layer (not in task)
 
-**Secrets location:**
-- Auth token stored in Roku device registry (encrypted at rest by Roku OS)
-- No secrets in source code
+**Metadata:**
+- Endpoint: `{serverUri}/library/metadata/{ratingKey}` - Item details
+- Endpoint: `{serverUri}/library/onDeck` - Continue watching
+- Implementation: `PlexApiTask`
 
-**Configuration that must be set at runtime:**
-- Auth token (obtained via PIN flow)
-- Server URI (discovered via plex.tv resources API, validated via connection testing)
+## Playback & Sessions
+
+**Direct Playback:**
+- URL format: `{serverUri}{partKey}?X-Plex-Token={token}`
+- Streaming: HTTP stream delivered by Plex Media Server
+- Player: Built-in Roku `VideoPlayer` SceneGraph component
+
+**Transcode Streams:**
+- Endpoint: `{serverUri}/video/:/transcode/universal/start.m3u8`
+- Parameters: `path={key}&protocol=hls` and other codec/bitrate settings
+- Used for: Compatibility with devices or quality constraints
+
+**Progress Tracking:**
+- Endpoint: `{serverUri}/:/timeline` (PUT via X-HTTP-Method-Override)
+- Parameters:
+  - `ratingKey` - Media item ID
+  - `state` - `playing`, `paused`, or `stopped`
+  - `time` - Current position in milliseconds
+  - `duration` - Total duration in milliseconds
+- Frequency: Every 10 seconds during playback
+- Implementation: `PlexSessionTask`
 
 ## Webhooks & Callbacks
 
 **Incoming:**
-- None
+- None - This app is consumer-only (no webhook endpoints)
 
 **Outgoing:**
-- Playback progress reports to PMS via `PUT /:/timeline` (periodic, every 10 seconds during playback)
-- Scrobble notifications via `GET /:/scrobble` when playback completes
-- Implementation: `SimPlex/components/widgets/VideoPlayer.brs` `reportProgress()` and `scrobble()` subs
+- None - Progress tracking via polling (PUT requests), not webhooks
 
-## Direct Play Support
+## Server Discovery
 
-The VideoPlayer (`SimPlex/components/widgets/VideoPlayer.brs`) determines direct play vs transcode:
+**Auto-Discovery:**
+- Service: plex.tv API provides server connection information
+- Endpoint: `GET https://plex.tv/api/v2/resources?includeHttps=1&includeRelay=1`
+- Returns: Array of available PMS servers with:
+  - Connection URIs (local, remote, relay)
+  - Server name and version
+  - Client identifier for management
+- Implementation: `PlexAuthTask.fetchResources()`
 
-**Direct Play codecs (function `checkDirectPlay()`):**
-- Video: h264, hevc, h265, vp9
-- Audio: aac, ac3, eac3, mp3
-- Containers: mp4, m4v, mkv
+**Connection Selection:**
+- Prioritizes local connections (same network)
+- Fallback to relay connections if local unavailable
+- Stores selected server URI and connection details
 
-**Fallback:** HLS transcoding via PMS transcode endpoint
+## Monitoring & Observability
 
-## Server Capabilities Detection
+**Error Tracking:**
+- None - No external error reporting
 
-`SimPlex/source/capabilities.brs` parses the PMS root endpoint (`/`) response to detect:
-- Server version (major.minor.patch parsing)
-- Intro marker support (PMS 1.30+)
-- Credits marker support (PMS 1.30+)
-- HLS transcoding support (assumed true)
-- Chapter support (assumed true)
+**Logs:**
+- None - No external log aggregation
+- Internal: `LogEvent()` function logs to Roku debug console (development only)
+
+**Debugging:**
+- Roku debug port: SSH to port 8222 for telnet console
+- Source maps available from build (sourceMap: true in bsconfig.json)
+
+## Environment Configuration
+
+**Required auth:**
+- Plex account (email/password at plex.tv)
+- Access to Plex Media Server
+
+**Required network:**
+- Internet connection to plex.tv for PIN auth and server discovery
+- Network access to local Plex Media Server
+
+**Optional:**
+- Managed user accounts (if using multi-user PIN mode)
+- Server with multiple libraries
+
+## Critical Headers
+
+**All Plex API requests include:**
+- `X-Plex-Product` - "SimPlex"
+- `X-Plex-Version` - "1.0.0"
+- `X-Plex-Client-Identifier` - Device UUID (unique per Roku)
+- `X-Plex-Platform` - "Roku"
+- `X-Plex-Platform-Version` - Device OS version
+- `X-Plex-Device` - Device model name
+- `X-Plex-Device-Name` - Device friendly name
+- `X-Plex-Token` - Auth token (except during PIN request)
+- `Accept` - "application/json"
+
+**Implementation:** `GetPlexHeaders()` in `SimPlex/source/utils.brs`
+
+## API Rate Limiting
+
+**Plex.tv PIN endpoint:**
+- Polling: 1 second intervals (client-side throttle in UI, not enforced by API)
+
+**PMS Library browsing:**
+- Pagination: 50 items per request (X-Plex-Container-Size=50)
+- Multiple fetches required for large libraries
+
+**No documented rate limits** from Plex (typical for home use)
 
 ---
 
-*Integration audit: 2026-03-08*
+*Integration audit: 2026-03-13*
