@@ -1,6 +1,14 @@
 sub init()
     m.video = m.top.findNode("video")
 
+    ' Customize trickplay bar colors via internal node
+    trickBar = m.video.trickPlayBar
+    if trickBar <> invalid
+        trickBar.filledBarBlendColor = "0xF3B125FF"
+        trickBar.currentTimeMarkerBlendColor = "0xF3B125FF"
+        trickBar.thumbBlendColor = "0xF3B125FF"
+    end if
+
     m.video.observeField("state", "onVideoStateChange")
     m.video.observeField("position", "onPositionChange")
 
@@ -61,18 +69,22 @@ sub init()
     ' Marker storage
     m.introMarker = invalid
     m.creditsMarker = invalid
+    m.introSkipped = false
     m.skipButtonVisible = false
     m.skipButtonType = ""
     m.skipButtonFocused = false
 
     ' Auto-play next episode
     m.autoPlayOverlay = m.top.findNode("autoPlayOverlay")
+    m.autoPlayTitle = m.top.findNode("autoPlayTitle")
     m.autoPlayEpisodeLabel = m.top.findNode("autoPlayEpisodeLabel")
     m.autoPlayCountdownLabel = m.top.findNode("autoPlayCountdownLabel")
     m.autoPlayFocusBorder = m.top.findNode("autoPlayFocusBorder")
     m.autoPlayFadeIn = m.top.findNode("autoPlayFadeIn")
     m.autoPlayFadeOut = m.top.findNode("autoPlayFadeOut")
     m.autoPlayFadeOut.observeField("state", "onAutoPlayFadeOutComplete")
+    m.autoPlayProgressTrack = m.top.findNode("autoPlayProgressTrack")
+    m.autoPlayProgressFill = m.top.findNode("autoPlayProgressFill")
 
     m.nextEpisodeInfo = invalid
     m.noNextEpisode = false
@@ -112,7 +124,7 @@ sub loadMedia()
     ' First fetch media metadata to determine playback URL
     task = CreateObject("roSGNode", "PlexApiTask")
     task.endpoint = m.top.mediaKey
-    task.params = {}
+    task.params = { "includeMarkers": "1" }
     task.observeField("status", "onMediaTaskStateChange")
     task.control = "run"
     m.mediaInfoTask = task
@@ -124,7 +136,7 @@ sub onMediaTaskStateChange(event as Object)
         processMediaInfo()
     else if state = "error"
         showError("Failed to load media: " + m.mediaInfoTask.error)
-        m.top.playbackComplete = true
+        signalPlaybackComplete("error")
     end if
 end sub
 
@@ -132,14 +144,14 @@ sub processMediaInfo()
     response = m.mediaInfoTask.response
     if response = invalid or response.MediaContainer = invalid
         showError("Invalid media response")
-        m.top.playbackComplete = true
+        signalPlaybackComplete("error")
         return
     end if
 
     metadata = response.MediaContainer.Metadata
     if metadata = invalid or metadata.count() = 0
         showError("No media metadata found")
-        m.top.playbackComplete = true
+        signalPlaybackComplete("error")
         return
     end if
 
@@ -153,7 +165,7 @@ sub processMediaInfo()
     media = item.Media
     if media = invalid or media.count() = 0
         showError("No media streams found")
-        m.top.playbackComplete = true
+        signalPlaybackComplete("error")
         return
     end if
 
@@ -162,7 +174,7 @@ sub processMediaInfo()
     parts = mediaInfo.Part
     if parts = invalid or parts.count() = 0
         showError("No media parts found")
-        m.top.playbackComplete = true
+        signalPlaybackComplete("error")
         return
     end if
 
@@ -179,8 +191,11 @@ sub processMediaInfo()
     streams = SafeGet(part, "Stream", [])
     parseStreams(streams)
 
-    ' Determine if we can direct play
+    ' Log playback context
+    playMode = "direct"
     m.canDirectPlay = checkDirectPlay(mediaInfo)
+    if not m.canDirectPlay then playMode = "transcode"
+    LogEvent("Playback: " + m.top.itemTitle + " [" + playMode + "] duration=" + m.duration.ToStr() + "ms")
 
     ' Build playback URL
     if m.canDirectPlay
@@ -203,8 +218,8 @@ sub processMediaInfo()
 
     m.video.content = content
 
-    ' Fetch intro/credits markers in parallel with playback start
-    fetchMarkers()
+    ' Parse intro/credits markers from metadata response (via includeMarkers=1)
+    parseMarkersFromMetadata(item)
 
     ' Set seek position if resuming
     if m.top.startOffset > 0
@@ -452,8 +467,24 @@ sub onVideoStateChange(event as Object)
             end if
         end if
 
+        ' If auto-play countdown is active, let it finish (don't exit to detail)
+        if m.countdownActive and m.nextEpisodeInfo <> invalid
+            return
+        end if
+
+        ' If we're currently fetching the next episode, wait for it
+        if m.fetchingNextEpisode
+            return
+        end if
+
+        ' If we have a next episode queued but countdown hasn't started, start it now
+        if m.nextEpisodeInfo <> invalid and not m.autoPlayOverlayVisible
+            showAutoPlayOverlay()
+            return
+        end if
+
         ' Normal completion (no playlist or end of playlist)
-        m.top.playbackComplete = true
+        signalPlaybackComplete("finished")
     else if state = "error"
         ' Handle transcode pivot failure
         if m.isTranscodePivotInProgress
@@ -467,7 +498,7 @@ sub onVideoStateChange(event as Object)
         m.reportTimer.control = "stop"
         errorInfo = m.video.errorMsg
         showError("Playback error: " + errorInfo)
-        m.top.playbackComplete = true
+        signalPlaybackComplete("error")
     end if
 end sub
 
@@ -480,9 +511,12 @@ end sub
 sub reportProgress()
     if m.currentPosition = invalid then return
 
+    ' Create a fresh task each time — Roku Task nodes cannot be re-run
+    ' by setting control="run" again (the field value doesn't change)
+    m.sessionTask = CreateObject("roSGNode", "PlexSessionTask")
     m.sessionTask.ratingKey = m.top.ratingKey
     m.sessionTask.mediaKey = m.top.mediaKey
-    m.sessionTask.state = "playing"
+    m.sessionTask.playbackState = "playing"
     m.sessionTask.time = m.currentPosition
     m.sessionTask.duration = m.duration
     m.sessionTask.control = "run"
@@ -499,14 +533,15 @@ sub scrobble()
 end sub
 
 sub stopPlayback()
-    ' Report final position
+    ' Report final position with a fresh task
     if m.currentPosition <> invalid
-        m.sessionTask.ratingKey = m.top.ratingKey
-        m.sessionTask.mediaKey = m.top.mediaKey
-        m.sessionTask.state = "stopped"
-        m.sessionTask.time = m.currentPosition
-        m.sessionTask.duration = m.duration
-        m.sessionTask.control = "run"
+        stopTask = CreateObject("roSGNode", "PlexSessionTask")
+        stopTask.ratingKey = m.top.ratingKey
+        stopTask.mediaKey = m.top.mediaKey
+        stopTask.playbackState = "stopped"
+        stopTask.time = m.currentPosition
+        stopTask.duration = m.duration
+        stopTask.control = "run"
     end if
 
     m.reportTimer.control = "stop"
@@ -533,6 +568,23 @@ sub stopPlayback()
 
     ' Reset playlist state
     m.hasPlaylist = false
+end sub
+
+sub signalPlaybackComplete(reason as String)
+    ' Build structured result and emit via playbackResult field
+    hasNext = (m.nextEpisodeInfo <> invalid)
+    result = {
+        reason: reason
+        ratingKey: m.top.ratingKey
+        itemTitle: m.top.itemTitle
+        hasNextEpisode: hasNext
+        nextEpisodeInfo: m.nextEpisodeInfo
+        grandparentRatingKey: m.top.grandparentRatingKey
+        viewOffset: m.currentPosition
+        duration: m.duration
+        isPlaylist: m.hasPlaylist
+    }
+    m.top.playbackResult = result
 end sub
 
 sub showError(message as String)
@@ -879,26 +931,19 @@ end sub
 
 ' ========== Intro/Credits Skip Markers ==========
 
-' Fetch intro and credits markers from Plex API
-sub fetchMarkers()
-    task = CreateObject("roSGNode", "PlexApiTask")
-    task.endpoint = "/library/metadata/" + m.top.ratingKey + "/markers"
-    task.observeField("status", "onMarkersLoaded")
-    task.control = "run"
-    m.markersTask = task
-end sub
+' Parse intro and credits markers from metadata response (included via includeMarkers=1)
+sub parseMarkersFromMetadata(item as Object)
+    m.introMarker = invalid
+    m.creditsMarker = invalid
+    m.introSkipped = false
 
-' Parse marker response and store intro/credits timespans
-sub onMarkersLoaded(event as Object)
-    state = event.getData()
-    if state <> "completed" then return
+    markers = SafeGet(item, "Marker", [])
+    if markers = invalid or markers.count() = 0
+        LogEvent("Markers: none found in metadata")
+        return
+    end if
 
-    response = m.markersTask.response
-    if response = invalid or response.MediaContainer = invalid then return
-
-    markers = SafeGet(response.MediaContainer, "Marker", [])
-    if markers = invalid or markers.count() = 0 then return
-
+    LogEvent("Markers: found " + markers.count().ToStr() + " marker(s)")
     for each marker in markers
         markerType = SafeGet(marker, "type", "")
         startMs = SafeGet(marker, "startTimeOffset", 0)
@@ -906,8 +951,10 @@ sub onMarkersLoaded(event as Object)
 
         if markerType = "intro" and startMs > 0 and endMs > startMs
             m.introMarker = { startMs: startMs, endMs: endMs }
+            LogEvent("Marker: intro " + startMs.ToStr() + "ms - " + endMs.ToStr() + "ms")
         else if markerType = "credits" and startMs > 0 and endMs > startMs
             m.creditsMarker = { startMs: startMs, endMs: endMs }
+            LogEvent("Marker: credits " + startMs.ToStr() + "ms - " + endMs.ToStr() + "ms")
         end if
     end for
 end sub
@@ -935,22 +982,29 @@ sub checkMarkers()
         end if
     end if
 
-    ' Fallback: 90% of duration for auto-play when no credits marker
+    ' Fallback: last 30 seconds for auto-play next episode (TV only, not movies)
     if not inCredits and m.creditsMarker = invalid and m.duration > 0
-        if currentPos >= m.duration * 0.9
-            inCredits = true
+        if m.top.grandparentRatingKey <> "" and m.top.grandparentRatingKey <> invalid
+            if m.duration > 0 and currentPos >= m.duration - 30000
+                inCredits = true
+            end if
         end if
     end if
 
     ' Show or hide overlays based on position
-    if inIntro and (not m.skipButtonVisible or m.skipButtonType <> "intro")
-        showSkipButton("intro")
+    if inIntro and not m.introSkipped
+        ' Auto-skip intro
+        LogEvent("Auto-skipping intro to " + m.introMarker.endMs.ToStr() + "ms")
+        m.introSkipped = true
+        m.video.seek = m.introMarker.endMs / 1000
+        return
     else if inCredits and m.hasPlaylist
         ' Playlist mode: skip credits overlays — playlist advances on finish
         return
     else if inCredits
         ' For TV episodes: show auto-play countdown instead of skip credits
         if m.top.grandparentRatingKey <> "" and m.top.grandparentRatingKey <> invalid
+            LogEvent("Credits region (TV): nextEp=" + (m.nextEpisodeInfo <> invalid).ToStr() + " fetching=" + m.fetchingNextEpisode.ToStr() + " noNext=" + m.noNextEpisode.ToStr() + " overlayVis=" + m.autoPlayOverlayVisible.ToStr())
             if m.nextEpisodeInfo <> invalid and not m.autoPlayOverlayVisible
                 showAutoPlayOverlay()
             else if not m.fetchingNextEpisode and m.nextEpisodeInfo = invalid and not m.noNextEpisode
@@ -959,6 +1013,7 @@ sub checkMarkers()
                 showSkipButton("credits")
             end if
         else if not m.skipButtonVisible or m.skipButtonType <> "credits"
+            LogEvent("Credits region (non-TV): showing skip credits")
             showSkipButton("credits")
         end if
     else if not inIntro and not inCredits
@@ -973,6 +1028,7 @@ end sub
 
 ' Show skip button with fade-in animation
 sub showSkipButton(markerType as String)
+    LogEvent("showSkipButton: " + markerType)
     ' Set button label text
     if markerType = "intro"
         m.skipButtonLabel.text = "Skip Intro"
@@ -1028,6 +1084,9 @@ sub handleSkipPress()
         endMs = m.introMarker.endMs
     else if m.skipButtonType = "credits" and m.creditsMarker <> invalid
         endMs = m.creditsMarker.endMs
+    else if m.skipButtonType = "credits" and m.duration > 0
+        ' Fallback: no credits marker, seek to end
+        endMs = m.duration
     end if
 
     if endMs > 0
@@ -1078,7 +1137,13 @@ sub onNextEpisodeLoaded(event as Object)
     end for
 
     if nextEp <> invalid
-        ratingKey = SafeGet(nextEp, "ratingKey", "")
+        ratingKeyRaw = SafeGet(nextEp, "ratingKey", "")
+        ratingKeyType = type(ratingKeyRaw)
+        if ratingKeyType = "roString" or ratingKeyType = "String"
+            ratingKey = ratingKeyRaw
+        else
+            ratingKey = ratingKeyRaw.ToStr()
+        end if
         epTitle = SafeGet(nextEp, "title", "Episode " + (currentIndex + 1).ToStr())
         parentIndex = SafeGet(nextEp, "parentIndex", m.top.seasonIndex)
         epIndex = SafeGet(nextEp, "index", currentIndex + 1)
@@ -1091,14 +1156,17 @@ sub onNextEpisodeLoaded(event as Object)
             seasonEp: seasonEp
         }
 
-        ' If we're currently in credits range, show overlay now
-        if m.currentPosition <> invalid
+        ' If video already finished while we were fetching, start auto-play now
+        if m.video.state = "finished"
+            showAutoPlayOverlay()
+        else if m.currentPosition <> invalid
+            ' If we're currently in credits range, show overlay now
             inCredits = false
             if m.creditsMarker <> invalid
                 if m.currentPosition >= m.creditsMarker.startMs and m.currentPosition < m.creditsMarker.endMs
                     inCredits = true
                 end if
-            else if m.duration > 0 and m.currentPosition >= m.duration * 0.9
+            else if m.duration > 0 and m.currentPosition >= m.duration - 30000
                 inCredits = true
             end if
 
@@ -1107,24 +1175,189 @@ sub onNextEpisodeLoaded(event as Object)
             end if
         end if
     else
-        ' Last episode of season — no auto-play
+        ' No next episode in current season - try next season
+        if m.top.grandparentRatingKey <> "" and m.top.grandparentRatingKey <> invalid
+            fetchNextSeason()
+        else
+            m.noNextEpisode = true
+        end if
+    end if
+end sub
+
+' Fetch the show's seasons to find the next one after the current season
+sub fetchNextSeason()
+    m.fetchingNextEpisode = true
+
+    task = CreateObject("roSGNode", "PlexApiTask")
+    task.endpoint = "/library/metadata/" + m.top.grandparentRatingKey + "/children"
+    task.observeField("status", "onSeasonsForNextLoaded")
+    task.control = "run"
+    m.nextSeasonTask = task
+end sub
+
+' Called when seasons list is fetched for season-boundary transition
+sub onSeasonsForNextLoaded(event as Object)
+    state = event.getData()
+    m.fetchingNextEpisode = false
+    if state <> "completed" then return
+
+    response = m.nextSeasonTask.response
+    if response = invalid or response.MediaContainer = invalid
         m.noNextEpisode = true
+        return
+    end if
+
+    seasons = SafeGet(response.MediaContainer, "Metadata", [])
+    if seasons = invalid or seasons.count() = 0
+        m.noNextEpisode = true
+        return
+    end if
+
+    ' Find current season by parentRatingKey, then get next season
+    currentParentKey = m.top.parentRatingKey
+    currentSeasonIndex = -1
+    for i = 0 to seasons.count() - 1
+        season = seasons[i]
+        seasonKeyRaw = SafeGet(season, "ratingKey", "")
+        seasonKeyType = type(seasonKeyRaw)
+        if seasonKeyType = "roString" or seasonKeyType = "String"
+            seasonKey = seasonKeyRaw
+        else
+            seasonKey = seasonKeyRaw.ToStr()
+        end if
+        if seasonKey = currentParentKey
+            currentSeasonIndex = i
+            exit for
+        end if
+    end for
+
+    if currentSeasonIndex = -1 or currentSeasonIndex >= seasons.count() - 1
+        ' No next season found
+        m.noNextEpisode = true
+        return
+    end if
+
+    nextSeason = seasons[currentSeasonIndex + 1]
+    nextSeasonKeyRaw = SafeGet(nextSeason, "ratingKey", "")
+    nextSeasonKeyType = type(nextSeasonKeyRaw)
+    if nextSeasonKeyType = "roString" or nextSeasonKeyType = "String"
+        nextSeasonKey = nextSeasonKeyRaw
+    else
+        nextSeasonKey = nextSeasonKeyRaw.ToStr()
+    end if
+
+    m.nextSeasonNumber = SafeGet(nextSeason, "index", 0)
+    m.nextSeasonKey = nextSeasonKey
+    m.fetchingNextEpisode = true
+
+    ' Fetch episodes from the next season
+    task = CreateObject("roSGNode", "PlexApiTask")
+    task.endpoint = "/library/metadata/" + nextSeasonKey + "/children"
+    task.observeField("status", "onNextSeasonEpisodesLoaded")
+    task.control = "run"
+    m.nextSeasonEpisodesTask = task
+end sub
+
+' Called when next season episodes are fetched
+sub onNextSeasonEpisodesLoaded(event as Object)
+    state = event.getData()
+    m.fetchingNextEpisode = false
+    if state <> "completed" then return
+
+    response = m.nextSeasonEpisodesTask.response
+    if response = invalid or response.MediaContainer = invalid
+        m.noNextEpisode = true
+        return
+    end if
+
+    episodes = SafeGet(response.MediaContainer, "Metadata", [])
+    if episodes = invalid or episodes.count() = 0
+        m.noNextEpisode = true
+        return
+    end if
+
+    ' Take first episode (lowest index)
+    firstEp = invalid
+    lowestIndex = 99999
+    for each ep in episodes
+        epIndex = SafeGet(ep, "index", 99999)
+        if epIndex < lowestIndex
+            lowestIndex = epIndex
+            firstEp = ep
+        end if
+    end for
+
+    if firstEp = invalid
+        firstEp = episodes[0]
+    end if
+
+    ratingKeyRaw = SafeGet(firstEp, "ratingKey", "")
+    ratingKeyType = type(ratingKeyRaw)
+    if ratingKeyType = "roString" or ratingKeyType = "String"
+        ratingKey = ratingKeyRaw
+    else
+        ratingKey = ratingKeyRaw.ToStr()
+    end if
+
+    epTitle = SafeGet(firstEp, "title", "Episode 1")
+    epIndex = SafeGet(firstEp, "index", 1)
+    seasonNumber = m.nextSeasonNumber
+    seasonEp = "S" + seasonNumber.ToStr() + " E" + epIndex.ToStr()
+
+    m.nextEpisodeInfo = {
+        ratingKey: ratingKey
+        mediaKey: "/library/metadata/" + ratingKey
+        title: epTitle
+        seasonEp: seasonEp
+        isNewSeason: true
+        seasonNumber: seasonNumber
+    }
+
+    ' If video already finished while we were fetching, start auto-play now
+    if m.video.state = "finished"
+        showAutoPlayOverlay()
+    else if m.currentPosition <> invalid
+        inCredits = false
+        if m.creditsMarker <> invalid
+            if m.currentPosition >= m.creditsMarker.startMs and m.currentPosition < m.creditsMarker.endMs
+                inCredits = true
+            end if
+        else if m.duration > 0 and m.currentPosition >= m.duration - 30000
+            inCredits = true
+        end if
+
+        if inCredits and not m.autoPlayOverlayVisible
+            showAutoPlayOverlay()
+        end if
     end if
 end sub
 
 ' Show auto-play countdown overlay
 sub showAutoPlayOverlay()
     if m.autoPlayOverlayVisible or m.nextEpisodeInfo = invalid then return
+    LogEvent("showAutoPlayOverlay: " + m.nextEpisodeInfo.title)
 
     ' Hide skip button if visible (countdown replaces it)
     if m.skipButtonVisible
         hideSkipButton()
     end if
 
+    ' Set title based on whether it's a new season
+    if m.nextEpisodeInfo.isNewSeason = true
+        m.autoPlayTitle.text = "Starting Season " + m.nextEpisodeInfo.seasonNumber.ToStr()
+    else
+        m.autoPlayTitle.text = "Up Next"
+    end if
+
     ' Set episode info
     m.autoPlayEpisodeLabel.text = m.nextEpisodeInfo.seasonEp + " - " + m.nextEpisodeInfo.title
     m.countdownSeconds = 10
     m.autoPlayCountdownLabel.text = "Starting in 10..."
+
+    ' Reset progress bar to full width
+    if m.autoPlayProgressFill <> invalid
+        m.autoPlayProgressFill.width = 400
+    end if
 
     ' Show overlay with fade-in
     m.autoPlayOverlay.visible = true
@@ -1180,6 +1413,10 @@ sub onCountdownTick(event as Object)
         startNextEpisode()
     else
         m.autoPlayCountdownLabel.text = "Starting in " + m.countdownSeconds.ToStr() + "..."
+        ' Update shrinking progress bar (counts down from 10)
+        if m.autoPlayProgressFill <> invalid
+            m.autoPlayProgressFill.width = Int(400 * (m.countdownSeconds / 10.0))
+        end if
     end if
 end sub
 
@@ -1218,6 +1455,7 @@ sub startNextEpisode()
     m.fetchingNextEpisode = false
     m.introMarker = invalid
     m.creditsMarker = invalid
+    m.introSkipped = false
     m.autoPlayOverlayVisible = false
     m.autoPlayFocused = false
     m.autoPlayOverlay.visible = false
@@ -1252,6 +1490,7 @@ sub advancePlaylist(nextIndex as Integer)
     ' Reset marker and auto-play state
     m.introMarker = invalid
     m.creditsMarker = invalid
+    m.introSkipped = false
     if m.skipButtonVisible then hideSkipButton()
     if m.autoPlayOverlayVisible then hideAutoPlayOverlay()
     m.nextEpisodeInfo = invalid
@@ -1271,10 +1510,20 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
 
     ' Handle auto-play overlay keys (highest priority)
     if m.autoPlayFocused
+        LogEvent("Key during auto-play: " + key)
         if key = "OK"
-            startNextEpisode()
+            ' OK during countdown: cancel and show PostPlayScreen
+            cancelAutoPlay()
+            stopPlayback()
+            signalPlaybackComplete("cancelled")
             return true
         else if key = "back"
+            ' Back during countdown: cancel and exit to PostPlayScreen
+            cancelAutoPlay()
+            stopPlayback()
+            signalPlaybackComplete("stopped")
+            return true
+        else if key = "left" or key = "right"
             cancelAutoPlay()
             return true
         end if
@@ -1282,10 +1531,11 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
 
     ' Handle skip button keys (before track panel check)
     if m.skipButtonFocused
+        LogEvent("Key during skip button: " + key)
         if key = "OK"
             handleSkipPress()
             return true
-        else if key = "back"
+        else if key = "back" or key = "left" or key = "right"
             hideSkipButton()
             return true
         end if
@@ -1302,39 +1552,11 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
         return true
     else if key = "back"
         stopPlayback()
-        m.top.playbackComplete = true
-        return true
-    else if key = "fastforward" or key = "right"
-        ' Skip forward
-        if m.currentPosition <> invalid
-            newPos = (m.currentPosition + (c.SKIP_FORWARD_SEC * 1000)) / 1000
-            m.video.seek = newPos
-        end if
-        return true
-    else if key = "rewind" or key = "left"
-        ' Skip back
-        if m.currentPosition <> invalid
-            newPos = (m.currentPosition - (c.SKIP_BACK_SEC * 1000)) / 1000
-            if newPos < 0 then newPos = 0
-            m.video.seek = newPos
-        end if
-        return true
-    else if key = "play" or key = "pause"
-        if m.video.state = "playing"
-            m.video.control = "pause"
-            ' Pause countdown timer if active
-            if m.countdownActive
-                m.countdownTimer.control = "stop"
-            end if
-        else if m.video.state = "paused"
-            m.video.control = "resume"
-            ' Resume countdown timer if active
-            if m.countdownActive
-                m.countdownTimer.control = "start"
-            end if
-        end if
+        signalPlaybackComplete("stopped")
         return true
     end if
 
+    ' All other keys (play, pause, OK, FF, RW, left, right, up, down)
+    ' are handled by the Video node's built-in transport/trickplay UI
     return false
 end function

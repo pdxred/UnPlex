@@ -285,7 +285,22 @@ sub startPlayback(offset as Integer)
     m.player.mediaKey = "/library/metadata/" + ratingKeyStr
     m.player.startOffset = offset
     m.player.itemTitle = m.itemData.title
-    m.player.observeField("playbackComplete", "onPlaybackComplete")
+
+    ' Wire episode context for auto-play next episode
+    if m.itemData.type = "episode"
+        if m.itemData.grandparentRatingKey <> invalid
+            m.player.grandparentRatingKey = GetRatingKeyStr(m.itemData.grandparentRatingKey)
+        end if
+        if m.itemData.parentRatingKey <> invalid
+            m.player.parentRatingKey = GetRatingKeyStr(m.itemData.parentRatingKey)
+        end if
+        if m.itemData.index <> invalid
+            m.player.episodeIndex = m.itemData.index
+        end if
+    end if
+
+    m.player.observeField("playbackResult", "onPlaybackResult")
+    m.player.observeField("nextEpisodeStarted", "onNextEpisodeStarted")
 
     ' Add player to scene
     m.top.getScene().appendChild(m.player)
@@ -293,15 +308,35 @@ sub startPlayback(offset as Integer)
     m.player.control = "play"
 end sub
 
-sub onPlaybackComplete(event as Object)
-    ' Remove video player and refresh metadata
+sub onPlaybackResult(event as Object)
+    result = event.getData()
+    if result = invalid then return
+
+    ' Remove video player from scene
     if m.player <> invalid
         m.top.getScene().removeChild(m.player)
         m.player = invalid
     end if
-    m.buttonGroup.setFocus(true)
-    ' Refresh to update watched status after playback
-    loadMetadata(m.top.ratingKey)
+
+    ' Always push PostPlayScreen after playback ends
+    m.top.itemSelected = {
+        action: "postPlay"
+        ratingKey: result.ratingKey
+        itemTitle: result.itemTitle
+        hasNextEpisode: result.hasNextEpisode
+        nextEpisodeInfo: result.nextEpisodeInfo
+        grandparentRatingKey: result.grandparentRatingKey
+        viewOffset: result.viewOffset
+        duration: result.duration
+        isPlaylist: result.isPlaylist
+    }
+end sub
+
+sub onNextEpisodeStarted(event as Object)
+    ' Refresh metadata to reflect new episode being played
+    if m.player <> invalid
+        loadMetadata(m.player.ratingKey)
+    end if
 end sub
 
 sub markAsWatched()

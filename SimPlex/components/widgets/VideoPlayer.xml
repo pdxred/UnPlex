@@ -109,14 +109,14 @@
                 id="autoPlayFocusBorder"
                 translation="[-3, -3]"
                 width="406"
-                height="146"
+                height="151"
                 color="0x00000000"
                 visible="false"
             />
             <Rectangle
                 id="autoPlayBg"
                 width="400"
-                height="140"
+                height="145"
                 color="0x000000EE"
             />
             <Label
@@ -152,6 +152,8 @@
                 color="0xF3B125FF"
                 width="80"
             />
+            <Rectangle id="autoPlayProgressTrack" translation="[0, 135]" width="400" height="5" color="0xFFFFFF33" />
+            <Rectangle id="autoPlayProgressFill" translation="[0, 135]" width="400" height="5" color="0xF3B125FF" />
         </Group>
 
         <!-- Fade animations for auto-play overlay -->
