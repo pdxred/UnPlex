@@ -85,36 +85,36 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SAFE-01 | — | Pending |
-| SAFE-02 | — | Pending |
-| SAFE-03 | — | Pending |
-| FIX-01 | — | Pending |
-| FIX-02 | — | Pending |
-| FIX-03 | — | Pending |
-| FIX-04 | — | Pending |
-| FIX-05 | — | Pending |
-| FIX-06 | — | Pending |
-| FIX-07 | — | Pending |
-| NAV-01 | — | Pending |
-| NAV-02 | — | Pending |
-| NAV-03 | — | Pending |
-| NAV-04 | — | Pending |
-| SRV-01 | — | Pending |
-| SRV-02 | — | Pending |
-| BRAND-01 | — | Pending |
-| BRAND-02 | — | Pending |
-| BRAND-03 | — | Pending |
-| BRAND-04 | — | Pending |
-| DOCS-01 | — | Pending |
-| DOCS-02 | — | Pending |
-| DOCS-03 | — | Pending |
-| DOCS-04 | — | Pending |
+| SAFE-01 | Phase 11 | Pending |
+| SAFE-02 | Phase 11 | Pending |
+| SAFE-03 | Phase 11 | Pending |
+| FIX-07 | Phase 11 | Pending |
+| FIX-01 | Phase 12 | Pending |
+| FIX-02 | Phase 12 | Pending |
+| FIX-03 | Phase 12 | Pending |
+| FIX-04 | Phase 13 | Pending |
+| FIX-05 | Phase 13 | Pending |
+| FIX-06 | Phase 13 | Pending |
+| NAV-01 | Phase 14 | Pending |
+| NAV-02 | Phase 14 | Pending |
+| NAV-03 | Phase 14 | Pending |
+| NAV-04 | Phase 14 | Pending |
+| SRV-01 | Phase 15 | Pending |
+| SRV-02 | Phase 15 | Pending |
+| BRAND-01 | Phase 16 | Pending |
+| BRAND-02 | Phase 16 | Pending |
+| BRAND-03 | Phase 16 | Pending |
+| BRAND-04 | Phase 16 | Pending |
+| DOCS-01 | Phase 17 | Pending |
+| DOCS-02 | Phase 17 | Pending |
+| DOCS-03 | Phase 17 | Pending |
+| DOCS-04 | Phase 17 | Pending |
 
 **Coverage:**
 - v1.1 requirements: 24 total
-- Mapped to phases: 0
-- Unmapped: 24 ⚠️
+- Mapped to phases: 24
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-03-13*
-*Last updated: 2026-03-13 after initial definition*
+*Last updated: 2026-03-13 — traceability complete, all 24 requirements mapped to Phases 11-17*
