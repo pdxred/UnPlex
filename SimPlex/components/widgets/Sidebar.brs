@@ -4,47 +4,33 @@ sub init()
     m.top.height = 1080
     m.top.color = c.BG_SIDEBAR
 
-    m.libraryList = m.top.findNode("libraryList")
-    m.hubList = m.top.findNode("hubList")
-    m.bottomList = m.top.findNode("bottomList")
-    m.separator1 = m.top.findNode("separator1")
-    m.separator2 = m.top.findNode("separator2")
+    ' Position "Plex" label right after "Sim" at same vertical position
+    titleSim = m.top.findNode("titleSim")
+    titlePlex = m.top.findNode("titlePlex")
+    simBounds = titleSim.boundingRect()
+    titlePlex.translation = [20 + simBounds.width, 25]
+
+    m.navList = m.top.findNode("navList")
+    m.navList.itemSize = [c.SIDEBAR_WIDTH, 76]
+    m.navList.numRows = 12
 
     m.libraries = []
-    m.activeList = "library"
+    m.libraryCount = 0
 
-    ' Observe list selections
-    m.libraryList.observeField("itemSelected", "onLibrarySelected")
-    m.hubList.observeField("itemSelected", "onHubSelected")
-    m.bottomList.observeField("itemSelected", "onBottomSelected")
+    ' Observe selection
+    m.navList.observeField("itemSelected", "onItemSelected")
 
-    ' Delegate focus to active list when sidebar receives focus
+    ' Delegate focus to navList when sidebar receives focus
     m.top.observeField("focusedChild", "onFocusChange")
 
-    ' Set up hub and bottom lists (static items)
-    setupStaticLists()
+    ' Observe sidebar refresh signal from settings
+    m.global.observeField("sidebarNeedRefresh", "onSidebarNeedRefresh")
 
-    ' Fetch libraries
+    ' Build nav content immediately (nav items only, no separator at top)
+    buildNavContent()
+
+    ' Fetch libraries (will rebuild content with libraries when complete)
     loadLibraries()
-end sub
-
-sub setupStaticLists()
-    ' Hub items: Home, Collections
-    hubContent = CreateObject("roSGNode", "ContentNode")
-    node = hubContent.createChild("ContentNode")
-    node.title = "  Home"
-    node = hubContent.createChild("ContentNode")
-    node.title = "  Collections"
-    m.hubList.content = hubContent
-
-    ' Bottom items: Playlists, Search, Settings
-    bottomContent = CreateObject("roSGNode", "ContentNode")
-    bottomItems = ["Playlists", "Search", "Settings"]
-    for each item in bottomItems
-        node = bottomContent.createChild("ContentNode")
-        node.title = "  " + item
-    end for
-    m.bottomList.content = bottomContent
 end sub
 
 sub loadLibraries()
@@ -74,138 +60,152 @@ sub processLibraries()
         return
     end if
 
-    m.libraries = directories
-    content = CreateObject("roSGNode", "ContentNode")
-
+    ' Filter to supported library types (video only)
+    supported = []
     for each lib in directories
-        node = content.createChild("ContentNode")
-        ' Add icon prefix based on type
-        prefix = "  "
-        if lib.type = "movie"
-            prefix = "  " ' Could use unicode film icon if supported
-        else if lib.type = "show"
-            prefix = "  "
-        else if lib.type = "artist"
-            prefix = "  "
+        if lib.type = "movie" or lib.type = "show"
+            supported.push(lib)
         end if
-        node.title = prefix + lib.title
     end for
 
-    m.libraryList.content = content
+    ' Check for pinned sidebar libraries
+    pinnedLibs = GetSidebarLibraries()
+    if pinnedLibs.count() > 0
+        ' Show only pinned libraries in stored order
+        ordered = []
+        for each pinned in pinnedLibs
+            for each lib in supported
+                if lib.key = pinned.key
+                    ordered.push(lib)
+                    exit for
+                end if
+            end for
+        end for
+        m.libraries = ordered
+    else
+        ' No pinned libraries - show all alphabetically (backward compatible)
+        m.libraries = sortLibraries(supported)
+    end if
 
-    ' Position the other elements based on library count
-    layoutLists()
-
-    ' Focus library list
-    m.libraryList.setFocus(true)
+    m.libraryCount = m.libraries.count()
+    buildNavContent()
 end sub
 
-sub layoutLists()
-    libCount = m.libraries.count()
-    libHeight = libCount * 50
+sub buildNavContent()
+    content = CreateObject("roSGNode", "ContentNode")
 
-    ' Position separator1 after library list
-    m.separator1.translation = [20, 100 + libHeight + 10]
+    ' Library items
+    for each lib in m.libraries
+        node = content.createChild("ContentNode")
+        node.title = lib.title
+        node.addFields({ isSeparator: false })
+    end for
 
-    ' Position hub list after separator1
-    m.hubList.translation = [0, 100 + libHeight + 22]
-    hubHeight = 2 * 50  ' 2 hub items (Home, Collections)
+    ' Only add separator between libraries and nav when libraries exist
+    if m.libraryCount > 0
+        sep = content.createChild("ContentNode")
+        sep.title = ""
+        sep.addFields({ isSeparator: true })
+    end if
 
-    ' Position separator2 after hub list
-    m.separator2.translation = [20, 100 + libHeight + 22 + hubHeight + 10]
+    ' Navigation items
+    navItems = ["Home", "Collections", "Playlists", "Search", "Settings"]
+    for each navItem in navItems
+        node = content.createChild("ContentNode")
+        node.title = navItem
+        node.addFields({ isSeparator: false })
+    end for
 
-    ' Position bottom list after separator2
-    m.bottomList.translation = [0, 100 + libHeight + 22 + hubHeight + 22]
+    ' Trailing separator after Settings (visual bookend)
+    sep2 = content.createChild("ContentNode")
+    sep2.title = ""
+    sep2.addFields({ isSeparator: true })
+
+    m.navList.content = content
+
+    ' Reinitialize focus on navList after content change
+    if m.top.isInFocusChain()
+        m.navList.jumpToItem = 0
+        m.navList.setFocus(true)
+    end if
 end sub
 
-sub onLibrarySelected(event as Object)
+sub onItemSelected(event as Object)
     index = event.getData()
-    if index >= 0 and index < m.libraries.count()
+    lc = m.libraryCount
+
+    ' Calculate nav offset: libraries + separator (if libraries exist)
+    if lc > 0
+        navOffset = lc + 1  ' libraries + separator
+    else
+        navOffset = 0  ' no libraries, no separator
+    end if
+
+    if index < lc
+        ' Library selected
         lib = m.libraries[index]
         m.top.selectedLibrary = {
             sectionId: lib.key
             sectionType: lib.type
             title: lib.title
         }
-    end if
-end sub
-
-sub onHubSelected(event as Object)
-    index = event.getData()
-    if index = 0
+    else if lc > 0 and index = lc
+        ' Separator row - ignore
+        return
+    else if index = navOffset
         m.top.specialAction = "viewHome"
-    else if index = 1
+    else if index = navOffset + 1
         m.top.specialAction = "viewCollections"
-    end if
-end sub
-
-sub onBottomSelected(event as Object)
-    index = event.getData()
-    if index = 0
+    else if index = navOffset + 2
         m.top.specialAction = "playlists"
-    else if index = 1
+    else if index = navOffset + 3
         m.top.specialAction = "search"
-    else if index = 2
+    else if index = navOffset + 4
         m.top.specialAction = "settings"
     end if
 end sub
 
 sub onFocusChange(event as Object)
-    ' When Sidebar is in focus chain but no child has focus, delegate to active list
+    ' When Sidebar is in focus chain but no child has focus, delegate to navList
     if m.top.isInFocusChain() and m.top.focusedChild = invalid
-        if m.activeList = "library"
-            m.libraryList.setFocus(true)
-        else if m.activeList = "hub"
-            m.hubList.setFocus(true)
-        else if m.activeList = "bottom"
-            m.bottomList.setFocus(true)
-        end if
+        m.navList.jumpToItem = 0
+        m.navList.setFocus(true)
     end if
 end sub
+
+sub onSidebarNeedRefresh(event as Object)
+    if m.global.sidebarNeedRefresh = true
+        m.global.sidebarNeedRefresh = false
+        loadLibraries()
+    end if
+end sub
+
+function sortLibraries(libs as Object) as Object
+    sorted = []
+    for each lib in libs
+        sorted.push(lib)
+    end for
+    ' Simple insertion sort by title (small list)
+    for i = 1 to sorted.count() - 1
+        key = sorted[i]
+        j = i - 1
+        while j >= 0 and LCase(sorted[j].title) > LCase(key.title)
+            sorted[j + 1] = sorted[j]
+            j = j - 1
+        end while
+        sorted[j + 1] = key
+    end for
+    return sorted
+end function
 
 sub cleanup()
     if m.libraryTask <> invalid
         m.libraryTask.control = "stop"
         m.libraryTask.unobserveField("status")
     end if
-
-    m.libraryList.unobserveField("itemSelected")
-    m.hubList.unobserveField("itemSelected")
-    m.bottomList.unobserveField("itemSelected")
+    m.navList.unobserveField("itemSelected")
 end sub
 
 function onKeyEvent(key as String, press as Boolean) as Boolean
-    if not press then return false
-
-    if key = "down"
-        if m.activeList = "library"
-            if m.libraryList.itemFocused >= m.libraries.count() - 1
-                m.activeList = "hub"
-                m.hubList.setFocus(true)
-                return true
-            end if
-        else if m.activeList = "hub"
-            if m.hubList.itemFocused >= 1
-                m.activeList = "bottom"
-                m.bottomList.setFocus(true)
-                return true
-            end if
-        end if
-    else if key = "up"
-        if m.activeList = "bottom"
-            if m.bottomList.itemFocused <= 0
-                m.activeList = "hub"
-                m.hubList.setFocus(true)
-                return true
-            end if
-        else if m.activeList = "hub"
-            if m.hubList.itemFocused <= 0
-                m.activeList = "library"
-                m.libraryList.setFocus(true)
-                return true
-            end if
-        end if
-    end if
-
     return false
 end function

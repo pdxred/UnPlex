@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component name="SidebarNavItem" extends="Group">
+    <interface>
+        <field id="itemContent" type="node" onChange="onContentChange" />
+        <field id="focusPercent" type="float" onChange="onFocusChange" />
+        <field id="width" type="float" value="340" />
+        <field id="height" type="float" value="76" />
+    </interface>
+
+    <script type="text/brightscript" uri="SidebarNavItem.brs" />
+
+    <children>
+        <!-- Focus highlight -->
+        <Rectangle
+            id="focusBg"
+            width="340"
+            height="76"
+            color="0xFFFFFF10"
+            visible="false"
+        />
+
+        <!-- Focus accent bar (left edge) -->
+        <Rectangle
+            id="focusAccent"
+            width="4"
+            height="76"
+            color="0xE5A00DFF"
+            visible="false"
+        />
+
+        <!-- Nav item label -->
+        <Label
+            id="titleLabel"
+            translation="[24, 22]"
+            font="font:SmallSystemFont"
+            color="0xFFFFFFFF"
+            width="280"
+        />
+
+        <!-- Separator line -->
+        <Rectangle
+            id="separatorLine"
+            translation="[24, 36]"
+            width="280"
+            height="1"
+            color="0xFFFFFF20"
+            visible="false"
+        />
+    </children>
+</component>

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<component name="Sidebar" extends="Rectangle">
+<component name="Sidebar" extends="Rectangle" color="0x121314FF">
     <interface>
         <field id="selectedLibrary" type="assocarray" alwaysNotify="true" />
         <field id="specialAction" type="string" alwaysNotify="true" />
@@ -8,50 +8,36 @@
 
     <script type="text/brightscript" uri="pkg:/source/utils.brs" />
     <script type="text/brightscript" uri="pkg:/source/constants.brs" />
+    <script type="text/brightscript" uri="pkg:/source/logger.brs" />
     <script type="text/brightscript" uri="Sidebar.brs" />
 
     <children>
         <Label
-            id="titleLabel"
-            translation="[20, 30]"
-            text="PlexClassic"
+            id="titleSim"
+            translation="[20, 25]"
+            text="Sim"
             font="font:LargeBoldSystemFont"
-            color="0xE5A00DFF"
+            color="0xFFFFFFFF"
         />
-        <LabelList
-            id="libraryList"
+        <Label
+            id="titlePlex"
+            translation="[20, 25]"
+            text="Plex"
+            font="font:LargeBoldSystemFont"
+            color="0xF3B125FF"
+        />
+        <MarkupList
+            id="navList"
             translation="[0, 100]"
-            itemSize="[280, 50]"
-            focusedColor="0xE5A00DFF"
-            color="0xFFFFFFFF"
-        />
-        <Rectangle
-            id="separator1"
-            translation="[20, 0]"
-            width="240"
-            height="2"
-            color="0x2A2A4AFF"
-        />
-        <LabelList
-            id="hubList"
-            translation="[0, 0]"
-            itemSize="[280, 50]"
-            focusedColor="0xE5A00DFF"
-            color="0xFFFFFFFF"
-        />
-        <Rectangle
-            id="separator2"
-            translation="[20, 0]"
-            width="240"
-            height="2"
-            color="0x2A2A4AFF"
-        />
-        <LabelList
-            id="bottomList"
-            translation="[0, 0]"
-            itemSize="[280, 50]"
-            focusedColor="0xE5A00DFF"
-            color="0xFFFFFFFF"
+            itemSize="[280, 76]"
+            itemComponentName="SidebarNavItem"
+            drawFocusFeedback="false"
+            numRows="12"
+            sectionDividerHeight="0"
+            focusBitmapUri=""
+            focusFootprintBitmapUri=""
+            wrapDividerBitmapUri=""
+            wrapDividerHeight="0"
         />
     </children>
 </component>
