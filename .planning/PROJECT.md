@@ -36,9 +36,17 @@ Fast, intuitive library browsing and playback on a single personal Plex server w
 
 ### Active
 
-**v1.0 Gap Fixes**
-- [ ] Auto-play next episode wiring (grandparentRatingKey not passed to VideoPlayer) — PLAY-12, PLAY-13
-- [ ] watchStateChanged propagation to parent screens — PLAY-04, PLAY-05
+**Current Milestone: v1.1 Polish & Navigation**
+
+**Goal:** Fix v1.0 bugs, overhaul TV show navigation, clean up codebase, refresh branding, and document for GitHub.
+
+**Target features:**
+- TV show navigation overhaul (Show → Season list → Episode grid)
+- Bug fixes: collections, search layout, thumbnail aspect ratios, auto-play wiring, watch state propagation
+- Server switching: fix or remove cleanly
+- App branding: bolder font with gray stroke, gradient backgrounds on icon/splash
+- Codebase cleanup: orphaned code, brittle patterns, inefficiencies
+- Full documentation (user guide + developer/architecture), publish to GitHub
 
 **Future Features**
 - [ ] Music: album/artist browse, track list, playback queue, now-playing bar
@@ -99,4 +107,4 @@ Known issues: auto-play next episode has a wiring gap (grandparentRatingKey not 
 | Admin token preserved separately | Enables managed user switching without re-auth | ✓ Good |
 
 ---
-*Last updated: 2026-03-13 after v1.0 milestone*
+*Last updated: 2026-03-13 after v1.1 milestone started*

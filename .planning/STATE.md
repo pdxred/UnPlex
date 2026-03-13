@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: MVP
-status: Milestone shipped
-stopped_at: v1.0 archived
+milestone: v1.1
+milestone_name: Polish & Navigation
+status: Defining requirements
+stopped_at: null
 last_updated: "2026-03-13T00:00:00.000Z"
-last_activity: 2026-03-13 -- Archived v1.0 MVP milestone
+last_activity: 2026-03-13 -- Milestone v1.1 started
 progress:
-  total_phases: 10
-  completed_phases: 10
-  total_plans: 17
-  completed_plans: 17
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -21,22 +21,20 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-13)
 
 **Core value:** Fast, intuitive library browsing and playback on a single personal Plex server
-**Current focus:** Planning next milestone
+**Current focus:** v1.1 Polish & Navigation
 
 ## Current Position
 
-Phase: v1.0 complete — awaiting next milestone
-Status: Milestone shipped and archived
-Last activity: 2026-03-13 -- Archived v1.0 MVP milestone
-
-Progress: [██████████] 100%
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-13 — Milestone v1.1 started
 
 ## Accumulated Context
 
 ### Decisions
 
 Decisions are logged in PROJECT.md Key Decisions table.
-All v1.0 decisions archived — see PROJECT.md for full table.
 
 ### Pending Todos
 
@@ -49,5 +47,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-13
-Stopped at: v1.0 milestone archived
+Stopped at: Defining requirements for v1.1
 Resume command: /gsd:new-milestone
