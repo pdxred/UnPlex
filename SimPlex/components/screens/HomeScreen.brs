@@ -4,7 +4,7 @@ sub init()
     m.posterGrid = m.top.findNode("posterGrid")
     m.filterBar = m.top.findNode("filterBar")
     m.alphaNav = m.top.findNode("alphaNav")
-    m.loadingSpinner = invalid ' LoadingSpinner removed - causes firmware SIGSEGV crash
+    m.loadingSpinner = m.top.findNode("loadingSpinner")
     m.hubRowContainer = m.top.findNode("hubRowContainer")
     m.hubRowList = invalid
     m.emptyState = m.top.findNode("emptyState")

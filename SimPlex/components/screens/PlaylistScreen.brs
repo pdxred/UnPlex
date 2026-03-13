@@ -39,7 +39,7 @@ sub onRatingKeyChange(event as Object)
 end sub
 
 sub loadPlaylistItems(ratingKey as String)
-    m.loadingSpinner.showSpinner = true
+    if m.loadingSpinner <> invalid then m.loadingSpinner.showSpinner = true
     m.emptyState.visible = false
     m.retryGroup.visible = false
 
@@ -57,12 +57,12 @@ end sub
 sub onPlaylistItemsLoaded(event as Object)
     state = event.getData()
     if state = "completed"
-        m.loadingSpinner.showSpinner = false
+        if m.loadingSpinner <> invalid then m.loadingSpinner.showSpinner = false
         m.retryCount = 0
         m.retryGroup.visible = false
         processPlaylistItems()
     else if state = "error"
-        m.loadingSpinner.showSpinner = false
+        if m.loadingSpinner <> invalid then m.loadingSpinner.showSpinner = false
         if m.apiTask.responseCode < 0
             if m.retryCount = 0
                 m.retryCount = 1
@@ -237,7 +237,7 @@ end sub
 
 sub retryLastRequest()
     if m.retryContext = invalid then return
-    m.loadingSpinner.showSpinner = true
+    if m.loadingSpinner <> invalid then m.loadingSpinner.showSpinner = true
 
     task = CreateObject("roSGNode", "PlexApiTask")
     task.endpoint = m.retryContext.endpoint

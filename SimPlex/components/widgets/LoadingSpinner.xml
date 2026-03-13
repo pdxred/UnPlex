@@ -7,10 +7,30 @@
     <script type="text/brightscript" uri="LoadingSpinner.brs" />
 
     <children>
-        <BusySpinner
-            id="spinner"
-            poster="pkg:/images/spinner.png"
+        <!-- Semi-transparent overlay blocks input while loading -->
+        <Rectangle
+            id="overlay"
+            width="1920"
+            height="1080"
+            color="0x00000099"
             visible="false"
+        />
+        <!-- Centered loading label -->
+        <Label
+            id="spinner"
+            translation="[960, 530]"
+            text="Loading..."
+            font="font:MediumSystemFont"
+            color="0xA0A0B0FF"
+            horizAlign="center"
+            width="200"
+            visible="false"
+        />
+        <!-- 300ms delay timer: only show spinner if loading takes longer than this -->
+        <Timer
+            id="delayTimer"
+            duration="0.3"
+            repeat="false"
         />
     </children>
 </component>

@@ -16,7 +16,7 @@
             id="background"
             width="1920"
             height="1080"
-            color="0x1A1A2EFF"
+            color="0x000000FF"
         />
         <Label
             id="showTitleLabel"
@@ -29,7 +29,7 @@
             translation="[80, 120]"
             itemSize="[200, 50]"
             numRows="1"
-            focusedColor="0xE5A00DFF"
+            focusedColor="0xF3B125FF"
             color="0xFFFFFFFF"
         />
         <MarkupList
@@ -88,10 +88,6 @@
                 buttons="[&quot;Retry&quot;]"
             />
         </Group>
-        <LoadingSpinner
-            id="loadingSpinner"
-            translation="[960, 540]"
-            visible="true"
-        />
+        <LoadingSpinner id="loadingSpinner" />
     </children>
 </component>

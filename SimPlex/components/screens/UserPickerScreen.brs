@@ -26,7 +26,7 @@ sub onFocusChange(event as Object)
 end sub
 
 sub fetchHomeUsers()
-    m.loadingSpinner.showSpinner = true
+    if m.loadingSpinner <> invalid then m.loadingSpinner.showSpinner = true
     m.emptyState.visible = false
 
     ' Ensure admin token is saved before any switch
@@ -49,7 +49,7 @@ end sub
 
 sub onUsersLoaded(event as Object)
     state = event.getData()
-    m.loadingSpinner.showSpinner = false
+    if m.loadingSpinner <> invalid then m.loadingSpinner.showSpinner = false
 
     if state = "completed"
         processUsers()
@@ -177,7 +177,7 @@ sub onPinDialogClosed(event as Object)
 end sub
 
 sub switchToUser(userId as String, userName as String, pin as String)
-    m.loadingSpinner.showSpinner = true
+    if m.loadingSpinner <> invalid then m.loadingSpinner.showSpinner = true
 
     ' Use admin token for the switch request
     adminToken = GetAdminToken()
@@ -203,7 +203,7 @@ end sub
 
 sub onSwitchComplete(event as Object)
     state = event.getData()
-    m.loadingSpinner.showSpinner = false
+    if m.loadingSpinner <> invalid then m.loadingSpinner.showSpinner = false
 
     if state = "completed"
         response = m.switchTask.response

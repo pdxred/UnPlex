@@ -16,7 +16,7 @@
         <Rectangle
             width="1920"
             height="1080"
-            color="0x1A1A2EFF"
+            color="0x000000FF"
         />
         <Label
             id="titleLabel"
@@ -40,7 +40,7 @@
             itemSize="[1800, 80]"
             itemSpacing="[0, 5]"
             drawFocusFeedback="true"
-            focusBitmapBlendColor="0xE5A00DFF"
+            focusBitmapBlendColor="0xF3B125FF"
             vertFocusAnimationStyle="floatingFocus"
             itemComponentName="PlaylistItem"
         />
@@ -89,10 +89,6 @@
                 buttons='["Retry"]'
             />
         </Group>
-        <LoadingSpinner
-            id="loadingSpinner"
-            translation="[960, 540]"
-            visible="false"
-        />
+        <LoadingSpinner id="loadingSpinner" />
     </children>
 </component>

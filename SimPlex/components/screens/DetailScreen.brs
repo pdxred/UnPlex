@@ -51,7 +51,7 @@ sub onRatingKeyChange(event as Object)
 end sub
 
 sub loadMetadata(ratingKey as String)
-    m.loadingSpinner.showSpinner = true
+    if m.loadingSpinner <> invalid then m.loadingSpinner.showSpinner = true
     m.retryGroup.visible = false
 
     endpoint = "/library/metadata/" + ratingKey
@@ -68,12 +68,12 @@ end sub
 sub onApiTaskStateChange(event as Object)
     state = event.getData()
     if state = "completed"
-        m.loadingSpinner.showSpinner = false
+        if m.loadingSpinner <> invalid then m.loadingSpinner.showSpinner = false
         m.retryCount = 0
         m.retryGroup.visible = false
         processMetadata()
     else if state = "error"
-        m.loadingSpinner.showSpinner = false
+        if m.loadingSpinner <> invalid then m.loadingSpinner.showSpinner = false
         if m.metadataTask.responseCode < 0
             if m.retryCount = 0
                 m.retryCount = 1
@@ -166,9 +166,9 @@ sub processMetadata()
         m.summaryLabel.text = ""
     end if
 
-    ' Set poster
+    ' Set thumbnail (16:9 for episodes/movies)
     if item.thumb <> invalid and item.thumb <> ""
-        m.poster.uri = BuildPosterUrl(item.thumb, 400, 600)
+        m.poster.uri = BuildPosterUrl(item.thumb, 640, 360)
     end if
 
     ' Store view offset
@@ -202,7 +202,7 @@ sub updateDetailProgress()
     ' Show progress bar
     m.detailProgressTrack.visible = true
     m.detailProgressFill.visible = true
-    m.detailProgressFill.width = Int(400 * progress)
+    m.detailProgressFill.width = Int(640 * progress)
     m.detailProgressFill.color = m.constants.ACCENT
 
     ' Calculate remaining time
@@ -315,13 +315,16 @@ sub markAsWatched()
 
     ' Rebuild buttons (will now show "Play" instead of "Resume")
     buildButtons()
+    m.buttonGroup.setFocus(true)
 
-    ' Propagate watch state change to parent screen
-    m.top.watchStateChanged = {
+    ' Propagate watch state change to parent screen via global
+    watchUpdate = {
         ratingKey: getRatingKeyString(m.itemData.ratingKey)
         viewCount: 1
         viewOffset: 0
     }
+    m.top.watchStateChanged = watchUpdate
+    m.global.watchStateUpdate = watchUpdate
 
     ' Fire API call
     task = CreateObject("roSGNode", "PlexApiTask")
@@ -341,13 +344,16 @@ sub markAsUnwatched()
 
     ' Rebuild buttons (will now show "Mark as Watched" instead of "Mark as Unwatched")
     buildButtons()
+    m.buttonGroup.setFocus(true)
 
-    ' Propagate watch state change to parent screen
-    m.top.watchStateChanged = {
+    ' Propagate watch state change to parent screen via global
+    watchUpdate = {
         ratingKey: getRatingKeyString(m.itemData.ratingKey)
         viewCount: 0
         viewOffset: m.viewOffset
     }
+    m.top.watchStateChanged = watchUpdate
+    m.global.watchStateUpdate = watchUpdate
 
     ' Fire API call
     task = CreateObject("roSGNode", "PlexApiTask")
@@ -381,7 +387,7 @@ end sub
 
 sub retryLastRequest()
     if m.retryContext = invalid then return
-    m.loadingSpinner.showSpinner = true
+    if m.loadingSpinner <> invalid then m.loadingSpinner.showSpinner = true
 
     task = CreateObject("roSGNode", "PlexApiTask")
     task.endpoint = m.retryContext.endpoint

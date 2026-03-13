@@ -22,6 +22,7 @@
 
     <script type="text/brightscript" uri="pkg:/source/utils.brs" />
     <script type="text/brightscript" uri="pkg:/source/constants.brs" />
+    <script type="text/brightscript" uri="pkg:/source/logger.brs" />
     <script type="text/brightscript" uri="VideoPlayer.brs" />
 
     <children>
@@ -29,7 +30,7 @@
             id="video"
             width="1920"
             height="1080"
-            enableUI="true"
+            enableTrickPlay="true"
         />
 
         <TrackSelectionPanel
@@ -44,30 +45,43 @@
                 height="1080"
                 color="0x00000088"
             />
-            <Group translation="[860, 490]">
-                <BusySpinner
+            <Group translation="[760, 490]">
+                <Label
                     id="transcodingSpinner"
-                    translation="[60, 0]"
+                    translation="[0, 0]"
+                    text="Please wait..."
+                    font="font:MediumSystemFont"
+                    color="0xFFFFFFFF"
+                    horizAlign="center"
+                    width="400"
                     visible="true"
                 />
                 <Label
                     id="transcodingLabel"
-                    translation="[0, 80]"
+                    translation="[0, 50]"
                     text="Switching subtitles..."
                     font="font:MediumSystemFont"
                     color="0xFFFFFFFF"
                     horizAlign="center"
-                    width="200"
+                    width="400"
                 />
             </Group>
         </Group>
         <!-- Skip button overlay - shown during intro/credits markers -->
         <Group id="skipButton" visible="false" opacity="0.0" translation="[1520, 940]">
             <Rectangle
+                id="skipButtonFocus"
+                translation="[-3, -3]"
+                width="306"
+                height="66"
+                color="0x00000000"
+                visible="false"
+            />
+            <Rectangle
                 id="skipButtonBg"
                 width="300"
                 height="60"
-                color="0x000000AA"
+                color="0x000000EE"
             />
             <Label
                 id="skipButtonLabel"
@@ -77,13 +91,6 @@
                 color="0xFFFFFFFF"
                 horizAlign="center"
                 width="300"
-            />
-            <Rectangle
-                id="skipButtonFocus"
-                width="300"
-                height="60"
-                color="0x00000000"
-                visible="false"
             />
         </Group>
 
@@ -98,10 +105,18 @@
         <!-- Auto-play next episode countdown overlay -->
         <Group id="autoPlayOverlay" visible="false" opacity="0.0" translation="[1420, 860]">
             <Rectangle
+                id="autoPlayFocusBorder"
+                translation="[-3, -3]"
+                width="406"
+                height="146"
+                color="0x00000000"
+                visible="false"
+            />
+            <Rectangle
                 id="autoPlayBg"
                 width="400"
                 height="140"
-                color="0x000000CC"
+                color="0x000000EE"
             />
             <Label
                 id="autoPlayTitle"
@@ -133,15 +148,8 @@
                 translation="[300, 100]"
                 text="Cancel"
                 font="font:SmallSystemFont"
-                color="0xE5A00DFF"
+                color="0xF3B125FF"
                 width="80"
-            />
-            <Rectangle
-                id="autoPlayFocusBorder"
-                width="400"
-                height="140"
-                color="0x00000000"
-                visible="false"
             />
         </Group>
 

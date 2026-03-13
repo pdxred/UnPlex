@@ -14,7 +14,7 @@
             id="background"
             width="1920"
             height="1080"
-            color="0x1A1A2EFF"
+            color="0x000000FF"
         />
         <Label
             id="titleLabel"
@@ -76,10 +76,6 @@
                 buttons="[&quot;Retry&quot;]"
             />
         </Group>
-        <LoadingSpinner
-            id="loadingSpinner"
-            translation="[1200, 500]"
-            visible="false"
-        />
+        <LoadingSpinner id="loadingSpinner" />
     </children>
 </component>

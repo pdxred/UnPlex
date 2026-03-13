@@ -15,7 +15,7 @@
         <Rectangle
             width="1920"
             height="1080"
-            color="0x1A1A2EFF"
+            color="0x000000FF"
         />
         <Label
             id="titleLabel"
@@ -28,13 +28,13 @@
         />
         <MarkupGrid
             id="userGrid"
-            translation="[360, 200]"
+            translation="[340, 200]"
             itemSize="[200, 250]"
             itemSpacing="[40, 40]"
             numColumns="5"
             numRows="2"
             drawFocusFeedback="true"
-            focusBitmapBlendColor="0xE5A00DFF"
+            focusBitmapBlendColor="0xF3B125FF"
             itemComponentName="UserAvatarItem"
         />
         <Group id="emptyState" translation="[960, 440]" visible="false">
@@ -58,10 +58,6 @@
                 translation="[-300, 60]"
             />
         </Group>
-        <LoadingSpinner
-            id="loadingSpinner"
-            translation="[960, 540]"
-            visible="true"
-        />
+        <LoadingSpinner id="loadingSpinner" />
     </children>
 </component>

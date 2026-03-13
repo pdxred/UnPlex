@@ -17,7 +17,7 @@
             id="sidebar"
             translation="[0, 0]"
         />
-        <Group id="contentArea" translation="[280, 0]">
+        <Group id="contentArea" translation="[340, 0]">
             <Group id="hubRowContainer" />
             <FilterBar
                 id="filterBar"
@@ -26,6 +26,11 @@
             <PosterGrid
                 id="posterGrid"
                 translation="[20, 100]"
+            />
+            <AlphaNav
+                id="alphaNav"
+                translation="[1520, 0]"
+                visible="false"
             />
             <Animation id="gridFadeOut" duration="0.15" easeFunction="linear">
                 <FloatFieldInterpolator
@@ -96,5 +101,6 @@
             />
         </Group>
         <Group id="filterBottomSheetContainer" />
+        <LoadingSpinner id="loadingSpinner" />
     </children>
 </component>

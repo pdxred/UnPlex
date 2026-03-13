@@ -8,6 +8,7 @@
 
     <script type="text/brightscript" uri="pkg:/source/utils.brs" />
     <script type="text/brightscript" uri="pkg:/source/constants.brs" />
+    <script type="text/brightscript" uri="pkg:/source/logger.brs" />
     <script type="text/brightscript" uri="SettingsScreen.brs" />
 
     <children>
@@ -15,7 +16,7 @@
             id="background"
             width="1920"
             height="1080"
-            color="0x1A1A2EFF"
+            color="0x000000FF"
         />
         <Group id="authGroup" translation="[0, 0]">
             <Rectangle
@@ -23,7 +24,7 @@
                 translation="[560, 290]"
                 width="800"
                 height="500"
-                color="0x232342FF"
+                color="0x121314FF"
             />
             <Label
                 id="authTitle"
@@ -46,7 +47,7 @@
                 translation="[960, 480]"
                 horizAlign="center"
                 font="font:LargeBoldSystemFont"
-                color="0xE5A00DFF"
+                color="0xF3B125FF"
             />
             <Label
                 id="authStatus"
@@ -76,14 +77,26 @@
                 id="settingsList"
                 translation="[80, 120]"
                 itemSize="[600, 60]"
-                focusedColor="0xE5A00DFF"
+                focusedColor="0xF3B125FF"
                 color="0xFFFFFFFF"
             />
+            <MarkupList
+                id="libraryList"
+                translation="[80, 120]"
+                itemSize="[800, 64]"
+                itemComponentName="LibrarySettingItem"
+                drawFocusFeedback="false"
+                visible="false"
+            />
+            <Label
+                id="libraryHint"
+                translation="[80, 980]"
+                font="font:SmallSystemFont"
+                color="0x606070FF"
+                width="800"
+                visible="false"
+            />
         </Group>
-        <LoadingSpinner
-            id="loadingSpinner"
-            translation="[960, 540]"
-            visible="false"
-        />
+        <LoadingSpinner id="loadingSpinner" />
     </children>
 </component>

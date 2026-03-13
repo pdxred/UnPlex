@@ -19,6 +19,9 @@ sub init()
     ' Observe server reconnected signal
     m.global.observeField("serverReconnected", "onServerReconnected")
 
+    ' Observe watch state updates from DetailScreen
+    m.global.observeField("watchStateUpdate", "onWatchStateUpdate")
+
     ' Observe season selection
     m.seasonList.observeField("itemFocused", "onSeasonFocused")
     m.seasonList.observeField("itemSelected", "onSeasonSelected")
@@ -50,7 +53,7 @@ sub onRatingKeyChange(event as Object)
 end sub
 
 sub loadSeasons(ratingKey as String)
-    m.loadingSpinner.showSpinner = true
+    if m.loadingSpinner <> invalid then m.loadingSpinner.showSpinner = true
     m.retryGroup.visible = false
 
     endpoint = "/library/metadata/" + ratingKey + "/children"
@@ -65,7 +68,7 @@ sub loadSeasons(ratingKey as String)
 end sub
 
 sub loadEpisodes(seasonKey as String)
-    m.loadingSpinner.showSpinner = true
+    if m.loadingSpinner <> invalid then m.loadingSpinner.showSpinner = true
     m.emptyState.visible = false
     m.retryGroup.visible = false
 
@@ -83,12 +86,12 @@ end sub
 sub onSeasonsTaskStateChange(event as Object)
     state = event.getData()
     if state = "completed"
-        m.loadingSpinner.showSpinner = false
+        if m.loadingSpinner <> invalid then m.loadingSpinner.showSpinner = false
         m.retryCount = 0
         m.retryGroup.visible = false
         processSeasons()
     else if state = "error"
-        m.loadingSpinner.showSpinner = false
+        if m.loadingSpinner <> invalid then m.loadingSpinner.showSpinner = false
         currentTask = m.seasonsTask
         if currentTask.responseCode < 0
             if m.retryCount = 0
@@ -113,12 +116,12 @@ end sub
 sub onEpisodesTaskStateChange(event as Object)
     state = event.getData()
     if state = "completed"
-        m.loadingSpinner.showSpinner = false
+        if m.loadingSpinner <> invalid then m.loadingSpinner.showSpinner = false
         m.retryCount = 0
         m.retryGroup.visible = false
         processEpisodes()
     else if state = "error"
-        m.loadingSpinner.showSpinner = false
+        if m.loadingSpinner <> invalid then m.loadingSpinner.showSpinner = false
         currentTask = m.episodesTask
         if currentTask.responseCode < 0
             if m.retryCount = 0
@@ -407,11 +410,48 @@ sub startPlayback(episode as Object, offset as Integer)
     m.player.mediaKey = "/library/metadata/" + episode.ratingKey
     m.player.startOffset = offset
     m.player.itemTitle = episode.title
+
+    ' Set fields needed for auto-play next episode
+    m.player.grandparentRatingKey = m.top.ratingKey  ' Show ratingKey
+    if m.seasons.count() > m.currentSeasonIndex
+        season = m.seasons[m.currentSeasonIndex]
+        seasonKey = ""
+        if season.ratingKey <> invalid
+            if type(season.ratingKey) = "roString" or type(season.ratingKey) = "String"
+                seasonKey = season.ratingKey
+            else
+                seasonKey = season.ratingKey.ToStr()
+            end if
+        end if
+        m.player.parentRatingKey = seasonKey  ' Season ratingKey
+    end if
+    if episode.episodeNumber <> invalid
+        m.player.episodeIndex = episode.episodeNumber
+    end if
+    m.player.seasonIndex = m.currentSeasonIndex
+
     m.player.observeField("playbackComplete", "onPlaybackComplete")
+    m.player.observeField("nextEpisodeStarted", "onNextEpisodeStarted")
 
     m.top.getScene().appendChild(m.player)
     m.player.setFocus(true)
     m.player.control = "play"
+end sub
+
+sub onNextEpisodeStarted(event as Object)
+    ' Refresh episode list when auto-play advances to next episode
+    if m.seasons.count() > m.currentSeasonIndex
+        season = m.seasons[m.currentSeasonIndex]
+        seasonKey = ""
+        if season.ratingKey <> invalid
+            if type(season.ratingKey) = "roString" or type(season.ratingKey) = "String"
+                seasonKey = season.ratingKey
+            else
+                seasonKey = season.ratingKey.ToStr()
+            end if
+        end if
+        loadEpisodes(seasonKey)
+    end if
 end sub
 
 sub onPlaybackComplete(event as Object)
@@ -441,7 +481,7 @@ end sub
 
 sub retryLastRequest()
     if m.retryContext = invalid then return
-    m.loadingSpinner.showSpinner = true
+    if m.loadingSpinner <> invalid then m.loadingSpinner.showSpinner = true
 
     task = CreateObject("roSGNode", "PlexApiTask")
     task.endpoint = m.retryContext.endpoint
@@ -517,6 +557,28 @@ sub showError(message as String)
     dialog.message = [message]
     dialog.buttons = ["OK"]
     m.top.getScene().dialog = dialog
+end sub
+
+sub onWatchStateUpdate(event as Object)
+    update = event.getData()
+    if update = invalid or update.ratingKey = invalid then return
+
+    ratingKey = update.ratingKey
+    viewCount = update.viewCount
+
+    ' Update matching episode in episode list
+    if m.episodeList.content <> invalid
+        for i = 0 to m.episodeList.content.getChildCount() - 1
+            item = m.episodeList.content.getChild(i)
+            if item <> invalid and item.ratingKey = ratingKey
+                item.viewCount = viewCount
+                item.watched = (viewCount > 0)
+                if update.viewOffset <> invalid
+                    item.viewOffset = update.viewOffset
+                end if
+            end if
+        end for
+    end if
 end sub
 
 function onKeyEvent(key as String, press as Boolean) as Boolean
