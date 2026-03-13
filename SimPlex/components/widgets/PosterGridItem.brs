@@ -8,7 +8,11 @@ sub init()
 
     ' Cache constants and set badge tint color
     m.constants = m.global.constants
-    m.unwatchedBadge.blendColor = m.constants.ACCENT
+    if m.constants <> invalid
+        m.unwatchedBadge.blendColor = m.constants.ACCENT
+    else
+        m.unwatchedBadge.blendColor = "0xF3B125FF"
+    end if
 end sub
 
 sub onItemContentChange(event as Object)
@@ -50,7 +54,7 @@ sub updateProgressBar(content as Object)
         if progress > 1.0 then progress = 1.0
         m.progressTrack.visible = true
         m.progressFill.visible = true
-        m.progressFill.width = Int(240 * progress)
+        m.progressFill.width = Int(m.constants.POSTER_WIDTH * progress)
         m.progressFill.color = m.constants.ACCENT
     else
         m.progressTrack.visible = false
