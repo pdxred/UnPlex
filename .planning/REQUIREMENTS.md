@@ -11,7 +11,7 @@ Requirements for v1.1 Polish & Navigation. Each maps to roadmap phases.
 
 - [x] **SAFE-01**: BusySpinner SIGSEGV root cause confirmed and resolved (safe loading states across all screens)
 - [x] **SAFE-02**: Orphaned files deleted (normalizers.brs, capabilities.brs)
-- [ ] **SAFE-03**: Utility code cleanup (extract common helpers, remove dead code patterns)
+- [x] **SAFE-03**: Utility code cleanup (extract common helpers, remove dead code patterns)
 
 ### Bug Fixes
 
@@ -21,7 +21,7 @@ Requirements for v1.1 Polish & Navigation. Each maps to roadmap phases.
 - [ ] **FIX-04**: Collections menu item navigates to collections browsing screen
 - [ ] **FIX-05**: Search results display without occluding search controls and are navigable
 - [ ] **FIX-06**: Movie libraries use poster aspect ratio for thumbnails; TV libraries use landscape/screen grab ratio
-- [ ] **FIX-07**: Progress bar width uses constant instead of hardcoded 240px
+- [x] **FIX-07**: Progress bar width uses constant instead of hardcoded 240px
 
 ### TV Show Navigation
 
@@ -87,8 +87,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | SAFE-01 | Phase 11 | Complete |
 | SAFE-02 | Phase 11 | Complete |
-| SAFE-03 | Phase 11 | Pending |
-| FIX-07 | Phase 11 | Pending |
+| SAFE-03 | Phase 11 | Complete |
+| FIX-07 | Phase 11 | Complete |
 | FIX-01 | Phase 12 | Pending |
 | FIX-02 | Phase 12 | Pending |
 | FIX-03 | Phase 12 | Pending |

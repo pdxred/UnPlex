@@ -29,7 +29,7 @@ Full details: [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)
 
 **Milestone Goal:** Fix v1.0 bugs, overhaul TV show navigation, clean up codebase, refresh branding, and publish to GitHub.
 
-- [ ] **Phase 11: Crash Safety and Foundation** - Confirm BusySpinner root cause, delete orphaned files, extract shared utilities, apply 1-line progress bar fix
+- [x] **Phase 11: Crash Safety and Foundation** - Confirm BusySpinner root cause, delete orphaned files, extract shared utilities, apply 1-line progress bar fix (completed 2026-03-13)
 - [ ] **Phase 12: Auto-play and Watch State** - Wire auto-play end-to-end from both entry points and propagate watch state to all parent screens
 - [ ] **Phase 13: Search, Collections, and Thumbnails** - Fix search layout, collections navigation, and thumbnail aspect ratios
 - [ ] **Phase 14: TV Show Navigation Overhaul** - Route TV show taps directly to EpisodeScreen with full season/episode grid and correct back stack
@@ -155,7 +155,7 @@ Plans:
 | 8. Auto-play Next Episode | v1.0 | 1/1 | Complete | 2026-03-10 |
 | 9. Collections and Playlists | v1.0 | 2/2 | Complete | 2026-03-10 |
 | 10. Managed Users | v1.0 | 1/1 | Complete | 2026-03-10 |
-| 11. Crash Safety and Foundation | 1/2 | In Progress|  | - |
+| 11. Crash Safety and Foundation | 2/2 | Complete   | 2026-03-13 | - |
 | 12. Auto-play and Watch State | v1.1 | 0/2 | Not started | - |
 | 13. Search, Collections, and Thumbnails | v1.1 | 0/2 | Not started | - |
 | 14. TV Show Navigation Overhaul | v1.1 | 0/2 | Not started | - |

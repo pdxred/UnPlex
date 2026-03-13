@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Polish & Navigation
 status: planning
-stopped_at: Completed 11-crash-safety-and-foundation plan 01 (11-01-PLAN.md)
-last_updated: "2026-03-13T19:12:46.832Z"
+stopped_at: Completed 11-crash-safety-and-foundation plan 02 (11-02-PLAN.md)
+last_updated: "2026-03-13T19:17:50.644Z"
 last_activity: 2026-03-13 — v1.1 roadmap created, 24 requirements mapped across 7 phases
 progress:
   total_phases: 7
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -47,6 +47,7 @@ Progress: [░░░░░░░░░░] 0%
 
 *Updated after each plan completion*
 | Phase 11-crash-safety-and-foundation P01 | 18 | 2 tasks | 19 files |
+| Phase 11-crash-safety-and-foundation P02 | 8 | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -60,6 +61,8 @@ Recent decisions affecting current work:
 - [v1.1 roadmap]: Server switching is removed entirely (not overhauled) — single-server scope per PROJECT.md
 - [Phase 11-crash-safety-and-foundation]: BusySpinner native Roku SceneGraph component causes firmware SIGSEGV ~3s after init — never use it; use Label+Rectangle overlay instead
 - [Phase 11-crash-safety-and-foundation]: LoadingSpinner uses 300ms delay Timer to prevent flash-of-spinner on fast loads
+- [Phase 11-crash-safety-and-foundation]: GetRatingKeyStr() is the single source of truth for ratingKey type coercion — no inline blocks anywhere
+- [Phase 11-crash-safety-and-foundation]: VideoPlayer.brs had zero inline ratingKey blocks (already clean) — no changes needed there
 
 ### Pending Todos
 
@@ -72,6 +75,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-13T19:12:46.828Z
-Stopped at: Completed 11-crash-safety-and-foundation plan 01 (11-01-PLAN.md)
+Last session: 2026-03-13T19:17:50.640Z
+Stopped at: Completed 11-crash-safety-and-foundation plan 02 (11-02-PLAN.md)
 Resume command: /gsd:plan-phase 11
