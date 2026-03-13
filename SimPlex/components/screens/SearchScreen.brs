@@ -127,14 +127,7 @@ sub processSearchResults()
         if hub.Metadata <> invalid
             for each item in hub.Metadata
                 ' Ensure ratingKey is stored as string
-                ratingKeyStr = ""
-                if item.ratingKey <> invalid
-                    if type(item.ratingKey) = "roString" or type(item.ratingKey) = "String"
-                        ratingKeyStr = item.ratingKey
-                    else
-                        ratingKeyStr = item.ratingKey.ToStr()
-                    end if
-                end if
+                ratingKeyStr = GetRatingKeyStr(item.ratingKey)
 
                 node = content.createChild("ContentNode")
                 node.addFields({

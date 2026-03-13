@@ -267,7 +267,7 @@ sub onButtonSelected(event as Object)
     else if action = "browseSeasons"
         m.top.itemSelected = {
             action: "episodes"
-            ratingKey: getRatingKeyString(m.itemData.ratingKey)
+            ratingKey: GetRatingKeyStr(m.itemData.ratingKey)
             title: m.itemData.title
         }
     else if action = "markWatched"
@@ -279,7 +279,7 @@ end sub
 
 sub startPlayback(offset as Integer)
     ' Create video player and start playback
-    ratingKeyStr = getRatingKeyString(m.itemData.ratingKey)
+    ratingKeyStr = GetRatingKeyStr(m.itemData.ratingKey)
     m.player = CreateObject("roSGNode", "VideoPlayer")
     m.player.ratingKey = ratingKeyStr
     m.player.mediaKey = "/library/metadata/" + ratingKeyStr
@@ -319,7 +319,7 @@ sub markAsWatched()
 
     ' Propagate watch state change to parent screen via global
     watchUpdate = {
-        ratingKey: getRatingKeyString(m.itemData.ratingKey)
+        ratingKey: GetRatingKeyStr(m.itemData.ratingKey)
         viewCount: 1
         viewOffset: 0
     }
@@ -331,7 +331,7 @@ sub markAsWatched()
     task.endpoint = "/:/scrobble"
     task.params = {
         "identifier": "com.plexapp.plugins.library"
-        "key": getRatingKeyString(m.itemData.ratingKey)
+        "key": GetRatingKeyStr(m.itemData.ratingKey)
     }
     task.control = "run"
     task.observeField("status", "onWatchedStateChange")
@@ -348,7 +348,7 @@ sub markAsUnwatched()
 
     ' Propagate watch state change to parent screen via global
     watchUpdate = {
-        ratingKey: getRatingKeyString(m.itemData.ratingKey)
+        ratingKey: GetRatingKeyStr(m.itemData.ratingKey)
         viewCount: 0
         viewOffset: m.viewOffset
     }
@@ -360,21 +360,12 @@ sub markAsUnwatched()
     task.endpoint = "/:/unscrobble"
     task.params = {
         "identifier": "com.plexapp.plugins.library"
-        "key": getRatingKeyString(m.itemData.ratingKey)
+        "key": GetRatingKeyStr(m.itemData.ratingKey)
     }
     task.control = "run"
     task.observeField("status", "onWatchedStateChange")
     m.watchedTask = task
 end sub
-
-function getRatingKeyString(ratingKey as Dynamic) as String
-    if ratingKey = invalid then return ""
-    if type(ratingKey) = "roString" or type(ratingKey) = "String"
-        return ratingKey
-    else
-        return ratingKey.ToStr()
-    end if
-end function
 
 sub onWatchedStateChange(event as Object)
     status = event.getData()

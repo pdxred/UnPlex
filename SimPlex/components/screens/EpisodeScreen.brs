@@ -173,16 +173,7 @@ sub processSeasons()
     if m.seasons.count() > 0
         m.currentSeasonIndex = 0
         season = m.seasons[0]
-        ' Ensure ratingKey is string
-        seasonKey = ""
-        if season.ratingKey <> invalid
-            if type(season.ratingKey) = "roString" or type(season.ratingKey) = "String"
-                seasonKey = season.ratingKey
-            else
-                seasonKey = season.ratingKey.ToStr()
-            end if
-        end if
-        loadEpisodes(seasonKey)
+        loadEpisodes(GetRatingKeyStr(season.ratingKey))
     end if
 
     m.seasonList.setFocus(true)
@@ -211,15 +202,7 @@ sub processEpisodes()
 
     for each episode in metadata
         node = content.createChild("ContentNode")
-        ' Ensure ratingKey is stored as string
-        ratingKeyStr = ""
-        if episode.ratingKey <> invalid
-            if type(episode.ratingKey) = "roString" or type(episode.ratingKey) = "String"
-                ratingKeyStr = episode.ratingKey
-            else
-                ratingKeyStr = episode.ratingKey.ToStr()
-            end if
-        end if
+        ratingKeyStr = GetRatingKeyStr(episode.ratingKey)
 
         node.addFields({
             title: episode.title
@@ -267,16 +250,7 @@ sub onSeasonFocused(event as Object)
     if index >= 0 and index < m.seasons.count() and index <> m.currentSeasonIndex
         m.currentSeasonIndex = index
         season = m.seasons[index]
-        ' Ensure ratingKey is string
-        seasonKey = ""
-        if season.ratingKey <> invalid
-            if type(season.ratingKey) = "roString" or type(season.ratingKey) = "String"
-                seasonKey = season.ratingKey
-            else
-                seasonKey = season.ratingKey.ToStr()
-            end if
-        end if
-        loadEpisodes(seasonKey)
+        loadEpisodes(GetRatingKeyStr(season.ratingKey))
     end if
 end sub
 
@@ -415,15 +389,7 @@ sub startPlayback(episode as Object, offset as Integer)
     m.player.grandparentRatingKey = m.top.ratingKey  ' Show ratingKey
     if m.seasons.count() > m.currentSeasonIndex
         season = m.seasons[m.currentSeasonIndex]
-        seasonKey = ""
-        if season.ratingKey <> invalid
-            if type(season.ratingKey) = "roString" or type(season.ratingKey) = "String"
-                seasonKey = season.ratingKey
-            else
-                seasonKey = season.ratingKey.ToStr()
-            end if
-        end if
-        m.player.parentRatingKey = seasonKey  ' Season ratingKey
+        m.player.parentRatingKey = GetRatingKeyStr(season.ratingKey)  ' Season ratingKey
     end if
     if episode.episodeNumber <> invalid
         m.player.episodeIndex = episode.episodeNumber
@@ -442,15 +408,7 @@ sub onNextEpisodeStarted(event as Object)
     ' Refresh episode list when auto-play advances to next episode
     if m.seasons.count() > m.currentSeasonIndex
         season = m.seasons[m.currentSeasonIndex]
-        seasonKey = ""
-        if season.ratingKey <> invalid
-            if type(season.ratingKey) = "roString" or type(season.ratingKey) = "String"
-                seasonKey = season.ratingKey
-            else
-                seasonKey = season.ratingKey.ToStr()
-            end if
-        end if
-        loadEpisodes(seasonKey)
+        loadEpisodes(GetRatingKeyStr(season.ratingKey))
     end if
 end sub
 
@@ -467,15 +425,7 @@ sub onPlaybackComplete(event as Object)
     ' Refresh episode list to update watched status
     if m.seasons.count() > m.currentSeasonIndex
         season = m.seasons[m.currentSeasonIndex]
-        seasonKey = ""
-        if season.ratingKey <> invalid
-            if type(season.ratingKey) = "roString" or type(season.ratingKey) = "String"
-                seasonKey = season.ratingKey
-            else
-                seasonKey = season.ratingKey.ToStr()
-            end if
-        end if
-        loadEpisodes(seasonKey)
+        loadEpisodes(GetRatingKeyStr(season.ratingKey))
     end if
 end sub
 

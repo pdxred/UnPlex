@@ -103,14 +103,7 @@ sub processPlaylistItems()
 
     itemIndex = 1
     for each item in metadata
-        ratingKeyStr = ""
-        if item.ratingKey <> invalid
-            if type(item.ratingKey) = "roString" or type(item.ratingKey) = "String"
-                ratingKeyStr = item.ratingKey
-            else
-                ratingKeyStr = item.ratingKey.ToStr()
-            end if
-        end if
+        ratingKeyStr = GetRatingKeyStr(item.ratingKey)
 
         ' Skip items with no ratingKey (deleted from library)
         if ratingKeyStr = "" then continue for

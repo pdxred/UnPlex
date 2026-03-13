@@ -76,6 +76,45 @@ sub ClearAuthData()
     LogEvent("Auth data cleared")
 end sub
 
+' Get pinned hub libraries from registry
+' Returns array of { key: "sectionId", title: "Library Name" }
+function GetPinnedLibraries() as Object
+    sec = CreateObject("roRegistrySection", "SimPlex")
+    json = sec.Read("pinnedLibraries")
+    if json = ""
+        return []
+    end if
+    parsed = ParseJson(json)
+    if parsed = invalid then return []
+    return parsed
+end function
+
+' Save pinned hub libraries to registry
+sub SetPinnedLibraries(libs as Object)
+    sec = CreateObject("roRegistrySection", "SimPlex")
+    sec.Write("pinnedLibraries", FormatJson(libs))
+    sec.Flush()
+end sub
+
+' Get sidebar pinned libraries from registry
+function GetSidebarLibraries() as Object
+    sec = CreateObject("roRegistrySection", "SimPlex")
+    json = sec.Read("sidebarLibraries")
+    if json = ""
+        return []
+    end if
+    parsed = ParseJson(json)
+    if parsed = invalid then return []
+    return parsed
+end function
+
+' Save sidebar pinned libraries to registry
+sub SetSidebarLibraries(libs as Object)
+    sec = CreateObject("roRegistrySection", "SimPlex")
+    sec.Write("sidebarLibraries", FormatJson(libs))
+    sec.Flush()
+end sub
+
 ' Build standard Plex headers as associative array
 function GetPlexHeaders() as Object
     di = CreateObject("roDeviceInfo")
@@ -159,4 +198,15 @@ function SafeGetMetadata(response as Dynamic) as Object
     if container = invalid then return []
     metadata = SafeGet(container, "Metadata", [])
     return metadata
+end function
+
+' Convert a ratingKey value to a guaranteed non-invalid String.
+' Plex API returns ratingKey as integer in some responses, string in others.
+' Usage: ratingKeyStr = GetRatingKeyStr(item.ratingKey)
+function GetRatingKeyStr(ratingKey as Dynamic) as String
+    if ratingKey = invalid then return ""
+    if type(ratingKey) = "roString" or type(ratingKey) = "String"
+        return ratingKey
+    end if
+    return ratingKey.ToStr()
 end function

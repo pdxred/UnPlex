@@ -353,14 +353,7 @@ sub addHubRow(rootContent as Object, title as String, metadata as Object, c as O
     for each item in metadata
         itemNode = rowNode.createChild("ContentNode")
 
-        ratingKeyStr = ""
-        if item.ratingKey <> invalid
-            if type(item.ratingKey) = "roString" or type(item.ratingKey) = "String"
-                ratingKeyStr = item.ratingKey
-            else
-                ratingKeyStr = item.ratingKey.ToStr()
-            end if
-        end if
+        ratingKeyStr = GetRatingKeyStr(item.ratingKey)
 
         itemNode.addFields({
             title: item.title
@@ -648,14 +641,7 @@ sub processApiResponse()
         node = content.createChild("ContentNode")
 
         ' Ensure ratingKey is stored as string
-        ratingKeyStr = ""
-        if item.ratingKey <> invalid
-            if type(item.ratingKey) = "roString" or type(item.ratingKey) = "String"
-                ratingKeyStr = item.ratingKey
-            else
-                ratingKeyStr = item.ratingKey.ToStr()
-            end if
-        end if
+        ratingKeyStr = GetRatingKeyStr(item.ratingKey)
 
         titleSortStr = ""
         if item.titleSort <> invalid
@@ -821,14 +807,7 @@ sub onCollectionsLoaded(event as Object)
         for each item in metadata
             node = content.createChild("ContentNode")
 
-            ratingKeyStr = ""
-            if item.ratingKey <> invalid
-                if type(item.ratingKey) = "roString" or type(item.ratingKey) = "String"
-                    ratingKeyStr = item.ratingKey
-                else
-                    ratingKeyStr = item.ratingKey.ToStr()
-                end if
-            end if
+            ratingKeyStr = GetRatingKeyStr(item.ratingKey)
 
             node.addFields({
                 title: item.title
@@ -962,14 +941,7 @@ sub onPlaylistsLoaded(event as Object)
             if item.playlistType = "video"
                 node = content.createChild("ContentNode")
 
-                ratingKeyStr = ""
-                if item.ratingKey <> invalid
-                    if type(item.ratingKey) = "roString" or type(item.ratingKey) = "String"
-                        ratingKeyStr = item.ratingKey
-                    else
-                        ratingKeyStr = item.ratingKey.ToStr()
-                    end if
-                end if
+                ratingKeyStr = GetRatingKeyStr(item.ratingKey)
 
                 node.addFields({
                     title: item.title
