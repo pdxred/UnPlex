@@ -156,7 +156,7 @@ Plans:
 | 9. Collections and Playlists | v1.0 | 2/2 | Complete | 2026-03-10 |
 | 10. Managed Users | v1.0 | 1/1 | Complete | 2026-03-10 |
 | 11. Crash Safety and Foundation | 2/2 | Complete    | 2026-03-13 | - |
-| 12. Auto-play and Watch State | v1.1 | 0/2 | Not started | - |
+| 12. Auto-play and Watch State | 1/2 | In Progress|  | - |
 | 13. Search, Collections, and Thumbnails | v1.1 | 0/2 | Not started | - |
 | 14. TV Show Navigation Overhaul | v1.1 | 0/2 | Not started | - |
 | 15. Server Switching Removal | v1.1 | 0/1 | Not started | - |

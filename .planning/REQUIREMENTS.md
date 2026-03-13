@@ -15,13 +15,14 @@ Requirements for v1.1 Polish & Navigation. Each maps to roadmap phases.
 
 ### Bug Fixes
 
-- [ ] **FIX-01**: Auto-play next episode fires correctly from both EpisodeScreen and DetailScreen (grandparentRatingKey wiring)
-- [ ] **FIX-02**: Auto-play countdown can be cancelled by user
+- [x] **FIX-01**: Auto-play next episode fires correctly from both EpisodeScreen and DetailScreen (grandparentRatingKey wiring)
+- [x] **FIX-02**: Auto-play countdown can be cancelled by user
 - [ ] **FIX-03**: Watch state changes propagate to parent screens (poster grids and hub rows)
 - [ ] **FIX-04**: Collections menu item navigates to collections browsing screen
 - [ ] **FIX-05**: Search results display without occluding search controls and are navigable
-- [ ] **FIX-06**: Movie libraries use poster aspect ratio for thumbnails; TV libraries use landscape/screen grab ratio
+- [ ] **FIX-06**: Thumbnail aspect ratio adapts based on image type — detect whether Plex is serving a poster (2:3) or screen grab (16:9) and size the grid item accordingly, rather than hardcoding by library type
 - [x] **FIX-07**: Progress bar width uses constant instead of hardcoded 240px
+- [ ] **FIX-08**: Subtitle/audio track selection panel must be accessible during playback — trigger with down arrow key (options key intercepted by Roku firmware on Video node; keep built-in trickplay bar)
 
 ### TV Show Navigation
 
@@ -89,8 +90,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SAFE-02 | Phase 11 | Complete |
 | SAFE-03 | Phase 11 | Complete |
 | FIX-07 | Phase 11 | Complete |
-| FIX-01 | Phase 12 | Pending |
-| FIX-02 | Phase 12 | Pending |
+| FIX-01 | Phase 12 | Complete |
+| FIX-02 | Phase 12 | Complete |
 | FIX-03 | Phase 12 | Pending |
 | FIX-04 | Phase 13 | Pending |
 | FIX-05 | Phase 13 | Pending |
