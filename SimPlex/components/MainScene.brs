@@ -13,6 +13,13 @@ sub init()
     ' Initialize global server disconnect/reconnect fields
     m.global.addFields({ serverUnreachable: false })
     m.global.addFields({ serverReconnected: false })
+
+    ' Watch state updates propagated from DetailScreen to grid screens
+    m.global.addFields({ watchStateUpdate: {} })
+
+    ' Signal to refresh hub rows and sidebar (set by SettingsScreen after pin changes)
+    m.global.addFields({ hubsNeedRefresh: false })
+    m.global.addFields({ sidebarNeedRefresh: false })
     m.global.observeField("serverUnreachable", "onServerUnreachable")
 
     ' Observe showSignOut field
@@ -217,6 +224,76 @@ sub showPlaylistScreen(ratingKey as String, title as String)
     m.top.currentScreen = "playlist"
 end sub
 
+sub showPostPlayScreen(data as Object)
+    screen = CreateObject("roSGNode", "PostPlayScreen")
+    if data.itemTitle <> invalid
+        screen.itemTitle = data.itemTitle
+    end if
+    if data.ratingKey <> invalid
+        screen.ratingKey = data.ratingKey
+    end if
+    if data.grandparentRatingKey <> invalid
+        screen.grandparentRatingKey = data.grandparentRatingKey
+    end if
+    screen.hasNextEpisode = (data.hasNextEpisode = true)
+    if data.nextEpisodeInfo <> invalid
+        screen.nextEpisodeInfo = data.nextEpisodeInfo
+    end if
+    if data.viewOffset <> invalid
+        screen.viewOffset = data.viewOffset
+    end if
+    if data.duration <> invalid
+        screen.duration = data.duration
+    end if
+    if data.isPlaylist <> invalid
+        screen.isPlaylist = data.isPlaylist
+    end if
+    screen.observeField("action", "onPostPlayAction")
+    screen.observeField("navigateBack", "onNavigateBack")
+    pushScreen(screen)
+    m.top.currentScreen = "postPlay"
+end sub
+
+sub onPostPlayAction(event as Object)
+    action = event.getData()
+    if action = invalid or action = "" then return
+
+    if action = "playNext"
+        ' Get next episode info before popping screen
+        postPlayScreen = getCurrentScreen()
+        nextInfo = invalid
+        if postPlayScreen <> invalid and postPlayScreen.nextEpisodeInfo <> invalid
+            nextInfo = postPlayScreen.nextEpisodeInfo
+        end if
+        popScreen()
+        ' Navigate to the next episode's detail screen
+        if nextInfo <> invalid
+            showDetailScreen(nextInfo.ratingKey, "episode")
+        end if
+    else if action = "replay"
+        ' Pop PostPlayScreen — calling screen is restored with Play button visible
+        popScreen()
+    else if action = "backToLibrary"
+        ' Pop all screens back to HomeScreen
+        while m.screenStack.count() > 1
+            currentScreen = m.screenStack.pop()
+            cleanupScreen(currentScreen)
+            m.screenContainer.removeChild(currentScreen)
+        end while
+        m.focusStack.clear()
+        ' Restore the home screen
+        homeScreen = m.screenStack.peek()
+        if homeScreen <> invalid
+            homeScreen.visible = true
+            homeScreen.setFocus(true)
+        end if
+        m.top.currentScreen = "home"
+    else if action = "playFromTimestamp"
+        ' Pop PostPlayScreen — calling screen is restored
+        popScreen()
+    end if
+end sub
+
 sub cleanupScreen(screen as Object)
     ' Unobserve all standard screen fields
     screen.unobserveField("itemSelected")
@@ -263,7 +340,7 @@ function getDeepFocusedChild(node as Object) as Object
     if node = invalid then return invalid
 
     child = node.focusedChild
-    if child <> invalid
+    if child <> invalid and child.isSameNode(node) = false
         return getDeepFocusedChild(child)
     else if node.hasFocus()
         return node
@@ -317,6 +394,8 @@ sub popScreen()
         m.top.currentScreen = "userPicker"
     else if previousScreen.subtype() = "PINScreen"
         m.top.currentScreen = "pin"
+    else if previousScreen.subtype() = "PostPlayScreen"
+        m.top.currentScreen = "postPlay"
     end if
 end sub
 
@@ -329,7 +408,7 @@ end function
 
 sub showExitDialog()
     dialog = CreateObject("roSGNode", "StandardMessageDialog")
-    dialog.title = "Exit PlexClassic?"
+    dialog.title = "Exit SimPlex?"
     dialog.message = ["Are you sure you want to exit?"]
     dialog.buttons = ["Exit", "Cancel"]
     dialog.observeField("buttonSelected", "onExitDialogButton")
@@ -373,6 +452,8 @@ sub onItemSelected(event as Object)
             showUserPickerScreen()
         else if data.action = "settings"
             showSettingsScreen()
+        else if data.action = "postPlay"
+            showPostPlayScreen(data)
         end if
     end if
 end sub

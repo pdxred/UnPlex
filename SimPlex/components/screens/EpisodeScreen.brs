@@ -396,7 +396,7 @@ sub startPlayback(episode as Object, offset as Integer)
     end if
     m.player.seasonIndex = m.currentSeasonIndex
 
-    m.player.observeField("playbackComplete", "onPlaybackComplete")
+    m.player.observeField("playbackResult", "onPlaybackResult")
     m.player.observeField("nextEpisodeStarted", "onNextEpisodeStarted")
 
     m.top.getScene().appendChild(m.player)
@@ -412,21 +412,28 @@ sub onNextEpisodeStarted(event as Object)
     end if
 end sub
 
-sub onPlaybackComplete(event as Object)
-    ' Remove video player
+sub onPlaybackResult(event as Object)
+    result = event.getData()
+    if result = invalid then return
+
+    ' Remove video player from scene
     if m.player <> invalid
         m.top.getScene().removeChild(m.player)
         m.player = invalid
     end if
 
-    ' TODO: Auto-play next episode with countdown
-    m.episodeList.setFocus(true)
-
-    ' Refresh episode list to update watched status
-    if m.seasons.count() > m.currentSeasonIndex
-        season = m.seasons[m.currentSeasonIndex]
-        loadEpisodes(GetRatingKeyStr(season.ratingKey))
-    end if
+    ' Always push PostPlayScreen after playback ends
+    m.top.itemSelected = {
+        action: "postPlay"
+        ratingKey: result.ratingKey
+        itemTitle: result.itemTitle
+        hasNextEpisode: result.hasNextEpisode
+        nextEpisodeInfo: result.nextEpisodeInfo
+        grandparentRatingKey: result.grandparentRatingKey
+        viewOffset: result.viewOffset
+        duration: result.duration
+        isPlaylist: result.isPlaylist
+    }
 end sub
 
 sub retryLastRequest()
