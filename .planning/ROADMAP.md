@@ -48,7 +48,7 @@ Full details: [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)
   2. The app compiles and sideloads cleanly with normalizers.brs and capabilities.brs deleted
   3. GetRatingKeyStr() exists as a single shared helper in utils.brs — no inline duplicate blocks remain
   4. Progress bar width in PosterGridItem references POSTER_WIDTH constant, not a hardcoded 240px value
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
 - [ ] 11-01: Confirm BusySpinner crash root cause and delete orphaned files
