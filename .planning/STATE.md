@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Polish & Navigation
 status: planning
-stopped_at: Completed 12-auto-play-and-watch-state plan 01 (12-01-PLAN.md)
-last_updated: "2026-03-13T23:41:51.784Z"
+stopped_at: Completed 12-auto-play-and-watch-state plan 02 (12-02-PLAN.md)
+last_updated: "2026-03-13T23:45:43.009Z"
 last_activity: 2026-03-13 — v1.1 roadmap created, 24 requirements mapped across 7 phases
 progress:
   total_phases: 7
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 4
-  completed_plans: 3
+  completed_plans: 4
   percent: 0
 ---
 
@@ -49,6 +49,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 11-crash-safety-and-foundation P01 | 18 | 2 tasks | 19 files |
 | Phase 11-crash-safety-and-foundation P02 | 8 | 2 tasks | 7 files |
 | Phase 12-auto-play-and-watch-state P01 | 55 | 3 tasks | 7 files |
+| Phase 12-auto-play-and-watch-state P02 | 8 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -66,6 +67,8 @@ Recent decisions affecting current work:
 - [Phase 11-crash-safety-and-foundation]: VideoPlayer.brs had zero inline ratingKey blocks (already clean) — no changes needed there
 - [Phase 12-auto-play-and-watch-state]: playbackComplete boolean kept in VideoPlayer.xml — HomeScreen and PlaylistScreen still reference it; only DetailScreen and EpisodeScreen migrated to playbackResult
 - [Phase 12-auto-play-and-watch-state]: PostPlayScreen pushed via itemSelected action='postPlay' pattern; Back to Library pops all screens except HomeScreen directly; Play Next navigates to DetailScreen
+- [Phase 12-auto-play-and-watch-state]: watchStateUpdate emitted from scrobble() and signalPlaybackComplete() (not reportProgress) to avoid excessive grid re-renders
+- [Phase 12-auto-play-and-watch-state]: Watched checkmark uses Unicode Label (no new PNG asset); fully watched TV shows also show checkmark
 
 ### Pending Todos
 
@@ -78,6 +81,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-13T23:41:51.780Z
-Stopped at: Completed 12-auto-play-and-watch-state plan 01 (12-01-PLAN.md)
+Last session: 2026-03-13T23:45:43.004Z
+Stopped at: Completed 12-auto-play-and-watch-state plan 02 (12-02-PLAN.md)
 Resume command: /gsd:plan-phase 11
