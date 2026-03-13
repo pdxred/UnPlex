@@ -1,534 +1,604 @@
-# Architecture Patterns
-
-**Domain:** Roku Plex Media Client (scaling from ~20 to ~40+ components)
-**Researched:** 2026-03-08
-
-## Recommended Architecture
-
-**Stay with enhanced MVC + Observer pattern. Do NOT migrate to Maestro MVVM.**
-
-The existing architecture is sound and follows Roku-idiomatic patterns. The codebase already has clean separation: MainScene as controller, screens as views, tasks as I/O layer, normalizers as data transform layer. Maestro MVVM adds BrighterScript compilation, IOC containers, and binding syntax that increase build complexity and learning curve with limited benefit for a single-developer sideloaded channel. The ~20 existing components would need full rewrites. The ROI is negative for this project's scope.
-
-Instead, invest in three targeted architectural improvements: (1) a centralized API service layer, (2) media-type-polymorphic screen design, and (3) a task pool for reuse.
-
-### System Diagram
-
-```
-+----------------------------------------------------------+
-|  MainScene (Controller / Router)                          |
-|  - Screen stack management                                |
-|  - Navigation routing (onItemSelected dispatcher)         |
-|  - Auth flow orchestration                                |
-|  - Global state coordination                              |
-+--+-------+-------+-------+-------+-------+-------+-------+
-   |       |       |       |       |       |       |
-   v       v       v       v       v       v       v
-+------+ +------+ +------+ +------+ +------+ +------+ +------+
-| Home | |Detail| |Episo.| |Search| |Music | |Photo | |LiveTV|
-|Screen| |Screen| |Screen| |Screen| |Screen| |Screen| |Guide |
-+--+---+ +--+---+ +--+---+ +--+---+ +--+---+ +--+---+ +--+---+
-   |         |         |         |         |         |       |
-   v         v         v         v         v         v       v
-+--------------------------------------------------------------+
-|  Widgets Layer                                                |
-|  Sidebar | PosterGrid | MediaRow | VideoPlayer | MusicPlayer |
-|  FilterBar | EpisodeItem | TrackList | PhotoViewer | EPGGrid |
-|  SubtitleOverlay | PlaybackOverlay | NowPlayingBar           |
-+--------------------------------------------------------------+
-   |         |         |         |
-   v         v         v         v
-+--------------------------------------------------------------+
-|  API Service Layer (source/api/)                              |
-|  PlexApiService.brs  - endpoint builders, response routing    |
-|  PlexPlaybackService.brs - playback URL construction          |
-|  PlexMediaService.brs - media type detection, codec checks    |
-+--------------------------------------------------------------+
-   |
-   v
-+--------------------------------------------------------------+
-|  Task Layer (components/tasks/)                               |
-|  PlexApiTask (pooled, reused) | PlexSessionTask               |
-|  PlexSearchTask | PlexAuthTask | ServerConnectionTask         |
-+--------------------------------------------------------------+
-   |
-   v
-+--------------------------------------------------------------+
-|  Data Layer (source/)                                         |
-|  normalizers.brs  - JSON to ContentNode transforms            |
-|  utils.brs        - auth, headers, URL builders               |
-|  constants.brs    - all magic numbers and config              |
-|  capabilities.brs - server feature detection                  |
-|  logger.brs       - structured logging                        |
-+--------------------------------------------------------------+
-   |
-   v
-+--------------------------------------------------------------+
-|  Persistence Layer                                            |
-|  roRegistrySection("SimPlex") - auth, server, user prefs      |
-+--------------------------------------------------------------+
-```
-
-### Component Boundaries
-
-| Component | Responsibility | Communicates With | Data Direction |
-|-----------|---------------|-------------------|----------------|
-| **MainScene** | Screen lifecycle, navigation stack, auth routing, global state | All screens (creates/destroys), m.global | Downward: pushes screen params. Upward: observes `itemSelected`, `navigateBack` |
-| **Screens** | Full-screen UI for one feature. Own their child widgets and task instances | MainScene (via interface fields), widgets (via child nodes), tasks (via observer) | Down to widgets: sets `.content`, calls functions. Up to MainScene: sets `itemSelected` |
-| **Widgets** | Reusable UI building blocks. Stateless where possible | Parent screen (via interface fields) | Up: fires events (`itemSelected`, `loadMore`). Down: receives `.content` ContentNode |
-| **Tasks** | Background HTTP I/O exclusively. No UI references | Screens/widgets (via field observers), utils.brs | In: `endpoint`, `params`. Out: `status`, `response`, `error` |
-| **Normalizers** | Transform raw JSON to ContentNode trees | Called by screens after task completion | In: JSON array. Out: ContentNode tree |
-| **Utils/Services** | Shared helper functions included via `<script>` | Available to all components that include them | Stateless function calls |
-
-### Communication Rules
-
-1. **Screens to MainScene**: Always via `itemSelected` (assocarray with `action` field) or `navigateBack` (boolean). Never call MainScene methods directly.
-2. **Widgets to Screens**: Via observable interface fields defined in widget XML. Never reference parent screen.
-3. **Tasks to Screens**: Via `status` field observer. Task sets `status = "completed"` or `"error"`, screen reads `response`/`error` fields.
-4. **Cross-screen communication**: Via `m.global` fields only (e.g., `authRequired`, current user context). Keep this minimal.
-5. **No Task-to-Task communication**: All task coordination flows through the render thread.
-
-## Data Flow for New Features
-
-### Hub Rows (Continue Watching, Recently Added)
-
-```
-HomeScreen.init()
-  -> fetch /hubs via PlexApiTask
-  -> onHubsLoaded(): for each hub in response
-     -> create MediaRow widget
-     -> set MediaRow.content = NormalizeHubRow(hub.Metadata)
-     -> MediaRow handles horizontal scroll internally
-  -> MediaRow.itemSelected fires -> HomeScreen routes to detail
-```
-
-**Key decision:** Hub rows load as a single batch request to `/hubs`, not individual requests per hub. This minimizes task thread round-trips. The response contains multiple hub sections; normalize each into a separate ContentNode tree and assign to individual MediaRow widgets.
-
-### Subtitle and Audio Track Selection
-
-```
-VideoPlayer receives media metadata (already fetched)
-  -> processMediaInfo() extracts Stream[] from Part[0]
-  -> Filter streams by streamType: 1=video, 2=audio, 3=subtitle
-  -> Store in m.audioStreams[], m.subtitleStreams[]
-
-User presses * (options) during playback
-  -> Show PlaybackOverlay widget (new)
-  -> PlaybackOverlay displays audio/subtitle track lists
-  -> User selects track -> PlaybackOverlay.trackSelected fires
-  -> VideoPlayer sets subtitle/audio via:
-     - Embedded: m.video.globalCaptionMode / subtitleTrack
-     - Sidecar SRT: fetch via PlexApiTask, inject into ContentNode
-     - Burn-in: rebuild transcode URL with subtitleStreamID param
-```
-
-**Important:** Roku's built-in `Video` node supports embedded SRT/WebVTT subtitles natively. For ASS/SSA or PGS image-based subtitles, the only option is server-side burn-in via Plex transcode. Do NOT attempt to render these client-side.
-
-### Music Playback
-
-```
-MusicScreen (new)
-  -> Sidebar shows music libraries (type="artist" from /library/sections)
-  -> Browse: /library/sections/{id}/all -> NormalizeArtistList()
-  -> ArtistScreen -> /library/metadata/{id}/children -> NormalizeAlbumList()
-  -> AlbumScreen -> /library/metadata/{id}/children -> NormalizeTrackList()
-
-MusicPlayer (new widget, distinct from VideoPlayer)
-  -> Uses roAudioPlayer (NOT roVideo) for audio-only content
-  -> Manages play queue as ContentNode array
-  -> NowPlayingBar (persistent widget in MainScene, not screen-scoped)
-     -> Visible during music playback across all screens
-     -> Shows track info, play/pause, progress
-     -> Communicates with MusicPlayer via m.global fields
-```
-
-**Critical:** MusicPlayer must be a separate widget from VideoPlayer. `roVideo` works for music but wastes GPU resources. Audio playback also needs queue management (next/previous/shuffle/repeat) which is fundamentally different from video's single-item model. The NowPlayingBar must live in MainScene (outside screen stack) so it persists across screen navigation.
-
-### Live TV and DVR
-
-```
-LiveTVScreen (new)
-  -> Fetch /tv.plex.provider.epg/grid via PlexApiTask
-  -> EPGGrid (new widget): time-based grid, channels on Y, time on X
-  -> Channel select -> tune via /livetv/sessions (transcode-only, HLS)
-  -> DVR: /media/subscriptions for recordings list -> standard grid browse
-
-EPGGrid considerations:
-  -> Large dataset: 100+ channels x 24 hours = 2400+ cells
-  -> Must virtualize: only render visible portion
-  -> Use Timer to shift grid as time progresses
-  -> Roku MarkupGrid can handle this with careful ContentNode management
-```
-
-**Build order implication:** Live TV is the most complex new media type. It requires a custom EPGGrid widget that nothing else uses. Defer to a late phase.
-
-### Photos
-
-```
-PhotoScreen (new)
-  -> Browse: standard grid (reuse PosterGrid with different aspect ratio)
-  -> Full-screen viewer: single Poster node, scaled to fit
-  -> Slideshow: Timer-driven advancement through photo list
-  -> No playback state management needed (simplest media type)
-```
-
-### Managed Users
-
-```
-UserPickerScreen (new, shown after server connection)
-  -> Fetch /api/v2/home/users via PlexApiTask (plex.tv endpoint)
-  -> Display user avatars in grid
-  -> If user has PIN: show PINDialog (numeric keypad widget)
-  -> On user selected: switch X-Plex-Token to user-specific token
-  -> Store selected user in registry
-  -> m.global.currentUser field for cross-component access
-```
-
-**Data flow impact:** Managed users change the auth token used for all API requests. `GetPlexHeaders()` in utils.brs must read the current user's token, not just the admin token. This is a cross-cutting concern that affects every API call.
-
-## Patterns to Follow
-
-### Pattern 1: Task Node Pooling
-
-**What:** Reuse task nodes instead of creating new ones for each request.
-
-**When:** Any screen that makes multiple sequential API calls (most screens).
-
-**Why:** Creating a new `roSGNode("PlexApiTask")` allocates memory for the node, its fields, and its thread. Roku's garbage collection is not aggressive. Reusing tasks avoids this churn.
-
-**Current state:** HomeScreen already does this correctly (creates `m.apiTask` once in `init()` and reuses). VideoPlayer creates a fire-and-forget task for scrobble. The scrobble pattern is acceptable for one-shot calls but should not be the default.
-
-**Example:**
-```brightscript
-' GOOD: Reuse task (already done in HomeScreen)
-sub init()
-    m.apiTask = CreateObject("roSGNode", "PlexApiTask")
-    m.apiTask.observeField("status", "onApiTaskStateChange")
-end sub
-
-sub loadData()
-    m.apiTask.endpoint = "/some/endpoint"
-    m.apiTask.params = { key: "value" }
-    m.apiTask.control = "run"
-end sub
-
-' BAD: Creating new task per request
-sub loadData()
-    task = CreateObject("roSGNode", "PlexApiTask")  ' memory churn
-    task.observeField("status", "onTaskDone")
-    task.endpoint = "/some/endpoint"
-    task.control = "run"
-end sub
-```
-
-### Pattern 2: Normalizer-per-Media-Type
-
-**What:** One normalizer function per Plex content type. Each returns a ContentNode tree with type-specific fields.
-
-**When:** Adding support for new media types (music, photos, live TV).
-
-**Why:** The existing normalizers (`NormalizeMovieList`, `NormalizeShowList`, etc.) establish this pattern well. Extending it keeps the data transform layer consistent and testable. Normalizers should be the ONLY place where raw Plex JSON field names appear.
-
-**New normalizers needed:**
-```brightscript
-' source/normalizers.brs - add these
-function NormalizeArtistList(jsonArray) as Object    ' music
-function NormalizeAlbumList(jsonArray) as Object      ' music
-function NormalizeTrackList(jsonArray) as Object      ' music
-function NormalizePhotoList(jsonArray) as Object      ' photos
-function NormalizeHubRow(jsonArray) as Object         ' hub rows (mixed types)
-function NormalizeChannelList(jsonArray) as Object    ' live TV
-function NormalizeEPGData(jsonArray) as Object        ' live TV guide
-function NormalizePlaylist(jsonArray) as Object       ' playlists
-function NormalizeUserList(jsonArray) as Object       ' managed users
-```
-
-### Pattern 3: Screen Interface Contract
-
-**What:** Every screen exposes the same interface fields for MainScene to observe.
-
-**When:** Adding any new screen.
-
-**Why:** MainScene's `pushScreen()` blindly observes `itemSelected` and `navigateBack` on every screen. This contract must be maintained for the navigation stack to work.
-
-**Required interface for all screens:**
-```xml
-<interface>
-    <field id="itemSelected" type="assocarray" alwaysNotify="true" />
-    <field id="navigateBack" type="boolean" alwaysNotify="true" />
-</interface>
-```
-
-**Additional per-screen interface fields** (for MainScene to pass data in):
-```xml
-<!-- DetailScreen -->
-<field id="ratingKey" type="string" />
-<field id="itemType" type="string" />
-
-<!-- MusicScreen (new) -->
-<field id="sectionId" type="string" />
-
-<!-- UserPickerScreen (new) -->
-<field id="users" type="assocarray" />
-```
-
-### Pattern 4: Widget Cleanup Protocol
-
-**What:** Every screen implements a `cleanup()` function that unobserves all fields, stops tasks, and releases resources.
-
-**When:** On every `popScreen()` call.
-
-**Why:** Roku leaks memory when observers are left connected to removed nodes. The existing `cleanupScreen()` in MainScene calls `screen.callFunc("cleanup")` if the field exists. This pattern must be followed consistently.
-
-**Example:**
-```brightscript
-sub cleanup()
-    ' Stop all tasks
-    if m.apiTask <> invalid
-        m.apiTask.control = "stop"
-        m.apiTask.unobserveField("status")
-    end if
-
-    ' Unobserve child widgets
-    m.sidebar.unobserveField("selectedLibrary")
-    m.posterGrid.unobserveField("itemSelected")
-    m.posterGrid.unobserveField("loadMore")
-end sub
-```
-
-### Pattern 5: Action Routing via itemSelected
-
-**What:** Screens signal navigation intent by setting `m.top.itemSelected = { action: "actionName", ...params }`. MainScene's `onItemSelected` dispatches to the appropriate `show*Screen()` method.
-
-**When:** Adding new navigation targets.
-
-**Why:** This is the existing pattern and it works well. It keeps screens decoupled from each other - a screen never creates another screen directly.
-
-**Extending for new screens:**
-```brightscript
-' In MainScene.onItemSelected():
-sub onItemSelected(event as Object)
-    data = event.getData()
-    if data <> invalid
-        if data.action = "detail"
-            showDetailScreen(data.ratingKey, data.itemType)
-        else if data.action = "episodes"
-            showEpisodeScreen(data.ratingKey, data.title)
-        else if data.action = "search"
-            showSearchScreen()
-        else if data.action = "settings"
-            showSettingsScreen()
-        ' NEW actions:
-        else if data.action = "artist"
-            showArtistScreen(data.ratingKey)
-        else if data.action = "album"
-            showAlbumScreen(data.ratingKey)
-        else if data.action = "playlist"
-            showPlaylistScreen(data.ratingKey)
-        else if data.action = "livetv"
-            showLiveTVScreen()
-        else if data.action = "photo"
-            showPhotoScreen(data.ratingKey)
-        else if data.action = "users"
-            showUserPickerScreen()
-        end if
-    end if
-end sub
-```
-
-## Anti-Patterns to Avoid
-
-### Anti-Pattern 1: God Screen
-
-**What:** Putting all media-type-specific logic in a single screen (e.g., making HomeScreen handle music browse, photo browse, and video browse differently based on content type).
-
-**Why bad:** BrightScript has no classes or inheritance. A single screen handling 5 media types becomes an unmaintainable if/else chain. Focus management becomes a nightmare.
-
-**Instead:** Create separate screens per media type with shared widgets. `MusicScreen`, `PhotoScreen`, `LiveTVScreen` each compose `Sidebar`, `PosterGrid`, etc. as needed. Duplication of 10 lines of widget setup is preferable to 500 lines of conditional branching.
-
-### Anti-Pattern 2: Task-to-Task Communication
-
-**What:** Having one task node communicate directly with another task node.
-
-**Why bad:** Roku requires all inter-task communication to go through the render thread, doubling rendezvous count. It also creates implicit dependencies between tasks.
-
-**Instead:** Screen orchestrates: Task A completes -> screen processes -> sets up Task B. Sequential, explicit, debuggable.
-
-### Anti-Pattern 3: Storing State in m.global
-
-**What:** Using `m.global` as a general-purpose state store for user preferences, current library, current filter state, etc.
-
-**Why bad:** Every field set on `m.global` triggers a rendezvous. Too many global observers create performance bottlenecks. State becomes hard to reason about when any component can read/write it.
-
-**Instead:** Use `m.global` only for truly cross-cutting concerns: `authRequired` (boolean), `currentUserToken` (string), `nowPlaying` (assocarray for music bar). Everything else stays in screen-scoped `m.*` variables or is passed via interface fields.
-
-### Anti-Pattern 4: Creating Renderable Nodes in Tasks
-
-**What:** Building UI nodes (Labels, Posters, Rectangles) inside a Task thread.
-
-**Why bad:** Every property set on a renderable node from a Task thread triggers a full rendezvous with the render thread. This serializes execution and destroys performance.
-
-**Instead:** Tasks should return raw data (JSON parsed to associative arrays). Normalizers in the render thread build ContentNode trees. ContentNodes are non-renderable and can be created in either thread, but creating them in the render thread after task completion is simpler and avoids confusion.
-
-### Anti-Pattern 5: Deep Observer Chains
-
-**What:** Widget A observes Widget B, which observes Widget C, creating a chain of observer-triggered updates.
-
-**Why bad:** Debugging becomes impossible. Field changes cascade unpredictably. One change triggers multiple re-renders.
-
-**Instead:** Keep observer chains shallow (max 2 levels). Screen observes its direct child widgets. Widgets do NOT observe sibling widgets. If two widgets need to coordinate, the parent screen mediates.
-
-## Maestro MVVM Migration Assessment
-
-**Recommendation: Do NOT migrate. Confidence: HIGH.**
-
-### Arguments For Maestro
-- View lifecycle management (onShow, onHide, onFocus hooks)
-- MVVM binding reduces boilerplate observer setup
-- IOC container for dependency injection
-- Unit testable view models via Rooibos
-- Navigation framework (TabController, NavController)
-
-### Arguments Against Maestro (for this project)
-1. **Rewrite scope:** Every existing component needs conversion to BrighterScript + Maestro node classes. This is not incremental - it is a full rewrite of ~20 working components before any new features can be added.
-2. **Build toolchain:** Requires `bsc` (BrighterScript compiler) + `maestro-cli` + `ropm` package manager. Current project deploys by zipping a folder. Adding a build step for a sideloaded personal channel adds friction with no offsetting team-productivity benefit.
-3. **Single developer:** MVVM's benefits (testability, separation of concerns, team velocity) are most impactful on multi-developer projects. A solo developer already holds the full mental model.
-4. **Debugging cost:** Maestro's generated code makes debugger stack traces harder to read. The compilation step adds a translation layer between what you write and what runs on the device.
-5. **Lifecycle hooks already exist:** The current `cleanup()` pattern, `init()`, and `onKeyEvent()` provide the lifecycle hooks this app needs. Adding Maestro's `onShow`/`onHide`/`onFirstShow` hooks is nice but not necessary given the simple screen stack model.
-6. **Project constraint:** PROJECT.md explicitly lists "BrighterScript v1.0.0-alpha migration -- defer until stable release" as out of scope. Maestro requires BrighterScript.
-
-### What to Adopt Instead
-Cherry-pick Maestro's best ideas without the framework:
-- **Cleanup protocol:** Already implemented. Ensure consistency across all new screens.
-- **Focus management:** Add a `saveFocusState()` / `restoreFocusState()` helper to utils.brs for screens that need to preserve complex focus positions.
-- **Style centralization:** Keep using `GetConstants()` for all style values. Consider adding a `GetStyles()` function if component-level styling becomes repetitive.
-
-## Suggested Component Inventory (Target ~40 Components)
-
-### Screens (13 total, 6 new)
-
-| Screen | Status | Dependencies | Phase Implication |
-|--------|--------|-------------|-------------------|
-| HomeScreen | Existing | Sidebar, PosterGrid, FilterBar, MediaRow | Enhance with hub rows early |
-| DetailScreen | Existing | VideoPlayer | Enhance with resume, watched toggle |
-| EpisodeScreen | Existing | EpisodeItem | Enhance with auto-play next |
-| SearchScreen | Existing | PosterGrid | Stable |
-| PINScreen | Existing | PlexAuthTask | Stable |
-| ServerListScreen | Existing | ServerConnectionTask | Stable |
-| SettingsScreen | Existing | None | Enhance with prefs |
-| MusicScreen | **New** | Sidebar, PosterGrid/TrackList | Requires MusicPlayer widget first |
-| PhotoScreen | **New** | PosterGrid, PhotoViewer | Relatively independent |
-| LiveTVScreen | **New** | EPGGrid, VideoPlayer | Most complex, defer |
-| PlaylistScreen | **New** | PosterGrid, TrackList | After music basics |
-| UserPickerScreen | **New** | PINDialog | Early-ish (affects auth flow) |
-| CollectionScreen | **New** | PosterGrid | Simple, reuses existing widgets |
-
-### Widgets (16 total, 7 new)
-
-| Widget | Status | Used By |
-|--------|--------|---------|
-| Sidebar | Existing | HomeScreen, MusicScreen |
-| PosterGrid | Existing | HomeScreen, SearchScreen, PhotoScreen, CollectionScreen |
-| PosterGridItem | Existing | PosterGrid |
-| EpisodeItem | Existing | EpisodeScreen |
-| FilterBar | Existing | HomeScreen |
-| VideoPlayer | Existing | DetailScreen, LiveTVScreen |
-| LoadingSpinner | Existing | All screens |
-| MediaRow | Existing | HomeScreen (hub rows) |
-| KeyboardDialog | Existing | SearchScreen |
-| PlaybackOverlay | **New** | VideoPlayer (audio/subtitle selection, intro skip) |
-| SubtitleRenderer | **New** | VideoPlayer (sidecar SRT display) |
-| MusicPlayer | **New** | MusicScreen, MainScene (persists) |
-| NowPlayingBar | **New** | MainScene (persistent during music playback) |
-| PhotoViewer | **New** | PhotoScreen |
-| EPGGrid | **New** | LiveTVScreen |
-| TrackList | **New** | MusicScreen, PlaylistScreen |
-
-### Tasks (6 total, 0 new)
-
-| Task | Status | Notes |
-|------|--------|-------|
-| PlexApiTask | Existing | General-purpose, handles all new endpoints |
-| PlexAuthTask | Existing | Extend for managed user token switching |
-| PlexSearchTask | Existing | Stable |
-| PlexSessionTask | Existing | Extend for music scrobbling |
-| ServerConnectionTask | Existing | Stable |
-| ImageCacheTask | Existing | Stable |
-
-No new task types needed. `PlexApiTask` is general-purpose enough to handle all new API endpoints. Adding new tasks would fragment HTTP handling unnecessarily.
-
-## Build Order (Dependency-Driven)
-
-The dependencies between new components dictate the order in which features can be built:
-
-```
-Phase order by dependency chain:
-
-1. PlaybackOverlay widget
-   |- No dependencies on new components
-   |- Unlocks: subtitle selection, audio selection, intro skip
-
-2. Hub rows on HomeScreen
-   |- Requires: MediaRow (existing), NormalizeHubRow (new normalizer)
-   |- No new components, just HomeScreen enhancement
-
-3. Filters and sorting
-   |- Requires: FilterBar (existing, enhance)
-   |- No new components
-
-4. Resume/watched toggle on DetailScreen
-   |- No new components, DetailScreen enhancement
-
-5. Auto-play next episode
-   |- Requires: EpisodeScreen enhancement
-   |- Depends on: VideoPlayer playbackComplete handling
-
-6. UserPickerScreen
-   |- Requires: PINDialog enhancement
-   |- Cross-cutting: changes auth token flow in utils.brs
-   |- Should be done before features that depend on user context
-
-7. CollectionScreen + PlaylistScreen
-   |- Reuses: PosterGrid, existing patterns
-   |- Simple screen additions
-
-8. MusicPlayer + NowPlayingBar + MusicScreen + TrackList
-   |- MusicPlayer must come first (new audio engine)
-   |- NowPlayingBar depends on MusicPlayer
-   |- MusicScreen depends on both + TrackList
-   |- This is a connected cluster, build together
-
-9. PhotoScreen + PhotoViewer
-   |- Independent from everything else
-   |- Can be built anytime after core patterns established
-
-10. LiveTVScreen + EPGGrid
-    |- Most complex new feature
-    |- EPGGrid is unique widget (nothing reuses it)
-    |- Depends on server having Live TV capability
-    |- Build last
-```
-
-## Scalability Considerations
-
-| Concern | At current size (~20 components) | At target (~40 components) | Mitigation |
-|---------|----------------------------------|---------------------------|------------|
-| MainScene routing | 5-case if/else in onItemSelected | 12+ case if/else | Acceptable. BrightScript has no better dispatch mechanism. Keep cases alphabetically sorted. |
-| Screen stack memory | 2-3 screens deep | 4-5 screens deep (Home -> Artist -> Album -> Detail -> Player) | Add max depth check. Call `cleanup()` on all popped screens. Consider collapsing unnecessary intermediate screens. |
-| Observer count | ~20 active observers | ~40+ active observers | Ensure `cleanup()` unobserves everything. Only observe fields you actively need. |
-| ContentNode trees | Hundreds of nodes (library grid) | Thousands (EPG grid, music library) | Paginate aggressively. Use `removeChildIndex()` to trim old pages if memory is tight. |
-| Task concurrency | 1-2 tasks running simultaneously | 3-4 (API + session + search + image cache) | Acceptable for Roku. Do not exceed 5 concurrent tasks. |
-| normalizers.brs size | ~130 lines, 5 functions | ~300 lines, 14 functions | Consider splitting into `normalizers-video.brs`, `normalizers-music.brs`, `normalizers-livetv.brs` if file exceeds 400 lines. |
-
-## Sources
-
-- [Roku SceneGraph Core Concepts](https://developer.roku.com/docs/developer-program/core-concepts/core-concepts.md) - HIGH confidence
-- [Roku Optimization Techniques](https://developer.roku.com/docs/developer-program/performance-guide/optimization-techniques.md) - HIGH confidence (accessed via search summaries)
-- [Maestro-roku Documentation](https://georgejecook.github.io/maestro-roku/index.html) - HIGH confidence
-- [Maestro View Framework](https://georgejecook.github.io/maestro-roku/4.%20View%20Framework/index.html) - HIGH confidence
-- [Roku SceneGraph Threads](https://sdkdocs-archive.roku.com/SceneGraph-Threads_4262152.html) - HIGH confidence (rendezvous patterns)
-- [Roku SceneGraph Benchmarks: AA vs Node](https://medium.com/dazn-tech/rokus-scenegraph-benchmarks-aa-vs-node-9be5158474c1) - MEDIUM confidence
-- [Plex Labs RSG Application](https://medium.com/plexlabs/xml-code-good-times-rsg-application-b963f0cec01b) - MEDIUM confidence
+# Architecture Research
+
+**Domain:** Roku SceneGraph / BrightScript Plex client — v1.1 Polish & Navigation
+**Researched:** 2026-03-13
+**Confidence:** HIGH (analysis of live codebase, no speculation)
 
 ---
 
-*Architecture research: 2026-03-08*
+## System Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        MainScene (root)                              │
+│  screenStack: []   focusStack: []   m.global.constants              │
+├─────────────────────────────────────────────────────────────────────┤
+│                       Screen Layer (push/pop)                        │
+│  ┌───────────┐  ┌────────────┐  ┌─────────────┐  ┌──────────────┐  │
+│  │HomeScreen │  │DetailScreen│  │EpisodeScreen│  │ SearchScreen │  │
+│  │(sidebar + │  │(movie/ep   │  │(season list │  │(keyboard +   │  │
+│  │ grid/hubs)│  │ detail)    │  │ + ep list)  │  │ PosterGrid)  │  │
+│  └───────────┘  └────────────┘  └─────────────┘  └──────────────┘  │
+│  ┌───────────┐  ┌────────────┐  ┌─────────────┐                     │
+│  │Settings   │  │UserPicker  │  │Playlist     │                     │
+│  │Screen     │  │Screen      │  │Screen       │                     │
+│  └───────────┘  └────────────┘  └─────────────┘                     │
+├─────────────────────────────────────────────────────────────────────┤
+│                       Widget Layer (reusable)                        │
+│  ┌──────────┐  ┌────────────┐  ┌──────────┐  ┌────────────────────┐ │
+│  │PosterGrid│  │EpisodeItem │  │VideoPlayer│  │TrackSelectionPanel│ │
+│  │(MarkupGrid│  │(MarkupList │  │(Video +  │  │(audio/subtitle)   │ │
+│  │+GridItem)│  │ item comp) │  │ overlays)│  │                   │ │
+│  └──────────┘  └────────────┘  └──────────┘  └────────────────────┘ │
+│  ┌──────────┐  ┌────────────┐  ┌──────────┐                         │
+│  │Sidebar   │  │FilterBar   │  │AlphaNav  │                         │
+│  └──────────┘  └────────────┘  └──────────┘                         │
+├─────────────────────────────────────────────────────────────────────┤
+│                        Task Layer (background HTTP)                  │
+│  ┌──────────┐  ┌────────────┐  ┌──────────────┐  ┌──────────────┐  │
+│  │PlexApiTask│  │PlexSearch  │  │PlexAuthTask  │  │PlexSession   │  │
+│  │(general) │  │Task        │  │(PIN OAuth)   │  │Task (progress│  │
+│  └──────────┘  └────────────┘  └──────────────┘  └──────────────┘  │
+│  ┌──────────┐                                                         │
+│  │ServerConn│                                                         │
+│  │ectionTask│                                                         │
+│  └──────────┘                                                         │
+├─────────────────────────────────────────────────────────────────────┤
+│                       Persistence Layer                              │
+│  roRegistrySection("SimPlex") — authToken, adminToken, serverUri,   │
+│  serverClientId, activeUserName, deviceId, pinnedLibraries,         │
+│  sidebarLibraries                                                    │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Component Responsibilities
+
+| Component | Responsibility | v1.1 Status |
+|-----------|----------------|-------------|
+| `MainScene` | Screen stack (push/pop/clear), auth routing, server disconnect/reconnect, dialog owner | Stable — minor extension for new popScreen type checks |
+| `HomeScreen` | Sidebar + hub rows + library grid (three-zone focus) | **Modified** — TV show tap routing change |
+| `DetailScreen` | Movie/episode detail + playback buttons + watched state toggle | Stable |
+| `EpisodeScreen` | Season list (LabelList) + episode list (MarkupList/EpisodeItem) + inline playback | **Modified** — overhaul target |
+| `SearchScreen` | Keyboard (left) + PosterGrid results (right) — left/right focus split | **Modified** — layout fix |
+| `PosterGrid` | MarkupGrid wrapper — pagination trigger, focus delegation | **Bug fix** — progress bar width |
+| `PosterGridItem` | Poster + title + progress bar + unwatched badge | **Bug fix** — hardcoded 240 width |
+| `EpisodeItem` | 16:9 thumbnail + title + summary + duration + progress + badge | Stable |
+| `VideoPlayer` | Video node + skip intro/credits + auto-play overlay + track panel + session reporting | Stable |
+| `SettingsScreen` | Auth, server discovery, library manager, user context | **Modified** — server switching simplified |
+| `PlexApiTask` | All PMS and plex.tv HTTP | Stable |
+
+---
+
+## TV Show Navigation: Current State and Overhaul Target
+
+### Current Flow (v1.0)
+
+```
+HomeScreen grid → itemSelected {action:"detail", itemType:"show"}
+    → MainScene.showDetailScreen()
+        → DetailScreen loads /library/metadata/{id}
+        → buildButtons() sees type="show" → adds "Browse Seasons" button
+        → user presses Browse Seasons → itemSelected {action:"episodes", ratingKey, title}
+            → MainScene.showEpisodeScreen()
+                → EpisodeScreen: LabelList seasons (top) + MarkupList episodes (below)
+```
+
+**Stack depth for TV show:** HomeScreen → DetailScreen → EpisodeScreen (3 levels)
+
+**Problem:** DetailScreen is an unnecessary intermediate screen for TV shows. The "Browse Seasons" button is non-obvious for a TV remote — users expect: grid tap → season/episode screen → play. The extra hop adds friction and the detail screen layout (poster left, metadata right, buttons below) is designed for movies, not for shows with season structure.
+
+### Overhaul Target (v1.1): Direct Navigation
+
+From the grid, TV show taps go directly to EpisodeScreen. DetailScreen remains accessible via an "Info" action from within EpisodeScreen.
+
+```
+HomeScreen grid → itemSelected {action:"episodes", ratingKey, title}  [for shows]
+    → MainScene.showEpisodeScreen(ratingKey, title)
+        → EpisodeScreen: season selector + episode list
+        → user can press * (options) → "Show Info" → pushes DetailScreen
+```
+
+**Stack depth for TV show:** HomeScreen → EpisodeScreen (2 levels, same as movies)
+
+### Integration Requirements
+
+**`HomeScreen.brs`:**
+In `onGridItemSelected` and hub row selection handlers, the current logic fires `{action:"detail"}` for all item types. Change the type check so shows fire `{action:"episodes"}` instead:
+
+```brightscript
+' Current (v1.0):
+m.top.itemSelected = {action: "detail", ratingKey: ratingKey, itemType: itemType}
+
+' Target (v1.1) — add type branch:
+if itemType = "show"
+    m.top.itemSelected = {action: "episodes", ratingKey: ratingKey, title: title}
+else
+    m.top.itemSelected = {action: "detail", ratingKey: ratingKey, itemType: itemType}
+end if
+```
+
+**`MainScene.brs`:**
+`onItemSelected` already has the `action:"episodes"` branch routing to `showEpisodeScreen`. No change needed.
+
+**`EpisodeScreen.brs`:**
+Add options key handler that fires `{action:"detail", ratingKey: m.top.ratingKey, itemType:"show"}` for users who want the show metadata screen. This makes DetailScreen an optional destination, not a required step.
+
+**Watch state propagation fix:**
+EpisodeScreen should emit `m.global.watchStateUpdate` after playback completes (same structure DetailScreen uses). HomeScreen already observes this field. The payload should include the show's `ratingKey` (the `m.top.ratingKey` in EpisodeScreen) so HomeScreen can update the show poster's unwatched episode badge.
+
+### Season/Episode Layout
+
+Currently EpisodeScreen uses:
+- `LabelList` — horizontal season tabs at top (numRows=1, items [200, 50])
+- `MarkupList` — vertical full-width episode rows using `EpisodeItem`
+
+The two-zone layout (tabs above, list below) is the right pattern and should be kept. The v1.1 work is layout polish: ensure the season list scrolls correctly if there are many seasons, add keyboard shortcut hints, and verify `EpisodeItem.brs` is correctly wired. The XML references `EpisodeItem.brs` via a `<script>` tag but the file must exist and have an `onItemContentChange` handler — verify this is in place.
+
+---
+
+## Search Layout Restructure
+
+### Current Layout Problem
+
+```
+SearchScreen (1920x1080):
+  Keyboard: translation="[80, 120]"   (~620px wide)
+  PosterGrid: translation="[700, 200]", gridWidth="1140"
+    → 6-column grid in 1140px = only 4 full columns fit (240px * 4 = 960, 5th clips)
+  Focus: left key → keyboard, right key → grid
+```
+
+The `PosterGrid` is instantiated with `gridWidth="1140"` but PosterGrid.brs sets `numColumns = c.GRID_COLUMNS` (6). This means only ~4 full posters fit in the 1140px right zone. The `gridWidth` field exists in the PosterGrid interface but currently has no effect on column count — it is just stored, never read.
+
+Additionally, search results flatten all Hub types (movies, shows, episodes, artists) into a single grid using the 240x360 portrait poster. Episodes appear with portrait frames for landscape thumbnails, which looks wrong.
+
+### Recommended Fix (v1.1)
+
+**Step 1 — Fix column count in search:** Make `PosterGrid.brs` read `gridWidth` and compute columns:
+
+```brightscript
+' In PosterGrid.brs onGridWidthChange() or in init():
+availableWidth = m.top.gridWidth
+columnWidth = c.POSTER_WIDTH + c.GRID_H_SPACING
+m.grid.numColumns = Int(availableWidth / columnWidth)  ' = 4 for 1140px
+```
+
+This makes the 4-column layout intentional rather than accidental clipping.
+
+**Step 2 — Keyboard collapse on grid focus:** When user moves right into the grid, hide the keyboard and expand the grid to full width:
+
+```brightscript
+' In SearchScreen.brs onKeyEvent:
+else if key = "right" and m.focusOnKeyboard
+    m.focusOnKeyboard = false
+    m.keyboard.visible = false
+    ' Reposition grid to full width
+    m.resultsGrid.translation = [80, 160]
+    m.top.findNode("searchQueryLabel").translation = [80, 80]
+    m.resultsGrid.setFocus(true)
+    return true
+else if key = "left" and not m.focusOnKeyboard
+    m.focusOnKeyboard = true
+    m.keyboard.visible = true
+    m.resultsGrid.translation = [700, 200]
+    m.top.findNode("searchQueryLabel").translation = [700, 120]
+    m.keyboard.setFocus(true)
+    return true
+```
+
+Full-width grid (1760px) at 6 columns shows the same density as the library grid, which makes result browsing feel consistent.
+
+**Step 3 — Search result type grouping (optional):** Rather than mixing all types into one flat grid, consider labeling sections ("Movies", "Shows") using a RowList or section headers. This is medium complexity and can be deferred if scope is tight.
+
+---
+
+## Thumbnail Aspect Ratio Changes
+
+### Problem
+
+`PosterGrid` and `PosterGridItem` hardcode 240x360 (2:3 portrait). This is correct for movies and TV shows. It fails for episodes (16:9) which appear pinched in portrait frames.
+
+### Current Thumbnail Requests by Context
+
+| Context | Requested Size | Ratio | Source |
+|---------|---------------|-------|--------|
+| Library grid (movies/shows) | 240x360 | 2:3 portrait | `PosterGridItem.brs` via `HDPosterUrl` |
+| Episode list thumbnails | 320x180 | 16:9 landscape | `EpisodeScreen.brs` line 247 |
+| Detail screen poster | 640x360 | 16:9 landscape | `DetailScreen.brs` line 172 |
+| Search results (mixed) | 240x360 | 2:3 portrait (wrong for episodes) | `SearchScreen.brs` line 149 |
+
+### Bug: Hardcoded Width in PosterGridItem
+
+`PosterGridItem.brs` line 57 hardcodes:
+```brightscript
+m.progressFill.width = Int(240 * progress)
+```
+
+This should use the actual poster width from constants:
+```brightscript
+m.progressFill.width = Int(m.constants.POSTER_WIDTH * progress)
+```
+
+One-line fix, no dependencies.
+
+### Aspect Ratio for v1.1 Scope
+
+The `EpisodeItem` widget already uses 213x120 (16:9) thumbnails — this is the right place for episode thumbnails. The issue is that collections browsed through the library grid occasionally show up in search results with wrong ratios, and episodes should never appear in a portrait PosterGrid.
+
+**For v1.1:** Fix the progress bar width bug. Ensure search results only show movies and shows (filter episodes and other types from `processSearchResults`), so the portrait grid issue is avoided rather than solved. A landscape `PosterGrid` variant is a future enhancement.
+
+---
+
+## Server Switching Architecture
+
+### Current State
+
+"Switch Server" appears in `SettingsScreen.brs` (index 4 in the settings list → `discoverServers()`). This function:
+1. Fires `PlexApiTask` to `plex.tv/api/v2/resources`
+2. Iterates servers and connections via `tryServerConnection()` / `onConnectionTestComplete()`
+3. On success: calls `SetServerUri()` (writes registry) but does NOT update `m.global.serverUri`
+4. Fires `m.top.authComplete = true` — which MainScene interprets as full re-auth complete → clears screen stack and shows home
+
+**Bugs:**
+- `m.global.serverUri` (if cached) is not updated after `SetServerUri()` in `onConnectionTestComplete`. Screens that use `GetServerUri()` (reads registry directly) are fine. Tasks that cache the URI during their init are not.
+- The discovery logic in SettingsScreen (`discoverServers()`, `tryServerConnection()`, `onConnectionTestComplete()`) duplicates the logic in `MainScene.navigateToServerList()` / `MainScene.autoConnectToServer()`.
+- Sequential connection testing (one at a time, fallback to next) is slow for a single-server use case.
+
+### Fix Decision: Remove "Switch Server", Keep "Re-authenticate"
+
+Since multi-server is explicitly out of scope (PROJECT.md), "Switch Server" is unnecessary complexity. The right user action for changing servers is to sign out and sign back in, which already works.
+
+**Replace** SettingsScreen item index 4 ("Switch Server") with either:
+- Nothing (remove from the menu), or
+- "Re-authenticate" which calls `signOut()` and `requestPin()` — identical to signing out
+
+This removes ~80 lines of duplicate discovery/connection logic from SettingsScreen and eliminates the stale `m.global.serverUri` bug.
+
+**If keep for future:** The fix is to add a global update helper in utils.brs:
+```brightscript
+sub UpdateServerUri(uri as String)
+    SetServerUri(uri)
+    if m.global <> invalid
+        m.global.serverUri = uri
+    end if
+end sub
+```
+And call this instead of `SetServerUri()` everywhere a new server URI is established.
+
+---
+
+## Watch State Propagation Gap
+
+### Problem
+
+When returning from EpisodeScreen (after watching episodes), HomeScreen's grid still shows old progress/watched state for the show poster. The `onWatchStateUpdate` observer in HomeScreen works for individual item updates (DetailScreen → HomeScreen path), but EpisodeScreen → HomeScreen is missing.
+
+### Current Propagation Paths
+
+| Source | Signal | Observer |
+|--------|--------|----------|
+| DetailScreen marks watched | `m.global.watchStateUpdate = {ratingKey, viewCount, viewOffset}` | HomeScreen.onWatchStateUpdate, EpisodeScreen.onWatchStateUpdate |
+| EpisodeScreen playback ends | `loadEpisodes()` called — episode list refreshed | Nothing propagates to HomeScreen |
+| EpisodeScreen options menu watched toggle | `m.episodeList.content = m.episodeList.content` (force re-render) | Nothing propagates to HomeScreen |
+
+### Fix
+
+After `onPlaybackComplete` in EpisodeScreen refreshes the episode list, it should also emit a watch state signal for the show itself. Since EpisodeScreen holds `m.top.ratingKey` (the show's ratingKey), it can emit:
+
+```brightscript
+' In EpisodeScreen.onPlaybackComplete(), after loadEpisodes():
+watchUpdate = {
+    ratingKey: m.top.ratingKey  ' show ratingKey
+    viewCount: -1               ' -1 = "needs refresh", not a known value
+    viewOffset: 0
+}
+m.global.watchStateUpdate = watchUpdate
+```
+
+HomeScreen's `onWatchStateUpdate` already scans its ContentNode grid by ratingKey and updates the matching item. The `-1` viewCount convention signals "re-fetch this item's data" vs an optimistic update. Alternatively, HomeScreen can simply reload the current library page when it returns to focus via a `onFocusChange` observer — simpler but causes a flash.
+
+---
+
+## Auto-Play Wiring Gap
+
+### Problem (Known from PROJECT.md)
+
+`grandparentRatingKey` is correctly passed to VideoPlayer from EpisodeScreen (line 416):
+```brightscript
+m.player.grandparentRatingKey = m.top.ratingKey  ' Show ratingKey
+m.player.parentRatingKey = seasonKey             ' Season ratingKey
+m.player.episodeIndex = episode.episodeNumber
+m.player.seasonIndex = m.currentSeasonIndex
+```
+
+The gap is that when VideoPlayer auto-plays the next episode and fires `nextEpisodeStarted`, EpisodeScreen's `onNextEpisodeStarted` handler calls `loadEpisodes(currentSeason)` but does not check if the new episode is in the *next* season. If auto-play crosses a season boundary, the episode list shows the wrong season.
+
+### Fix
+
+VideoPlayer's `nextEpisodeStarted` field should carry metadata about the next episode:
+```brightscript
+' VideoPlayer should set:
+m.top.nextEpisodeStarted = {
+    ratingKey: nextEpisode.ratingKey
+    seasonIndex: nextEpisode.seasonIndex  ' 0-based
+    episodeIndex: nextEpisode.index
+}
+```
+
+EpisodeScreen's `onNextEpisodeStarted` should update `m.currentSeasonIndex` and reload episodes if the season changed:
+```brightscript
+sub onNextEpisodeStarted(event as Object)
+    data = event.getData()
+    if data <> invalid and data.seasonIndex <> invalid
+        if data.seasonIndex <> m.currentSeasonIndex
+            m.currentSeasonIndex = data.seasonIndex
+            m.seasonList.jumpToItem = data.seasonIndex
+        end if
+    end if
+    ' Always refresh current season's episode list
+    loadEpisodes(m.seasons[m.currentSeasonIndex].ratingKey)
+end sub
+```
+
+---
+
+## Codebase Cleanup: Orphaned and Brittle Patterns
+
+### Orphaned Files
+
+| File | Issue | Action |
+|------|-------|--------|
+| `source/normalizers.brs` | Functions defined (NormalizeMovieList, NormalizeShowList, etc.) but never called — all screens do inline JSON→ContentNode conversion | **Delete** |
+| `source/capabilities.brs` | `ParseServerCapabilities()` defined but never called | **Delete** |
+
+Both files were written during planning phase as forward-looking scaffolding. They contradict the actual pattern that evolved (inline normalization per screen). Leaving them in creates confusion about which pattern to follow. Delete them; if future phases need normalizers, reintroduce with a clear adoption plan.
+
+### Brittle Patterns to Fix
+
+**1. ratingKey type coercion — duplicated in 8+ locations**
+
+Every screen repeats:
+```brightscript
+if type(season.ratingKey) = "roString" or type(season.ratingKey) = "String"
+    seasonKey = season.ratingKey
+else
+    seasonKey = season.ratingKey.ToStr()
+end if
+```
+
+`DetailScreen.brs` already has this as a local function `getRatingKeyString()`. Promote it to `utils.brs` as `GetRatingKeyStr(key as Dynamic) as String` and replace all instances.
+
+**2. Dead spinner code in every screen**
+
+Every screen has:
+```brightscript
+' LoadingSpinner removed - BusySpinner causes firmware SIGSEGV crashes on Roku
+m.loadingSpinner = invalid
+```
+...followed by guards like `if m.loadingSpinner <> invalid then m.loadingSpinner.showSpinner = true`.
+
+These guards are dead code. Remove all spinner-related lines from all screens. If loading indication is needed in a future phase, use a safe approach (a Rectangle + opacity animation).
+
+**3. Task creation pattern — new task per request**
+
+Several screens create a new `PlexApiTask` node for every request:
+```brightscript
+task = CreateObject("roSGNode", "PlexApiTask")
+task.endpoint = endpoint
+task.observeField("status", "handler")
+task.control = "run"
+m.someTask = task
+```
+
+HomeScreen already uses the better pattern (single task created in `init()`, reused). The "create per request" pattern is not catastrophically wrong (SceneGraph GC handles it), but it creates memory churn on large libraries. For v1.1 cleanup, EpisodeScreen and SearchScreen are the highest-traffic screens and should be updated to use a single reused task.
+
+**4. `showError()` vs `showErrorDialog()` inconsistency**
+
+Several screens have both `showError(message)` (no buttons, just OK) and `showErrorDialog(title, message)` (Retry/Dismiss buttons). They're slightly different dialogs used in slightly different contexts. Consolidate into one pattern: always show Retry/Dismiss, remove the standalone `showError`.
+
+---
+
+## Data Flow
+
+### TV Show Navigation Flow (after v1.1 overhaul)
+
+```
+User selects TV show in grid (HomeScreen)
+    ↓
+HomeScreen.onGridItemSelected:
+    itemType = "show" → m.top.itemSelected = {action:"episodes", ratingKey, title}
+    ↓
+MainScene.onItemSelected → showEpisodeScreen(ratingKey, title)
+    ↓
+EpisodeScreen.onRatingKeyChange → loadSeasons(ratingKey)
+    ↓ [PlexApiTask: /library/metadata/{id}/children]
+EpisodeScreen.processSeasons() → LabelList populated → loadEpisodes(season[0].ratingKey)
+    ↓ [PlexApiTask: /library/metadata/{seasonKey}/children]
+EpisodeScreen.processEpisodes() → MarkupList populated via EpisodeItem
+    ↓
+User selects episode → showResumeDialog (if offset > 5%) or startPlayback()
+    ↓
+startPlayback() → VideoPlayer appended to scene root, setFocus, control="play"
+    ↓
+VideoPlayer.onPlaybackComplete → EpisodeScreen.onPlaybackComplete
+    ↓
+EpisodeScreen: loadEpisodes(currentSeason) + emit m.global.watchStateUpdate  [NEW]
+    ↓
+HomeScreen.onWatchStateUpdate → scan grid ContentNode, update show's badge/progress
+```
+
+### Search Flow (after v1.1 layout fix)
+
+```
+SearchScreen pushed → keyboard visible (left), PosterGrid (right, 4 cols)
+    ↓
+User types → onTextChange → debounceTimer → performSearch()
+    ↓ [PlexSearchTask: /hubs/search?query=...]
+processSearchResults():
+    - flatten hub.Metadata (filter to movies + shows only, skip episodes/artists)
+    - build ContentNode, set HDPosterUrl with 240x360 portrait dimensions
+    ↓
+PosterGrid.content set → 4-column grid in right zone
+    ↓
+User presses right key:
+    m.focusOnKeyboard = false
+    keyboard.visible = false
+    resultsGrid repositioned to full width (1760px, 6 cols)
+    resultsGrid.setFocus(true)
+    ↓
+User selects item → m.top.itemSelected = {action:"detail"|"episodes", ratingKey, itemType}
+    ↓
+MainScene routes to DetailScreen or EpisodeScreen based on itemType
+```
+
+### Watch State Global Signal Flow
+
+```
+DetailScreen / EpisodeScreen (after watched toggle or playback)
+    ↓
+m.global.watchStateUpdate = {ratingKey, viewCount, viewOffset}
+    ↓
+All active observers fire simultaneously:
+  - HomeScreen.onWatchStateUpdate: scan grid ContentNode children by ratingKey, update
+  - EpisodeScreen.onWatchStateUpdate: scan episodeList ContentNode children by ratingKey, update
+```
+
+---
+
+## Component Boundaries: New vs Modified for v1.1
+
+### New Components
+
+None required. All v1.1 features integrate into existing components.
+
+### Modified Components
+
+| Component | Change Type | Description | Complexity |
+|-----------|------------|-------------|------------|
+| `HomeScreen.brs` | Routing logic | TV show taps → `{action:"episodes"}` instead of `{action:"detail"}` | XS — 5-line change |
+| `EpisodeScreen.brs` | Feature + bug fix | Watch state emission, auto-play season boundary fix, options key "Info" action | M |
+| `EpisodeScreen.xml` | Layout polish | Season list spacing, episode list visual improvements | S |
+| `SearchScreen.brs` | Layout + filter | Keyboard collapse on grid focus, filter episodes from results | S-M |
+| `SearchScreen.xml` | Layout | Coordinate adjustments if keyboard collapse is implemented | XS |
+| `PosterGridItem.brs` | Bug fix | `Int(240 * progress)` → `Int(m.constants.POSTER_WIDTH * progress)` | XS — 1-line |
+| `PosterGrid.brs` | Enhancement | Read `gridWidth` field to compute column count | XS |
+| `SettingsScreen.brs` | Simplification | Remove "Switch Server" discovery flow (~80 lines) | S |
+| `utils.brs` | Cleanup | Promote `getRatingKeyString` → `GetRatingKeyStr`, add `UpdateServerUri` if server switching kept | S |
+| `MainScene.brs` | Minor | `popScreen` type string check — verify covers all screen subtypes | XS |
+| `source/normalizers.brs` | Delete | Orphaned file | — |
+| `source/capabilities.brs` | Delete | Orphaned file | — |
+
+### Not Touched in v1.1
+
+- `VideoPlayer.xml/.brs` — Auto-play fix is a data-passing change in EpisodeScreen. VideoPlayer's `nextEpisodeStarted` field already fires; the fix is to enrich its payload.
+- `PlexApiTask.brs` — No changes needed.
+- `DetailScreen.xml/.brs` — Still used for movies and episode detail. No structural changes.
+- `Sidebar`, `FilterBar`, `AlphaNav`, `TrackSelectionPanel` — v1.1 does not touch these.
+- `PlexSessionTask`, `PlexAuthTask`, `ServerConnectionTask` — No changes.
+
+---
+
+## Suggested Build Order
+
+Build in dependency order to avoid blocked work:
+
+**1. utils.brs cleanup** (no dependencies)
+- Promote `GetRatingKeyStr()` helper
+- Remove dead spinner-related code from utils.brs if any
+
+**2. Delete orphaned files** (no dependencies)
+- Remove `normalizers.brs`, `capabilities.brs`
+
+**3. PosterGridItem progress bar bug fix** (no dependencies)
+- One-line change — do early to avoid merge conflicts
+
+**4. SettingsScreen server switching removal** (no dependencies)
+- Isolated change — remove "Switch Server" and discovery logic from SettingsScreen
+
+**5. Watch state propagation fix in EpisodeScreen** (depends on: utils.brs cleanup)
+- Add `m.global.watchStateUpdate` emission after playback and watched state toggle
+- HomeScreen already has the observer in place — this just wires the source
+
+**6. TV show direct navigation — HomeScreen tap routing** (depends on: watch state fix)
+- Change show tap from `{action:"detail"}` to `{action:"episodes"}`
+- Watch state must be in place so HomeScreen updates properly when EpisodeScreen pops
+
+**7. EpisodeScreen overhaul** (depends on: direct navigation in place)
+- Layout improvements, "Info" options key action, auto-play season fix
+- Do after direct navigation so EpisodeScreen is being actively exercised as the entry point
+
+**8. Search layout fix** (independent — can be done at any point after utils.brs)
+- Keyboard collapse, column count fix, episode type filtering
+
+**9. Branding / assets** (independent — no code dependencies)
+- Icon/splash gradient, font changes, manifest version bump
+
+**10. Documentation** (do last — after code is stable)
+- User guide and developer/architecture docs for GitHub publish
+
+---
+
+## Anti-Patterns to Avoid in v1.1
+
+### Anti-Pattern 1: Replacing MarkupList with Custom Scrolling
+
+**What people do:** Build a custom scrollable container because MarkupList "feels limiting."
+**Why it's wrong:** Custom scrolling on Roku's render thread is jittery and brittle. BusySpinner proved that deviating from built-in components causes firmware crashes (SIGSEGV).
+**Do this instead:** Use `MarkupList` for episodes, `MarkupGrid` for grids. Customize via `itemComponentName`.
+
+### Anti-Pattern 2: Moving HTTP Calls to the Render Thread
+
+**What people do:** Call `roUrlTransfer` synchronously in a BRS callback to "simplify" code.
+**Why it's wrong:** Causes rendezvous crashes. This is a hard platform constraint.
+**Do this instead:** Always use a Task node. PlexApiTask handles all cases.
+
+### Anti-Pattern 3: Proliferating m.global Signals
+
+**What people do:** Add new global signals for every cross-screen communication need (e.g., `m.global.episodeWatched`, `m.global.seasonChanged`).
+**Why it's wrong:** Global signals fire on all screens simultaneously, including hidden/stale screens still in the stack. Too many global observers create performance issues and debugging nightmares.
+**Do this instead:** Use the existing `watchStateUpdate` signal for watch state. For other coordination, pass data via screen interface fields before navigation.
+
+### Anti-Pattern 4: Rebuilding ContentNode Tree on Every Watch State Change
+
+**What people do:** On `onWatchStateUpdate`, call the API to re-fetch the library page and rebuild the entire grid ContentNode.
+**Why it's wrong:** Network round-trip + full grid flash. Destroys the "instant feedback" feel.
+**Do this instead:** Scan children by `ratingKey`, mutate only the matching child's fields in-place. MarkupGrid re-renders only the changed item. This is the existing pattern — keep it.
+
+---
+
+## Integration Points
+
+### External Service: Plex Media Server
+
+| Endpoint | Used By | Notes |
+|----------|---------|-------|
+| `/library/metadata/{id}` | DetailScreen | Movie/episode/show metadata |
+| `/library/metadata/{id}/children` | EpisodeScreen | Seasons (children of show), episodes (children of season) |
+| `/hubs/search?query=` | SearchScreen | Returns Hub array — flatten Metadata for grid |
+| `/:/scrobble`, `/:/unscrobble` | DetailScreen, EpisodeScreen | Watched state toggle; fire-and-forget |
+| `plex.tv/api/v2/resources` | MainScene, SettingsScreen | Server discovery — remove from SettingsScreen in v1.1 |
+
+### Internal Boundaries
+
+| Boundary | Communication | Notes |
+|----------|---------------|-------|
+| Screen → MainScene (navigate forward) | `m.top.itemSelected = {action, ratingKey, ...}` | Standard pattern, stable |
+| Screen → MainScene (navigate back) | `m.top.navigateBack = true` | Standard pattern, stable |
+| Screen → Screen (watch state) | `m.global.watchStateUpdate = {ratingKey, viewCount, viewOffset}` | Fires on all screens; keep payload minimal |
+| Task → Screen | `task.observeField("status", "handler")` | Standard async pattern |
+| SettingsScreen → MainScene (user switch) | `m.top.itemSelected = {action:"switchUser"}` | Routed via MainScene.onItemSelected |
+| SettingsScreen → MainScene (auth complete) | `m.top.authComplete = true` | Triggers clearScreenStack + showHomeScreen |
+| SettingsScreen → MainScene (server switch BUG) | `m.top.authComplete = true` after server test | Triggers full auth flow — this is the server-switch bug (correct behavior after fix is removal) |
+
+---
+
+## Sources
+
+- Live codebase analysis: `SimPlex/components/screens/`, `SimPlex/components/widgets/`, `SimPlex/source/` — HIGH confidence
+- `.planning/PROJECT.md` — v1.1 target features and known issues — HIGH confidence
+- `CLAUDE.md` — architecture constraints and platform rules — HIGH confidence
+
+---
+
+*Architecture research for: SimPlex v1.1 Polish & Navigation*
+*Researched: 2026-03-13*

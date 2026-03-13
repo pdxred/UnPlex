@@ -1,214 +1,274 @@
-# Technology Stack
+# Stack Research
 
-**Project:** SimPlex (Roku Plex Client)
-**Researched:** 2026-03-08
+**Domain:** Roku BrightScript / SceneGraph channel — v1.1 Polish & Navigation milestone
+**Researched:** 2026-03-13
+**Confidence:** HIGH for platform findings; MEDIUM for icon dimensions (official spec page returned 403, community-verified values used)
 
-## Critical Finding: Maestro Is Deprecated -- Do NOT Adopt
+---
 
-The project brief specifies Maestro MVVM v0.72.0 as a target framework. **This recommendation is now obsolete.** Tantawowa Ltd officially deprecated Maestro in late 2023. No maintenance, no updates, no new features. Critical fixes are available only to existing enterprise clients on a case-by-case basis.
+## What This Document Covers
 
-Tantawowa announced a replacement cross-platform TV framework "coming later in 2024" but as of March 2026, no public release has materialized. Adopting a deprecated framework with no successor would be reckless.
+This replaces the v1.0 STACK.md. The v1.0 stack (BrighterScript 0.70.x, SceneGraph RSG 1.3, Task nodes, roRegistrySection) is fully validated and unchanged. This document covers **only delta requirements** for v1.1 features: TV show navigation overhaul, bug fixes, branding refresh, codebase cleanup, and GitHub documentation.
 
-**Confidence: HIGH** -- Verified via official GitHub README and release history.
+---
 
-## Recommendation: BrighterScript Without Maestro
+## Key Finding: Most v1.1 Work Requires No New Stack
 
-Use BrighterScript as a build-time compiler for the existing plain BrightScript codebase. Do NOT adopt Maestro or any MVVM framework. The app is a single-developer, single-purpose Plex client -- MVVM abstraction adds complexity without proportional benefit.
+After examining the existing codebase (`EpisodeScreen.brs`, `EpisodeScreen.xml`, `EpisodeItem.xml`, `constants.brs`, `utils.brs`, `SearchScreen.brs`, `manifest`), the v1.1 milestone is overwhelmingly a **bug fix and polish** milestone. The platform capabilities needed already exist in Roku OS and the existing codebase. The only genuine new stack items are:
 
-### Why BrighterScript (Without a Framework)
+1. A bundled custom TTF font for bolder title typography
+2. Pre-rendered PNG image assets for gradient backgrounds and redesigned icons/splash
 
-1. **Zero-cost migration**: BrighterScript is a strict superset of BrightScript. Every existing `.brs` file is already valid BrighterScript. You adopt it by adding a build step, not by rewriting code.
-2. **Compile-time error checking**: Catches null references, type mismatches, and missing fields before sideloading. Currently these only surface at runtime on the Roku device.
-3. **Namespaces and classes**: Reduce global scope pollution as the codebase grows (e.g., normalizers, utilities, constants can be namespaced).
-4. **Better IDE experience**: The BrightScript Language VSCode extension uses BrighterScript's language server for intellisense, go-to-definition, and diagnostics -- even on plain `.brs` files.
-5. **Ecosystem standard**: Jellyfin-Roku, and many professional Roku shops use BrighterScript as their compiler. It is the de facto standard for serious Roku development.
-6. **Gradual adoption**: New files can use `.bs` extension with classes/namespaces. Existing `.brs` files work unchanged. No big-bang migration required.
+Everything else — auto-play Timer, watch state propagation, season progress display, search layout fixes — uses existing SceneGraph nodes and BrightScript patterns.
 
-### Why NOT Maestro
+---
 
-1. **Deprecated** -- No maintenance, no roadmap, no community support.
-2. **Heavy abstraction** -- MVVM with IOC containers, node classes, and annotation-driven XML generation is overengineered for a single-developer sideloaded channel.
-3. **Build complexity** -- Requires `maestro-cli-roku`, a post-install hook (`maestro-ropm-hook.js`), and the `ropm` package manager. Adds fragile toolchain dependencies.
-4. **No replacement** -- Tantawowa's promised successor hasn't shipped. Betting on vaporware is worse than betting on deprecated software.
-5. **Existing architecture is sound** -- The current observer + task node + screen stack pattern is the canonical Roku architecture. It does not need an MVVM overlay.
+## Delta Stack for v1.1
 
-## Recommended Stack
+### New Assets (Not Code Dependencies)
 
-### Core Language & Compiler
+| Asset | Type | Dimensions / Format | Purpose | Source |
+|-------|------|---------------------|---------|--------|
+| InterBold.ttf OR OutfitBold.ttf | TrueType font | N/A | Heavier title/heading weight than system bold | rsms.me/inter / fonts.google.com |
+| icon_focus_fhd.png (redesigned) | PNG | 540 x 405 px | Channel tile, focused state (FHD) | Designed externally, bundled in `images/` |
+| icon_side_fhd.png (redesigned) | PNG | 246 x 140 px | Channel tile, side state (FHD) | Designed externally, bundled in `images/` |
+| icon_focus_hd.png (redesigned) | PNG | 336 x 210 px | Channel tile, focused state (HD) | Designed externally, bundled in `images/` |
+| icon_side_hd.png (redesigned) | PNG | 164 x 94 px | Channel tile, side state (HD) | Designed externally, bundled in `images/` |
+| splash_fhd.jpg (redesigned) | JPG or PNG | 1920 x 1080 px | Launch splash screen | Designed externally, bundled in `images/` |
+| gradient panels (optional) | PNG | Varies (1580x1080 or similar) | Background gradient overlay for screens | Designed externally, bundled in `images/` |
 
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| BrighterScript | ^0.70.3 (stable) | Compiler / transpiler | Superset of BrightScript; compile-time checking, namespaces, classes. Transpiles to standard BrightScript for Roku. Stable branch actively maintained. | HIGH |
-| BrightScript | Roku OS native | Runtime language | What actually runs on the device. BrighterScript compiles down to this. | HIGH |
-| SceneGraph XML | RSG 1.3 | UI framework | Roku's native component framework. No alternative exists. | HIGH |
+**No new npm packages.** **No new BrighterScript plugins.** **No new Task nodes.**
 
-**Do NOT use BrighterScript v1.0.0-alpha.x** -- As of v1.0.0-alpha.50 (Jan 2025), the alpha branch has breaking changes and is not production-ready. Stick with the 0.70.x stable line. The project brief's target of ^0.69.x is fine but 0.70.3 is the current stable release; use that.
+---
 
-### Build & Deploy Tools
+## Feature-by-Feature Stack Analysis
 
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| roku-deploy | ^3.16.1 | Package & sideload | Zips the app and deploys to Roku device over HTTP. Integrates with VSCode extension. | HIGH |
-| BrightScript Language VSCode Extension | Latest | IDE support | Debugging, intellisense, deploy-on-save. Uses BrighterScript language server internally. | HIGH |
+### 1. TV Show Navigation Overhaul
 
-### Testing (Deferred -- Phase 19 Stretch Goal)
+**Existing implementation is mostly correct.** `EpisodeScreen.xml` already uses:
+- `LabelList` for horizontal season tabs (fires `itemFocused` to load episodes dynamically)
+- `MarkupList` with custom `EpisodeItem` component for episode rows
+- Up/down key routing between season list and episode list
+- `grandparentRatingKey` / `parentRatingKey` passing into `VideoPlayer` for auto-play
 
-| Technology | Version | Purpose | Why | Confidence |
-|------------|---------|---------|-----|------------|
-| Rooibos | Latest via ropm | Unit testing | The only serious BrightScript testing framework. Supports mocking, code coverage. Used in production by Jellyfin, enterprise Roku shops. | MEDIUM |
+**What needs fixing (BrightScript logic only, no new stack):**
 
-Rooibos requires BrighterScript as a compiler (it's a BSC plugin). Adopting BrighterScript now means testing is available when needed later.
+| Issue | What It Is | Fix Approach |
+|-------|-----------|--------------|
+| Season progress display | `leafCount` and `viewedLeafCount` are returned by `/library/metadata/{id}/children` but not parsed | Read these fields in `processSeasons()` and format "S01 (6/10)" in the LabelList content |
+| Auto-play countdown wiring | `onPlaybackComplete` in EpisodeScreen has a `TODO` comment; countdown never fires | Use SceneGraph `Timer` node (already in Roku OS) with a 10-second countdown overlay Group/Label |
+| Watch state propagation | `m.global.watchStateUpdate` is fired from DetailScreen but HomeScreen does not observe it | Add `m.global.observeField("watchStateUpdate", ...)` in HomeScreen and refresh hub rows |
 
-### Package Management (Optional)
+**SceneGraph `Timer` node** (for auto-play countdown):
+- Built into Roku OS — zero import, zero dependency
+- `timer.duration = 10`, `timer.repeat = false`, `timer.observeField("fire", "onAutoPlayTimer")`
+- Already used in `SearchScreen.brs` for debounce — proven pattern in this codebase
 
-| Technology | Version | Purpose | When to Use | Confidence |
-|------------|---------|---------|-------------|------------|
-| ropm | Latest | Roku package manager | Only if you need third-party packages (e.g., Rooibos for testing). Not needed for the core app since it has no third-party dependencies. | MEDIUM |
+### 2. Bug Fixes
 
-## Alternatives Considered
+All bugs are BrightScript/XML logic errors. No new stack for any of them:
 
-| Category | Recommended | Alternative | Why Not |
-|----------|-------------|-------------|---------|
-| Language | BrighterScript 0.70.x | Plain BrightScript (status quo) | Loses compile-time checking, namespaces, classes. IDE intellisense is worse. Migration cost is near-zero since BS is a superset. |
-| Language | BrighterScript 0.70.x | BrighterScript 1.0.0-alpha | Unstable, breaking changes between alphas. Not ready for production. PROJECT.md already lists this as out of scope. |
-| Framework | None (plain SceneGraph) | Maestro MVVM 0.72.0 | **Deprecated.** Adds complexity without proportional benefit for a single-developer app. |
-| Framework | None (plain SceneGraph) | Tantawowa's successor | Does not exist publicly. Vaporware as of March 2026. |
-| Testing | Rooibos (deferred) | Roku's unit-testing-framework | Less capable, less maintained, no mocking support. Rooibos is the community standard. |
-| Build | roku-deploy + bsc CLI | Manual zip + HTTP upload | Slower iteration. roku-deploy automates the zip-and-upload cycle. |
+| Bug | Root Cause | Fix |
+|-----|-----------|-----|
+| Collections navigation | Likely ratingKey type coercion or missing `type = "collection"` check | BrightScript fix in collection item handler |
+| Search result layout | `EpisodeItem`-style component assumes 2:3 portrait ratio for all results; episode results are 16:9 | Branch on `type` field in search result item renderer; apply correct `width`/`height` to `BuildPosterUrl()` |
+| Thumbnail aspect ratios | Same root cause as search layout | Correct dimensions per content type: movie=240x360, episode=320x180, show=240x360 |
+| Auto-play wiring gap | `onPlaybackComplete` missing countdown implementation (confirmed by `TODO` comment in code) | Timer node + overlay Group (see above) |
+| Watch state propagation | HomeScreen not observing `m.global.watchStateUpdate` | Single `observeField` call + refresh logic |
+| Server switching | Feature is unclear/broken; PROJECT.md lists as "fix or remove" | Remove UI paths for server switching; consolidate to single-server flow (deletion task) |
 
-## Migration Path: Plain BrightScript to BrighterScript
+### 3. App Branding
 
-This is a LOW-RISK migration because BrighterScript is a superset -- no code changes required to start.
+#### Custom Font (Bolder Title Weight)
 
-### Step 1: Add BrighterScript to the project (1-2 hours)
+Roku SceneGraph supports custom fonts via the `Font` node:
 
-```bash
-npm init -y
-npm install brighterscript roku-deploy
+```xml
+<Label id="titleLabel" translation="[80, 40]" color="0xFFFFFFFF">
+    <Font uri="pkg:/fonts/InterBold.ttf" size="52" />
+</Label>
 ```
 
-### Step 2: Create bsconfig.json
+Or in BrightScript when setting font dynamically:
+```brightscript
+font = CreateObject("roSGNode", "Font")
+font.uri = "pkg:/fonts/InterBold.ttf"
+font.size = 52
+m.titleLabel.font = font
+```
+
+**Recommended font:** Inter Bold (`InterBold.ttf`)
+- Open-source, SIL OFL licensed — no legal constraints
+- Designed for screen legibility at small pixel densities; excellent for 10-foot TV UI
+- ~300KB file size; no enforced sideload package size limit for developer channels
+- Download from https://rsms.me/inter/ (variable font or static Bold weight)
+
+**File placement:** `SimPlex/fonts/InterBold.ttf` — new `fonts/` directory at same level as `source/`, `components/`, `images/`
+
+**bsconfig.json files array must include:** `"fonts/**/*"` (or the fonts dir will not be zipped into the package)
+
+#### Text Stroke / Outline Effect
+
+Roku SceneGraph `Label` nodes have **no stroke, outline, or shadow property**. This is a confirmed platform limitation — there is no workaround via Label fields.
+
+**Standard community workaround:** Stack two Label nodes at the same position, offset the lower one by 1-2px in a dark translucent color:
+
+```xml
+<!-- Shadow/depth layer (render first, underneath) -->
+<Label id="titleShadow" translation="[82, 42]" color="0x00000099" />
+<!-- Primary text layer -->
+<Label id="titleLabel" translation="[80, 40]" color="0xFFFFFFFF" />
+```
+
+Both labels receive the same `text` value in BrightScript. Render cost is negligible for a few title labels.
+
+#### Gradient Backgrounds
+
+Roku SceneGraph `Rectangle` nodes have **no gradient fill property**. This is a confirmed platform limitation — no workaround exists within SceneGraph node properties.
+
+**Only approach:** Pre-render gradient as a PNG image and display it via a `Poster` node:
+
+```xml
+<Poster id="gradientBg" uri="pkg:/images/gradient_bg.png" width="1920" height="1080" />
+```
+
+Generate gradient PNGs using any image tool (Figma, Photoshop, ImageMagick, etc.) outside the channel. Bundle the PNG in `SimPlex/images/`. PNG supports alpha channel for partial-transparency gradient overlays.
+
+#### Icon and Splash Screen Assets
+
+Icons and splash are static image files referenced in `manifest`. They are replaced by designing new assets externally and overwriting the existing files. **No BrightScript or SceneGraph changes needed.**
+
+Required dimensions (community-verified; official spec page returned HTTP 403):
+
+| Manifest Key | Current File | Required Size | Format |
+|-------------|-------------|---------------|--------|
+| `mm_icon_focus_fhd` | icon_focus_fhd.png | 540 x 405 px | PNG |
+| `mm_icon_side_fhd` | icon_side_fhd.png | 246 x 140 px | PNG |
+| `mm_icon_focus_hd` | icon_focus_hd.png | 336 x 210 px | PNG |
+| `mm_icon_side_hd` | icon_side_hd.png | 164 x 94 px | PNG |
+| `splash_screen_fhd` | splash_fhd.jpg | 1920 x 1080 px | JPG or PNG |
+
+`splash_min_time = 1500` in manifest is appropriate — no change needed.
+
+### 4. Codebase Cleanup
+
+Pure deletion and refactoring — no new stack:
+
+| Task | What |
+|------|------|
+| Delete `normalizers.brs` | Confirmed orphaned in PROJECT.md ("Known issues") |
+| Delete `capabilities.brs` | Confirmed orphaned in PROJECT.md |
+| Extract `SafeStr(ratingKey)` helper to `utils.brs` | The ratingKey string coercion block appears 15+ times verbatim across EpisodeScreen, DetailScreen, etc. — consolidate |
+| Remove server switching UI | Delete or simplify ServerListScreen paths |
+
+### 5. GitHub Documentation
+
+Plain Markdown in the repository. No documentation generator needed.
+
+**Recommended structure:**
+```
+README.md                  — Project overview, screenshots, sideload how-to, feature list
+docs/
+  USER_GUIDE.md            — Remote control map, navigation flows, settings
+  ARCHITECTURE.md          — Component map, task node pattern, screen stack, data flow
+  CONTRIBUTING.md          — BrightScript style guide, how to add a screen/widget
+```
+
+No Docusaurus, MkDocs, or similar — overengineered for a personal sideloaded channel with no public API.
+
+---
+
+## Recommended Stack Summary (v1.1 Delta)
+
+### New Code Dependencies: None
+
+The BrighterScript 0.70.x + SceneGraph RSG 1.3 toolchain handles everything. No new npm packages, no new plugins, no new ropm packages.
+
+### New File System Additions
+
+```
+SimPlex/
+  fonts/                    ← NEW directory
+    InterBold.ttf           ← NEW font asset
+  images/
+    icon_focus_fhd.png      ← REPLACE (redesigned)
+    icon_side_fhd.png       ← REPLACE (redesigned)
+    icon_focus_hd.png       ← REPLACE (redesigned)
+    icon_side_hd.png        ← REPLACE (redesigned)
+    splash_fhd.jpg          ← REPLACE (redesigned)
+    gradient_bg.png         ← NEW (optional, if gradient backgrounds are used)
+```
+
+### bsconfig.json Update Required
+
+Add `fonts/**/*` to the `files` array so the font is included in the sideload package:
 
 ```json
 {
-  "rootDir": "SimPlex",
   "files": [
     "manifest",
     "source/**/*",
     "components/**/*",
-    "images/**/*"
-  ],
-  "stagingDir": "build",
-  "createPackage": true,
-  "autoImportComponentScript": true,
-  "diagnosticFilters": [
-    { "src": "**/*.brs", "codes": [1001] }
+    "images/**/*",
+    "fonts/**/*"
   ]
 }
 ```
-
-### Step 3: Build and deploy
-
-```bash
-npx bsc --project bsconfig.json
-```
-
-Or integrate with VSCode launch.json for F5 deploy:
-
-```json
-{
-  "version": "0.2.0",
-  "configurations": [
-    {
-      "type": "brightscript",
-      "request": "launch",
-      "name": "SimPlex",
-      "rootDir": "${workspaceFolder}/SimPlex",
-      "host": "${env:ROKU_IP}",
-      "password": "${env:ROKU_DEV_PASSWORD}",
-      "files": [
-        "manifest",
-        "source/**/*",
-        "components/**/*",
-        "images/**/*"
-      ]
-    }
-  ]
-}
-```
-
-### Step 4: Gradual adoption of BrighterScript features (ongoing)
-
-- New files: use `.bs` extension, leverage classes and namespaces
-- Existing files: rename to `.bs` only when actively refactoring
-- No big-bang rewrite needed
-
-### Migration Risk Assessment
-
-| Risk | Likelihood | Impact | Mitigation |
-|------|-----------|--------|------------|
-| BrighterScript compiler bug | Low | Medium | Pin to 0.70.3, update cautiously |
-| Transpiled output differs from hand-written BS | Very Low | Low | BrighterScript is mature (5+ years). Output is predictable. |
-| Build step slows iteration | Low | Low | Compilation is fast (seconds). VSCode extension handles it transparently. |
-| npm/Node.js dependency on dev machine | N/A | N/A | Already required if using VSCode BrightScript extension for debugging |
-
-## What NOT to Use
-
-| Technology | Why Not |
-|------------|---------|
-| Maestro MVVM | Deprecated. No maintenance. Overengineered for this project. |
-| BrighterScript 1.0.0-alpha | Unstable. Breaking changes between releases. |
-| ropm (for app dependencies) | The app has no third-party runtime dependencies. All code is first-party. Adding ropm for its own sake adds toolchain complexity. |
-| React Native for TV | Does not support Roku. Roku requires native BrightScript. |
-| Direct Publisher | For MRSS-based linear channels, not custom interactive apps. |
-| Roku's built-in unit-testing-framework | Inferior to Rooibos in every way. Use Rooibos when testing is needed. |
-
-## Installation
-
-```bash
-# Initialize Node project (for build tooling only -- nothing runs on Roku via Node)
-npm init -y
-
-# Core build tools
-npm install -D brighterscript@^0.70.3 roku-deploy@^3.16.1
-
-# Later, when adding tests (Phase 19):
-# npm install -D rooibos-roku
-```
-
-## Project Structure After Migration
-
-```
-SimPlex/                    # rootDir for bsconfig.json
-  manifest
-  source/
-    main.brs               # Keep as .brs (entry point, rarely changes)
-    constants.brs           # Keep as .brs or migrate to .bs with namespace
-    utils.brs               # Keep as .brs or migrate to .bs with namespace
-    ...
-  components/
-    ...                     # All existing files work unchanged
-  images/
-    ...
-build/                      # stagingDir -- transpiled output (gitignore this)
-bsconfig.json               # BrighterScript configuration
-package.json                # Node.js package for dev dependencies
-node_modules/               # gitignore this
-```
-
-## Sources
-
-- [BrighterScript GitHub - rokucommunity/brighterscript](https://github.com/rokucommunity/brighterscript) -- Confirmed v0.70.3 stable, v1.0.0-alpha.50 latest alpha (HIGH confidence)
-- [BrighterScript Releases](https://github.com/rokucommunity/brighterscript/releases) -- Version history and dates verified
-- [Maestro-Roku GitHub - georgejecook/maestro-roku](https://github.com/georgejecook/maestro-roku) -- Confirmed deprecated by Tantawowa Ltd (HIGH confidence)
-- [Maestro-Roku Releases](https://github.com/georgejecook/maestro-roku/releases) -- v0.72.0 confirmed as final release, Nov 2023
-- [roku-deploy npm](https://www.npmjs.com/package/roku-deploy) -- v3.16.1 confirmed current (HIGH confidence)
-- [Rooibos GitHub - rokucommunity/rooibos](https://github.com/rokucommunity/rooibos) -- Community standard testing framework
-- [BrighterScript bsconfig.json docs](https://github.com/rokucommunity/BrighterScript/blob/master/docs/bsconfig.md) -- Configuration reference
-- [Jellyfin-Roku BrighterScript updates](https://github.com/jellyfin/jellyfin-roku/pull/232) -- Real-world production usage of BrighterScript 0.69.x-0.70.x
-- [BrightScript VSCode Extension](https://marketplace.visualstudio.com/items?itemName=RokuCommunity.brightscript) -- IDE tooling
-- [RokuCommunity](https://rokucommunity.github.io/) -- Ecosystem hub
 
 ---
 
-*Stack research: 2026-03-08*
+## Alternatives Considered
+
+| Feature | Recommended | Alternative | Why Not |
+|---------|-------------|-------------|---------|
+| Bolder font | Bundle InterBold.ttf | Use `font:LargeBoldSystemFont` | System bold is visually thin at 40-52px title sizes; no weight control; cannot match brand intent |
+| Text stroke | Stacked Label shadow offset | Image-based text overlay | Image overlays cannot work for dynamic text strings |
+| Gradient background | Pre-rendered PNG as Poster | Rectangle gradient | Rectangle gradient not supported in Roku OS (confirmed) |
+| Auto-play countdown | SceneGraph `Timer` node | New Task node | Timer fires on render thread — no async work needed; simpler |
+| Season progress | Parse `leafCount`/`viewedLeafCount` from existing API response | Additional API call | Fields already present in `/children` response; zero cost |
+| Documentation | Plain Markdown | Docusaurus/MkDocs | No public API surface; sideload-only personal project; Markdown is faster to write and maintain |
+| Font weight | Inter Bold | Outfit Bold | Both are excellent choices; Inter has stronger screen legibility research behind it and is used by major tech products |
+
+---
+
+## What NOT to Add
+
+| Avoid | Why | Use Instead |
+|-------|-----|-------------|
+| BrighterScript 1.0.0-alpha | Explicitly deferred in PROJECT.md; unstable alpha with breaking changes | Stay on 0.70.x |
+| Maestro MVVM | Deprecated November 2023; confirmed in v1.0 research | Plain BrightScript + SceneGraph |
+| SGDEX (SceneGraph Developer Extensions) | Heavy Roku-official framework for channel-store apps; adds enormous complexity for a custom sideloaded channel | Native SceneGraph nodes |
+| roFontRegistry BrightScript API | Legacy API for non-SceneGraph font registration; SceneGraph Font node is the correct approach | SceneGraph `Font` node with `uri` field |
+| WebP or AVIF for icons/splash | Roku firmware manifest image rendering expects PNG/JPG for icon and splash assets | PNG for icons, JPG/PNG for splash |
+| Variable font (single TTF with all weights) | Variable font support in Roku OS Font node is unverified; static weight TTF is confirmed working | Static weight TTF (e.g., InterBold.ttf, not Inter.ttf with `wght` axis) |
+
+---
+
+## Version Compatibility
+
+| Component | Version | Notes |
+|-----------|---------|-------|
+| BrighterScript | 0.70.x | Unchanged from v1.0; confirmed stable |
+| Roku OS | 11.5+ | Target per PROJECT.md; Timer, Font node, MarkupList, MarkupGrid all available since OS 9.x |
+| SceneGraph | RSG 1.3 | Set in manifest; confirmed in existing channel |
+| Inter font | v4.x (static Bold) | Download static Bold variant, not the variable font package |
+| PNG images | Standard PNG-24/32 | Roku OS renders standard PNG; APNG animation not supported |
+
+---
+
+## Sources
+
+- Roku Community — mm_icon_focus_fhd dimensions: https://community.roku.com/t5/Roku-Developer-Program/mm-icon-focus-fhd-resolution/td-p/492827 (MEDIUM confidence; official spec page returned 403; community values are consistent across multiple threads)
+- Roku Developer docs — Timer node: https://developer.roku.com/docs/references/scenegraph/control-nodes/timer.md
+- Roku Developer docs — Font node: https://developer.roku.com/docs/references/scenegraph/typographic-nodes/font.md
+- Roku Community — Gradient Rectangle limitation: https://community.roku.com/t5/Roku-Developer-Program/Gradient-rectangle/td-p/404364 (MEDIUM confidence; multiple threads confirm no native gradient; Roku docs page returned 403)
+- Roku Community — Custom TTF font usage: https://community.roku.com/t5/Roku-Developer-Program/Using-custom-fonts-ttf-files-in-XML/td-p/505688 (HIGH confidence; consistent with Font node documentation pattern)
+- Roku Community — Label stroke limitation: https://community.roku.com/t5/Roku-Developer-Program/How-to-modify-System-Fonts-in-SceneGraph/td-p/466671 (MEDIUM confidence; community confirms no stroke property; stacked-label workaround is established pattern)
+- Existing codebase — EpisodeScreen.brs, EpisodeScreen.xml, EpisodeItem.xml, constants.brs, utils.brs, SearchScreen.brs, manifest (HIGH confidence; direct code inspection)
+- PROJECT.md — Known issues (orphaned files, auto-play gap, watch state gap) (HIGH confidence; on-disk project record)
+- Inter font project — https://rsms.me/inter/ (HIGH confidence; verified open-source, SIL OFL license)
+
+---
+
+*Stack research for: SimPlex v1.1 Polish & Navigation (Roku BrightScript/SceneGraph channel)*
+*Researched: 2026-03-13*

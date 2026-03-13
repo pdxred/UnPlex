@@ -1,215 +1,206 @@
 # Project Research Summary
 
-**Project:** SimPlex (Roku Plex Client)
-**Domain:** Roku media client application (BrightScript / SceneGraph)
-**Researched:** 2026-03-08
+**Project:** SimPlex v1.1 — Polish & Navigation
+**Domain:** Roku BrightScript / SceneGraph sideloaded Plex client
+**Researched:** 2026-03-13
 **Confidence:** HIGH
 
 ## Executive Summary
 
-SimPlex is a sideloaded Roku channel replacing the official Plex app with a fast, sidebar-driven UI. The existing scaffold already covers authentication, server connection, library browsing, detail/episode screens, search, and video playback. Research confirms the current plain BrightScript + SceneGraph architecture is sound and should be enhanced, not replaced. The originally proposed Maestro MVVM framework is deprecated (confirmed dead since Nov 2023) and must not be adopted. BrighterScript 0.70.x should be added as a zero-cost compile-time upgrade for type checking, namespaces, and IDE support -- no code rewrite required.
+SimPlex v1.1 is a polish and bug-fix milestone for an existing, working Roku channel. Unlike greenfield projects, almost every deliverable is a targeted fix to a specific known gap — auto-play wiring, watch state propagation, TV show navigation friction, search layout defects, and orphaned code — rather than new feature construction. The platform stack (BrighterScript 0.70.x, SceneGraph RSG 1.3, Task nodes, roRegistrySection) is fully validated and unchanged. No new code dependencies are required; the only new file additions are a bundled TrueType font (InterBold.ttf) and replacement image assets for icons and splash screen.
 
-The path from scaffold to daily-driver hinges on a specific feature sequence: resume playback, watch progress indicators, hub rows (Continue Watching / Recently Added), and error states must ship first. Without these, no user would switch from the official app. After that, filter/sort, audio/subtitle selection, intro skip, and auto-play next episode bring feature parity. Differentiators like music playback, collections, playlists, and managed users follow. Live TV and photos are low priority and high complexity -- defer them.
+The recommended approach is a series of precise, well-scoped surgical fixes applied in dependency order, not a broad refactor. Research reveals that the most tempting expansion — splitting EpisodeScreen into a three-screen Season/Episode hierarchy — carries the highest risk of breaking existing working behaviour (VideoPlayer context fields, focus recovery after playback) and should be avoided unless the current two-panel layout proves genuinely insufficient. All required fix information exists in the live codebase; there is no speculative architecture work needed.
 
-The dominant risks are Roku-platform-specific: PGS subtitle burn-in (silent failure if handled wrong), rendezvous timeouts from observer cascades when loading hub rows, memory pressure from large ContentNode trees, and the architectural requirement that music playback audio nodes must be parented to MainScene (not any screen) to survive navigation. All of these have known mitigations documented in the pitfalls research. The single most impactful infrastructure fix -- caching GetConstants() in m.global -- should happen before any feature work to eliminate GC pressure across all subsequent phases.
+The primary risk for v1.1 is a live firmware crash: `BusySpinner` causes SIGSEGV signal 11 (crash, no BrightScript trace) on the test device, with root cause not yet fully confirmed (TEST4b pending). This must be resolved or definitively scoped before any new screen work proceeds. Secondary risks are procedural: orphaned file deletion requires a sideload-and-verify cycle after each deletion, server switching removal touches four separate codepaths that must all be patched before the screen is deleted, and the HAR file on disk contains auth tokens that must never reach GitHub.
 
 ## Key Findings
 
 ### Recommended Stack
 
-BrighterScript 0.70.x as the compiler, plain SceneGraph as the UI framework, no MVVM layer. This is a near-zero-risk adoption: BrighterScript is a superset of BrightScript, so every existing `.brs` file compiles unchanged. New files can use `.bs` extension for classes and namespaces. The build toolchain is `npm install brighterscript roku-deploy` and a `bsconfig.json` file.
+The v1.0 stack requires no changes for v1.1. BrighterScript 0.70.x compiles all existing and planned code. The only new file type is a static-weight TrueType font (InterBold.ttf, SIL OFL licensed, ~300KB) placed in a new `SimPlex/fonts/` directory and referenced via the SceneGraph `Font` node. `bsconfig.json` must include `fonts/**/*` in its files array. Icon and splash assets are PNG/JPG replacements bundled in `images/` — no new code path.
+
+Two platform limitations are confirmed and affect branding choices: SceneGraph `Label` nodes have no stroke or shadow property (workaround: stack two offset labels), and `Rectangle` nodes have no gradient fill (workaround: pre-rendered PNG via `Poster` node). Both workarounds are established community patterns with negligible render cost. Static-weight TTF (InterBold.ttf) is the correct font loading approach — variable font support in the Roku OS Font node is unverified and should not be assumed.
 
 **Core technologies:**
-- **BrighterScript 0.70.3:** Compile-time type checking, namespaces, classes -- transpiles to standard BrightScript for Roku
-- **SceneGraph RSG 1.3:** Roku's native UI framework -- no alternative exists
-- **roku-deploy 3.16.1:** Automated zip-and-sideload for development iteration
-- **Rooibos (deferred):** Unit testing framework, available when BrighterScript is in place -- adopt when testing phase begins
+- BrighterScript 0.70.x: compile toolchain — unchanged, confirmed stable, no update needed
+- SceneGraph RSG 1.3: all UI, task, and animation nodes — unchanged
+- SceneGraph `Timer` node: auto-play countdown — built into OS, already used in SearchScreen for debounce; proven pattern
+- SceneGraph `Font` node with `uri` field: custom TTF font loading — confirmed working community pattern
+- roRegistrySection("SimPlex"): all persistent state — unchanged
+- InterBold.ttf (new asset): bolder title typography — Inter is screen-legibility-optimised, SIL OFL licensed, ~300KB
 
-**What NOT to use:** Maestro MVVM (deprecated), BrighterScript 1.0.0-alpha (unstable), ropm for app dependencies (no third-party runtime deps needed).
+**What NOT to add:** BrighterScript 1.0.0-alpha (unstable alpha, explicitly deferred), Maestro MVVM (deprecated Nov 2023), SGDEX (adds enormous complexity for a sideloaded channel), roFontRegistry BrightScript API (legacy non-SceneGraph path), WebP/AVIF for icons (Roku manifest expects PNG/JPG), variable font TTF (support unverified), BusySpinner or Animation nodes (SIGSEGV crash risk until root cause confirmed).
 
 ### Expected Features
 
-**Must have (table stakes -- users expect these from any Plex client):**
-- Resume playback from last position (read `viewOffset`, pass `offset` to playback URL)
-- Watch progress indicators on poster items (progress bar overlay, watched badge)
-- Mark watched / unwatched (`/:/scrobble` and `/:/unscrobble` endpoints)
-- Hub rows: Continue Watching, Recently Added (`/hubs` endpoint)
-- On Deck for TV shows (`/library/onDeck`)
-- Filter and sort libraries (genre, year, unwatched, sort by title/date/rating)
-- Audio and subtitle track selection (with PGS burn-in handling)
-- Auto-play next episode (10-second countdown at end of episode)
-- Error states and empty states (loading, no items, network error, retry)
-- Collections browsing
+**Must have (table stakes — closes v1.1):**
+- Auto-play next episode working end-to-end — countdown fires, advances, cancels; currently unreachable because `grandparentRatingKey` is not passed from DetailScreen. EpisodeScreen is already fixed; DetailScreen is not.
+- Watch state propagates to HomeScreen hub rows after playback/watched toggle — currently only the poster grid ContentNode is walked; hub RowList ContentNode tree is not walked
+- TV show navigation: grid tap → EpisodeScreen directly, removing the unnecessary DetailScreen intermediate hop for shows
+- Search results legible with type context — episode results in portrait grid show `parentThumb` (portrait) not `thumb` (landscape, distorted)
+- Icon and splash replaced with correctly-sized, properly-branded assets across all four Roku variants simultaneously
+- Orphaned files (`normalizers.brs`, `capabilities.brs`) deleted and codebase compiles cleanly
+- README and CONTRIBUTING.md written; repository publishable to GitHub
 
-**Should have (differentiators -- better than the official app):**
-- Intro skip button (Plex marker API with `includeMarkers=1`)
-- Credits skip / auto-next trigger
-- Playlists browse and play
-- Managed user switching (Plex Home API)
-- Grid/list view toggle per library
+**Should have (valuable, can slip to v1.2 if scope is tight):**
+- Continue Watching hub items launch playback directly (check `viewOffset > 0`) rather than routing via DetailScreen
+- Collections accessible from sidebar without requiring a library context first
+- Season poster grid as an upgrade to the current LabelList season tabs
 
 **Defer (v2+):**
-- Music playback (high complexity, Roku audio limitations, requires persistent Audio node architecture)
-- Photo browsing and slideshow
-- Live TV / DVR (requires custom EPG grid, most complex feature)
-- Pre-rolls / cinema trailers
+- Music library browsing and playback
+- Photo grid and slideshow
+- Live TV / EPG
+- Grid/list toggle per library type
+- Bulk "mark all watched" for a season
+
+**Explicit anti-features (do not build in v1.1):**
+- Animated screen transitions — SceneGraph Animation nodes are the suspected BusySpinner crash trigger; defer until root cause confirmed
+- Custom episode sorting / filtering — Plex server handles ordering; UI complexity has near-zero benefit
+- Server switching UI overhaul — single-server scope per PROJECT.md; remove dead code rather than build it out
+- Loading spinners (BusySpinner) — confirmed SIGSEGV crash trigger
 
 ### Architecture Approach
 
-Stay with the existing enhanced MVC + Observer pattern. MainScene acts as controller/router with a screen stack. Screens own their widgets and task instances. Tasks handle all HTTP I/O. Normalizers transform Plex JSON into ContentNode trees. Communication flows through observable interface fields with a strict contract: every screen exposes `itemSelected` (assocarray) and `navigateBack` (boolean). Invest in three targeted improvements: (1) fix API task collision by using one task per request, (2) add normalizers for each new media type, (3) enforce cleanup protocol on all screens to prevent memory leaks.
+The v1.1 architecture is modification-only — no new screens or components are required. All changes are contained to existing files. The most complex target is EpisodeScreen (watch state emission, auto-play season boundary fix, options key "Info" action to reach DetailScreen from within EpisodeScreen). The simplest is a one-line bug fix in PosterGridItem (hardcoded progress bar width). The existing layered architecture — screen stack managed by MainScene, widgets reused across screens, all HTTP via Task nodes, persistence via roRegistrySection — remains intact and correct.
 
-**Major components:**
-1. **MainScene** -- Screen lifecycle, navigation stack, auth routing, global state coordination
-2. **Screens (13 total, 6 new)** -- Full-screen views: HomeScreen, DetailScreen, EpisodeScreen, SearchScreen, SettingsScreen, plus new MusicScreen, PhotoScreen, LiveTVScreen, PlaylistScreen, UserPickerScreen, CollectionScreen
-3. **Widgets (16 total, 7 new)** -- Reusable UI: Sidebar, PosterGrid, VideoPlayer, plus new PlaybackOverlay, MusicPlayer, NowPlayingBar, PhotoViewer, EPGGrid, TrackList, SubtitleRenderer
-4. **Tasks (6 total, 0 new)** -- PlexApiTask is general-purpose enough for all new endpoints; no new task types needed
-5. **Data layer** -- normalizers.brs (extend with per-media-type normalizers), utils.brs, constants.brs
+**Major components and their v1.1 status:**
+1. `HomeScreen.brs` — Modified: 5-line routing change so TV show taps emit `{action:"episodes"}` instead of `{action:"detail"}`
+2. `EpisodeScreen.brs` — Modified (primary overhaul target): watch state emission after playback, auto-play season boundary handling, options key "Info" route to DetailScreen
+3. `SearchScreen.brs` — Modified: keyboard collapse on grid focus, episode thumbnail fix (`parentThumb` for episode results), column count computed from `gridWidth` field
+4. `PosterGridItem.brs` — Bug fix: `Int(240 * progress)` → `Int(m.constants.POSTER_WIDTH * progress)` (1 line)
+5. `SettingsScreen.brs` — Simplified: remove "Switch Server" discovery flow (~80 lines, 4 call sites must be patched first)
+6. `utils.brs` — Cleaned: promote `GetRatingKeyStr()` as shared helper replacing 8+ duplicate inline blocks; remove dead spinner guards
+7. `source/normalizers.brs`, `source/capabilities.brs` — Delete (zero call sites confirmed; sideload-test after each deletion)
+8. `MainScene.brs` — Minor: verify `popScreen` type checks cover all screen subtypes
+
+**Not touched in v1.1:** VideoPlayer, PlexApiTask, DetailScreen (structural), Sidebar, FilterBar, AlphaNav, TrackSelectionPanel, PlexSessionTask, PlexAuthTask, ServerConnectionTask.
 
 ### Critical Pitfalls
 
-1. **PGS/bitmap subtitles silently fail on Roku** -- Roku cannot render PGS subtitles; must detect codec and force transcode with `subtitles=burn`. This is the #1 Plex+Roku complaint. Test with MKV files containing PGS tracks.
-2. **Rendezvous timeouts from observer cascades** -- Loading 8+ hub rows simultaneously cascades observer callbacks that block the render thread and crash low-end devices. Stagger row loads with 100-200ms Timer delays; build ContentNode trees in Task threads.
-3. **Memory pressure from ContentNode trees** -- Large libraries (10K+ items) exhaust Roku's limited RAM. Paginate at 50 items, release ContentNode trees in cleanup(), request poster images at exact display size.
-4. **Music audio stops on screen navigation** -- Audio node must be parented to MainScene, not to any screen. Design this before building any music screens.
-5. **Intro skip timing race condition** -- Marker data must be pre-fetched with media metadata before playback starts, not after. Otherwise the skip button appears too late for short intros.
+1. **BusySpinner SIGSEGV is unresolved — must be addressed in Phase 1.** Any screen that introduces `BusySpinner` or `Animation` nodes before root cause is confirmed will crash within 3-5 seconds of init with signal 11 (no BrightScript trace, silent channel exit). Use static `Label` text toggling for all loading feedback in v1.1.
+
+2. **EpisodeScreen navigation refactor can sever VideoPlayer context.** If the overhaul splits EpisodeScreen into Season + Episode screens, the five VideoPlayer context fields (`grandparentRatingKey`, `parentRatingKey`, `episodeIndex`, `seasonIndex`, `mediaKey`) must all survive the boundary. Auto-play silently breaks if any are missing. Prefer enhancing the existing two-panel EpisodeScreen over splitting into three screens.
+
+3. **Watch state does not reach hub row ContentNodes.** `HomeScreen.onWatchStateUpdate` walks the poster grid ContentNode tree but not the RowList tree. "Continue Watching" hub items persist after marking watched. The hub tree walker must be added; its structure (rows as children, items as grandchildren) differs from the flat poster grid.
+
+4. **Server switching removal touches four codepaths simultaneously.** Deleting `ServerListScreen` before patching all four call sites causes a crash during auth with a multi-server plex.tv account. Remove in sequence: patch all call sites first, delete screen last, test with a multi-server account.
+
+5. **Orphaned file deletion crashes the compile if any XML `<script>` tag still references the file.** Search all `.xml` and `.brs` files for references before each deletion. Sideload and check port 8085 debug console after each deletion. Treat each deletion as a separate deploy-test cycle.
+
+6. **Auto-play gap exists in both EpisodeScreen AND DetailScreen.** EpisodeScreen already passes all five VideoPlayer context fields (line 416-432 — already fixed). DetailScreen does not. Episode played from DetailScreen will not auto-play until DetailScreen is also updated.
+
+7. **HAR file on disk contains live auth tokens.** `plex.owlfarm.ad.har` is in the untracked files list. Add `*.har` to `.gitignore` before the first GitHub push; if not done first, the HAR file can be accidentally committed with a bulk `git add`.
 
 ## Implications for Roadmap
 
-Based on research, suggested phase structure:
+Based on combined research, the following phase structure is recommended. It follows the dependency order derived from architecture analysis and places the SIGSEGV investigation first as a mandatory gate for all screen work.
 
-### Phase 1: Infrastructure and Build Tooling
-**Rationale:** Cache GetConstants() in m.global (pitfall #15 affects every subsequent phase). Set up BrighterScript compiler. Fix API task collision pattern.
-**Delivers:** Clean build pipeline, eliminated GC pressure, reliable concurrent API requests
-**Avoids:** Pitfall #15 (GC pressure), Pitfall #13 (task collisions)
+### Phase 1: Crash Safety and Foundation Cleanup
+**Rationale:** The BusySpinner SIGSEGV (signal 11, no trace) is an open investigation with TEST4b still pending. Until the root cause is confirmed (BusySpinner-specific vs. Animation nodes broadly), no new screen work can be trusted to be stable. Cleanup now reduces confusion and sets a clean baseline for all subsequent phases.
+**Delivers:** Confirmed crash-safe baseline; orphaned files deleted; `GetRatingKeyStr()` extracted to utils; dead spinner guards removed; `*.har` in `.gitignore`; PosterGridItem progress bar 1-line fix applied
+**Addresses:** Codebase cleanup (P1), BusySpinner root cause confirmation, PosterGridItem bug (XS fix with no dependencies — do it here)
+**Avoids:** SIGSEGV from adding new SceneGraph components (Pitfall 8); compile crashes from orphaned file deletion (Pitfall 6)
 
-### Phase 2: Playback Foundation (Resume + Progress + Watched State)
-**Rationale:** Resume playback is the single most critical missing feature. Without it, no user switches from the official app. Watch progress indicators and mark-watched depend on the same `viewOffset`/`viewCount` fields.
-**Delivers:** Resume from last position, progress bars on poster items, watched badges, mark watched/unwatched
-**Addresses:** Features #1, #2, #3 from table stakes
+### Phase 2: Bug Fixes — Watch State and Auto-Play
+**Rationale:** Watch state propagation and auto-play are both P1 bugs with known exact fixes. They share a dependency (both require EpisodeScreen to emit `watchStateUpdate` correctly after playback) and should be done together to avoid double-patching EpisodeScreen. The hub row ContentNode walker must be added alongside the poster grid walker.
+**Delivers:** Auto-play working end-to-end from both EpisodeScreen and DetailScreen; "Continue Watching" hub row updates correctly after watched/unwatched toggle; watch state propagates to both poster grid and hub RowList ContentNode trees
+**Addresses:** Auto-play wiring (P1), watch state propagation (P1)
+**Avoids:** Auto-play gap in DetailScreen (Pitfall 9); watch state missing from hub rows (Pitfall 3)
 
-### Phase 3: Home Screen Hub Rows
-**Rationale:** The home screen must surface "what's next" to be useful as a daily driver. Hub rows (Continue Watching, Recently Added, On Deck) transform the home screen from a library browser into a personalized dashboard.
-**Delivers:** Continue Watching row, Recently Added row, On Deck section
-**Avoids:** Pitfall #2 (rendezvous cascade -- stagger loads), Pitfall #8 (RowList stutter -- pre-fetch ahead), Pitfall #13 (task collisions -- one task per row)
-**Addresses:** Features #4, #5 from table stakes
+### Phase 3: TV Show Direct Navigation
+**Rationale:** Direct navigation (show tap → EpisodeScreen) is a 5-line change in HomeScreen routing, but it must come after watch state is fixed. The new navigation path means HomeScreen must correctly update when EpisodeScreen pops — that update relies on watch state propagation being in place. The options key "Info" action in EpisodeScreen gives users a path back to DetailScreen for show-level metadata.
+**Delivers:** Grid tap on TV show goes directly to EpisodeScreen; DetailScreen accessible via options key ("Info") from within EpisodeScreen; navigation stack depth reduced from 3 to 2 levels for TV shows
+**Addresses:** TV show navigation overhaul (P1)
+**Avoids:** Splitting EpisodeScreen into three screens (Pitfall 1); focus loss after VideoPlayer closure (Pitfall 2); breaking VideoPlayer context fields
 
-### Phase 4: Error States and UI Polish
-**Rationale:** Before adding more features, ensure existing and new functionality handles failures gracefully. Loading spinners, empty states, network error retry, server unreachable messaging.
-**Delivers:** Comprehensive error handling across all screens
-**Addresses:** Feature #10 from table stakes
+### Phase 4: Search Layout Fix and Collections
+**Rationale:** These are independent fixes that do not depend on navigation or watch state changes. Grouping them keeps the patch set focused and avoids a state where search partially works and collections are still a dead-end.
+**Delivers:** Episode search results use `parentThumb` (no distorted thumbnails); keyboard collapses on grid focus expanding to full-width 6-column grid; column count computed dynamically from `gridWidth`; collections routable from both HomeScreen grid and SearchScreen
+**Addresses:** Search layout (P1), collections handler dispatch mismatch (Pitfall 4), search thumbnail aspect ratio (Pitfall 5)
+**Avoids:** Aspect ratio distortion in search grid; collections "Play" button sending collection ratingKey to VideoPlayer
 
-### Phase 5: Filter and Sort
-**Rationale:** Large libraries (10K+ items) are unusable without filtering. Depends on stable grid infrastructure from phases 2-3.
-**Delivers:** Sort by title/date/year/rating, filter by genre/year/unwatched/content rating
-**Avoids:** Pitfall #2 (rebuilding large grids -- build ContentNode in task, swap atomically)
-**Addresses:** Feature #6 from table stakes
+### Phase 5: Server Switching Removal and Settings Simplification
+**Rationale:** Server switching removal is isolated but requires careful sequencing across four codepaths. Doing it after navigation and search are stable means the test surface is smaller and regression risk is lower. This is the last code-only phase before asset and documentation work.
+**Delivers:** "Switch Server" removed from Settings; ~80 lines of duplicate discovery logic deleted; SettingsScreen simplified to auth, library manager, and user context; stale `m.global.serverUri` bug eliminated
+**Addresses:** Server switching fix-or-remove (P2 per PROJECT.md)
+**Avoids:** Partial removal crashing multi-server auth flow (Pitfall 7)
 
-### Phase 6: Audio and Subtitle Track Selection
-**Rationale:** Pairs naturally as same UI pattern (PlaybackOverlay widget). Subtitle handling requires careful PGS burn-in logic.
-**Delivers:** PlaybackOverlay widget, audio track picker, subtitle track picker with SRT direct play and PGS/ASS burn-in
-**Avoids:** Pitfall #1 (PGS silent failure), Pitfall #6 (SubtitleTracks vs SubtitleConfig), Pitfall #10 (focus traps in overlays)
-**Addresses:** Features #7, #8 from table stakes
+### Phase 6: App Branding
+**Rationale:** Purely asset work — no code dependencies. Can be run in parallel with Phase 5 if resources allow, or sequentially after. Placed here to ensure asset design reflects the final v1.1 feature set before GitHub publication.
+**Delivers:** InterBold.ttf bundled in `SimPlex/fonts/`; all four icon variants updated simultaneously (540x405 FHD focus, 246x140 FHD side, 336x210 HD focus, 164x94 HD side); splash at exactly 1920x1080; optional gradient background PNG; `bsconfig.json` updated with `fonts/**/*`; stacked-label shadow pattern applied where bold typography is used
+**Addresses:** App branding refresh (P1 per PROJECT.md)
+**Avoids:** Icon dimension mismatch across Roku devices (Pitfall 10); WebP/AVIF format incompatibility; variable font instability
 
-### Phase 7: Intro/Credits Skip
-**Rationale:** Depends on PlaybackOverlay from Phase 6. Same overlay pattern, same marker API.
-**Delivers:** Skip Intro button, Skip Credits / auto-next trigger
-**Avoids:** Pitfall #5 (pre-fetch markers before playback), Pitfall #10 (overlay focus management)
-**Addresses:** Differentiators #1, #2
-
-### Phase 8: Auto-play Next Episode
-**Rationale:** Depends on credits skip trigger from Phase 7. Completes the TV binge-watching workflow.
-**Delivers:** 10-second countdown at end of episode, auto-advance to next episode
-**Addresses:** Feature #9 from table stakes
-
-### Phase 9: Collections and Playlists
-**Rationale:** Both are content organization features that reuse PosterGrid. Playlists share sequential playback logic with auto-play next.
-**Delivers:** Collections browsing, playlist browsing and playback
-**Addresses:** Feature #11 from table stakes, Differentiator #5
-
-### Phase 10: Managed Users
-**Rationale:** Cross-cutting concern (changes auth token for all API calls). Build after core features are stable.
-**Delivers:** User picker screen, PIN entry, user switching with token swap
-**Avoids:** Pitfall #7 (token swap invalidates active tasks -- stop all tasks, clear caches, reset screen stack)
-**Addresses:** Differentiator #4
-
-### Phase 11: Music Playback (stretch)
-**Rationale:** Requires architectural change (persistent Audio node in MainScene, NowPlayingBar). High complexity. Fills gap left by official app removing music.
-**Delivers:** Artist/Album/Track browsing, MusicPlayer widget, NowPlayingBar, queue management
-**Avoids:** Pitfall #4 (Audio node parenting), Pitfall #12 (immutable playlist after play starts)
-
-### Phase 12: Photos (stretch)
-**Rationale:** Independent from other features. Simplest media type (no playback state management).
-**Delivers:** Photo grid browsing, full-screen viewer, slideshow
-
-### Phase 13: Live TV and DVR (stretch)
-**Rationale:** Most complex feature. Custom EPG grid widget. Defer to last.
-**Delivers:** Channel browsing, live stream playback, DVR recordings list
-**Avoids:** Pitfall #9 (live HLS handling), Pitfall #14 (EPG grid complexity -- start with simple channel list)
+### Phase 7: GitHub Documentation
+**Rationale:** Written last, after code and assets are final. Documentation describes what was actually built. This phase also includes the GitHub publish security audit (LogEvent credential leakage, HAR gitignore already done in Phase 1).
+**Delivers:** `README.md` (overview, screenshots, sideload how-to, feature list, license); `CONTRIBUTING.md` (dev environment, F5 deploy, code conventions, known limitations); optional `docs/ARCHITECTURE.md`; GitHub repository publishable
+**Addresses:** GitHub documentation (P1 for publishability)
+**Avoids:** Auth tokens in LogEvent calls (audit as part of this phase); HAR file in repo (gated by Phase 1 `.gitignore`)
 
 ### Phase Ordering Rationale
 
-- **Phases 1-4** make the app a viable daily driver. A user could switch from the official app after these phases.
-- **Phases 5-8** bring feature parity with the official Plex app for video content.
-- **Phases 9-10** add content organization and household support.
-- **Phases 11-13** are stretch goals for additional media types, ordered by complexity (music before photos before live TV).
-- Dependencies flow downward: resume/progress must exist before hub rows can show meaningful state; PlaybackOverlay must exist before intro skip; credits skip must exist before auto-play next.
-- Infrastructure fixes (Phase 1) prevent compounding issues across all later phases.
+- SIGSEGV confirmation gates all screen work — if Animation nodes broadly are implicated, several v1.1 changes that involve any visual feedback need to use only safe patterns. This cannot be discovered mid-refactor.
+- Watch state must precede direct navigation — the new HomeScreen → EpisodeScreen path immediately exercises the propagation path; broken propagation would manifest as a navigation bug and be harder to isolate.
+- Bug fixes (watch state, auto-play) precede less critical fixes (search, collections) to deliver the highest user value earliest.
+- Server switching removal is deferred past the core fixes to keep the test surface smaller during the most complex phases.
+- Branding and documentation are independent of code and are placed last to avoid rework if code changes affect what is documented or shown in screenshots.
 
 ### Research Flags
 
-Phases likely needing deeper research during planning:
-- **Phase 6 (Subtitles):** PGS burn-in transcode URL construction, SubtitleTracks content metadata format, and sidecar SRT URL format all need validation against actual Roku device behavior
-- **Phase 11 (Music):** Roku Audio node queue management, background playback limitations, NowPlayingBar focus management across screen stack
-- **Phase 13 (Live TV):** EPG data structure from Plex, tuner session management API, custom grid virtualization on Roku
+Phases with well-documented patterns where `research-phase` can be skipped:
+- **Phase 1 (Cleanup):** Pure deletion and refactoring. All information needed is in this research package.
+- **Phase 3 (Direct Navigation):** 5-line HomeScreen change. The routing pattern already exists in the codebase; MainScene already has the `action:"episodes"` branch.
+- **Phase 5 (Server Switching Removal):** Deletion and call-site patching. ARCHITECTURE.md identifies all four codepaths with exact sub names.
+- **Phase 6 (Branding):** Asset work with confirmed dimensions from STACK.md. No platform uncertainty beyond the icon dimension discrepancy noted in Gaps below.
+- **Phase 7 (Documentation):** Plain Markdown. No research needed.
 
-Phases with standard patterns (skip research-phase):
-- **Phase 1 (Infrastructure):** BrighterScript setup is well-documented with migration guides
-- **Phase 2 (Resume/Progress):** Standard Plex API fields, straightforward implementation
-- **Phase 3 (Hub Rows):** Well-documented Plex `/hubs` API, existing MediaRow widget
-- **Phase 5 (Filter/Sort):** Standard Plex API query parameters, existing grid infrastructure
-- **Phase 9 (Collections/Playlists):** Standard CRUD-style Plex API endpoints, reuses existing widgets
+Phases that may benefit from targeted research before planning:
+- **Phase 2 (Watch State and Auto-Play):** Hub row ContentNode tree walking is the non-obvious part. The existing poster grid walker provides a template, but RowList ContentNode structure (rows as children, items as grandchildren) differs from a flat grid. A quick code read of HomeScreen.brs at the RowList population site (`processHubs()`) before planning the walker is recommended.
+- **Phase 4 (Search Layout and Collections):** The keyboard collapse animation (repositioning grid to full width) should be prototyped early — if it causes render jank on low-RAM Roku Express devices, the simpler fallback is a fixed 4-column layout with no collapse. Collections endpoint response structure should be verified against the live Plex server before building the handler.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | BrighterScript stable branch verified, Maestro deprecation confirmed via GitHub, Jellyfin-Roku validates production use |
-| Features | HIGH | Plex API endpoints verified against Plexopedia, plexapi.dev, and official Plex support docs. User complaints verified via Plex forums. |
-| Architecture | HIGH | Patterns grounded in Roku official docs, existing codebase analysis, and DAZN engineering benchmarks. Maestro assessment based on official Maestro docs. |
-| Pitfalls | HIGH | Platform limitations verified via Roku developer docs. PGS issue confirmed by multiple sources. Rendezvous mechanics from Roku SDK archives. |
+| Stack | HIGH | Based on live codebase inspection and confirmed Roku platform behaviour. Only caveat: icon dimension spec page returned 403; community-verified values used (MEDIUM for that specific finding). |
+| Features | HIGH | All bugs confirmed by code reading (line numbers cited). Known gaps documented in PROJECT.md, CONCERNS.md, and v1.0 milestone audit. Feature priorities grounded in actual codebase state. |
+| Architecture | HIGH | All component analysis from live code, not speculation. Fix approaches are code-level specific with sub names, line numbers, and exact field names. |
+| Pitfalls | HIGH | All pitfalls grounded in observed code state or confirmed platform constraints. BusySpinner SIGSEGV is the only unresolved area — root cause pending TEST4b. |
 
 **Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **Transcode URL construction for PGS burn-in:** The exact parameter format (`subtitles=burn&subtitleStreamID={id}`) needs validation against a real Plex server during Phase 6 planning. Documentation is sparse.
-- **Roku Audio node background playback:** Whether audio continues when the Roku screensaver activates is unclear. Test on device during Phase 11.
-- **Managed user token scope:** Whether managed user tokens can access all server endpoints or have restrictions needs validation against Plex Home API during Phase 10 planning.
-- **BrighterScript 0.70.3 compatibility with existing codebase:** While the superset guarantee means it should work, the specific `diagnosticFilters` needed for existing code should be validated during Phase 1.
+- **BusySpinner root cause:** TEST4b (fade animations, no spinner) was pending at v1.0 close. Phase 1 must include a structured test run to confirm whether the crash is BusySpinner-specific or Animation-node-general. If Animation nodes broadly are implicated, any future loading feedback using opacity animation is also ruled out.
+- **Icon dimension discrepancy:** STACK.md and FEATURES.md report slightly different HD icon dimensions for side icons (STACK: 246x140 FHD side; FEATURES.md cites Zype source: 290x218 for both FHD focus and FHD side). The official Roku spec page returned 403. Verify by checking the Roku developer portal directly or testing a sideload with both dimension sets before committing to final asset production.
+- **RowList ContentNode tree shape for hub row watch state walker:** `processHubs()` in HomeScreen.brs builds the RowList ContentNode but the exact child/grandchild structure needs to be confirmed before writing the watch state walker. A code read of HomeScreen.brs at the hub population site resolves this; it is a 15-minute task, not a research gap.
+- **Collections API endpoint structure:** `/library/collections` is referenced in FEATURES.md and ARCHITECTURE.md but the exact API response shape should be verified against the live Plex server before building the handler. If it mirrors the standard `MediaContainer.Metadata[]` structure, no additional work is needed; if not, the handler must be adapted.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- [BrighterScript GitHub](https://github.com/rokucommunity/brighterscript) -- v0.70.3 stable, compiler features, bsconfig.json
-- [Maestro-Roku GitHub](https://github.com/georgejecook/maestro-roku) -- Confirmed deprecated, v0.72.0 final release Nov 2023
-- [Roku SceneGraph Core Concepts](https://developer.roku.com/docs/developer-program/core-concepts/core-concepts.md) -- Architecture patterns
-- [Roku Closed Caption docs](https://developer.roku.com/docs/developer-program/media-playback/closed-caption.md) -- Subtitle format support
-- [Roku Memory Management](https://developer.roku.com/docs/developer-program/performance-guide/memory-management.md) -- Memory limits
-- [Roku SceneGraph Threads](https://sdkdocs-archive.roku.com/SceneGraph-Threads_4262152.html) -- Rendezvous mechanics
-- [Plex API: Global Hubs](https://plexapi.dev/api-reference/hubs/get-global-hubs) -- Hub rows endpoint
-- [Plex API: Mark Watched](https://www.plexopedia.com/plex-media-server/api/library/media-mark-watched/) -- Scrobble endpoint
-- [Plex Skip Content](https://support.plex.tv/articles/skip-content/) -- Intro/credits markers
-- [Plex Fast User Switching](https://support.plex.tv/articles/204232453-fast-user-switching/) -- Managed users
+- Live codebase: `EpisodeScreen.brs/.xml`, `DetailScreen.brs`, `HomeScreen.brs`, `MainScene.brs`, `SearchScreen.brs/.xml`, `VideoPlayer.brs/.xml`, `PosterGrid.brs/.xml`, `PosterGridItem.brs`, `utils.brs`, `constants.brs`, `SettingsScreen.brs`, `source/normalizers.brs`, `source/capabilities.brs` — all architecture and pitfall findings
+- `.planning/PROJECT.md` — documented known gaps, explicit feature scope (single server, no multi-server)
+- `.planning/codebase/CONCERNS.md` — documented UX gaps and open bugs
+- `.planning/milestones/v1.0-MILESTONE-AUDIT.md` — confirmed v1.0 completion state
+- `CLAUDE.md` — platform constraints and architecture rules
+- `.planning/UAT-DEBUG-CONTEXT.md` — BusySpinner SIGSEGV investigation state, bisection results
+- Roku Developer docs — Timer node, Font node (official, HIGH confidence)
+- Inter font project (rsms.me/inter) — SIL OFL license confirmed
 
 ### Secondary (MEDIUM confidence)
-- [ContentNode Benchmarks (DAZN Engineering)](https://medium.com/dazn-tech/rokus-scenegraph-benchmarks-aa-vs-node-9be5158474c1) -- Performance data
-- [Plex Roku app backlash](https://piunikaweb.com/2025/09/17/plex-roku-update-backlash/) -- User sentiment
-- [PGS Subtitles on Roku (How-To Geek)](https://www.howtogeek.com/as-a-plex-user-im-begging-roku-to-support-pgs-subtitles/) -- PGS limitation confirmation
-- [Plex Labs RSG Application](https://medium.com/plexlabs/xml-code-good-times-rsg-application-b963f0cec01b) -- Architecture reference
+- Roku Community Forum — `mm_icon_focus_fhd` dimensions (multiple threads consistent; official spec page returned 403)
+- Roku Community Forum — gradient Rectangle limitation (multiple threads confirm no native gradient; workaround established)
+- Roku Community Forum — custom TTF font usage (consistent with Font node documentation pattern)
+- Roku Community Forum — Label stroke limitation (no stroke property; stacked-label workaround established)
+- Zype Roku App Images guide — icon dimension reference (cross-check source; differs from other community sources on side icon FHD dimensions)
+- Jellyfin Roku GitHub — README and CONTRIBUTING.md structure reference
 
-### Tertiary (LOW confidence)
-- [RARflix community Roku client](https://github.com/ljunkie/rarflix) -- Historical reference for Roku Plex client patterns (project inactive)
+### Tertiary
+- TV UX best practices (spyro-soft.com) — season navigation patterns across Netflix, Plex, Infuse, Jellyfin (used to validate feature prioritisation only, not implementation decisions)
+- Plex forum feedback on TV navigation — user complaint patterns confirming TV show navigation friction (corroborating, not primary)
 
 ---
-*Research completed: 2026-03-08*
+*Research completed: 2026-03-13*
 *Ready for roadmap: yes*

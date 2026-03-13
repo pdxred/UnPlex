@@ -1,160 +1,232 @@
-# Feature Landscape
+# Feature Research
 
-**Domain:** Roku Plex Media Server Client (replacing official Plex Roku app)
-**Researched:** 2026-03-08
+**Domain:** Roku Plex Media Server Client — v1.1 Polish & Navigation Milestone
+**Researched:** 2026-03-13
+**Confidence:** HIGH (code read directly; UX patterns from TV media client ecosystem; Roku specs from official and community sources)
+
+---
 
 ## Context
 
-SimPlex replaces the official Plex Roku app, which was recently redesigned and is widely criticized for removing sidebar navigation, slow performance, and missing features. The opportunity is clear: users actively want a fast, sidebar-driven Plex client. The existing SimPlex scaffold already covers auth, server connection, library browsing, detail/episode screens, search, and video playback.
+This document replaces the v1.0 FEATURES.md. The v1.0 research catalogued what to build across the full app. This document focuses exclusively on what the v1.1 milestone needs to accomplish: TV show navigation overhaul, bug fixes, branding refresh, codebase cleanup, and GitHub documentation.
 
-This document categorizes features by what matters for daily use of a personal Plex server with movies and TV shows as the primary content.
-
----
-
-## Table Stakes
-
-Features users expect from any Plex client. Missing any of these makes the app feel incomplete for daily use.
-
-| Feature | Why Expected | Complexity | Plex API Endpoints | Notes |
-|---------|--------------|------------|-------------------|-------|
-| **Resume playback from last position** | Users pause and return constantly; without this, the app is unusable | Low | `viewOffset` field on metadata items; pass `offset` param to playback URL | Already have progress reporting via `/:/timeline`; need to read `viewOffset` from item metadata and pass to Video node |
-| **Mark watched / unwatched** | Core library management action | Low | `GET /:/scrobble?key={ratingKey}` (watched), `GET /:/unscrobble?key={ratingKey}` (unwatched) | Toggle from detail screen; update UI state immediately |
-| **Watch progress indicators** | Users need to see what they've started and finished at a glance | Low | `viewOffset` and `viewCount` fields on item metadata; `leafCount`/`viewedLeafCount` on shows | Overlay progress bar on poster items; watched badge |
-| **Hub rows (Continue Watching, Recently Added)** | Primary home screen discovery; users expect to land on "what's next" | Med | `GET /hubs` (global), `GET /hubs/sections/{id}` (per-library); params: `count`, `onlyTransient` | Continue Watching is the single most-used hub. Recently Added close second. |
-| **On Deck** | "What episode comes next" for TV watchers | Low | `GET /library/onDeck` | Can be a hub row or standalone section |
-| **Filter and sort library** | Large libraries (10K+ items) are unusable without filtering | Med | `GET /library/sections/{id}/all?sort=titleSort:asc&unwatched=1&genre=Action` ; filter options from `GET /library/sections/{id}?includeDetails=1` | Sort: title, date added, year, rating. Filter: unwatched, genre, year, decade, content rating |
-| **Audio track selection** | Many users have multi-language media | Med | Audio streams listed in `/library/metadata/{id}` media parts; set via playback URL params `audioStreamID={id}` or `PUT /library/parts/{partId}?audioStreamID={id}` | Show in playback overlay or pre-play options |
-| **Subtitle selection** | Essential for foreign content and accessibility | Med | Subtitle streams in media metadata; set via `subtitleStreamID={id}` param; `subtitleMode` preference | Support embedded subtitles (SRT, ASS via burn-in); surface subtitle tracks in playback overlay |
-| **Auto-play next episode** | TV binge watching is the primary use case | Med | Next episode from `/library/metadata/{id}` or increment ratingKey; need countdown UI | 10-second countdown overlay at end of episode with cancel option |
-| **Error states and empty states** | Without these, users hit dead ends and think the app is broken | Med | N/A (UI concern) | Loading spinners, "No items found", network error retry, server unreachable messaging |
-| **Collections browsing** | Many users organize libraries with collections | Med | `GET /library/sections/{id}/collections`, collection items via `GET /library/collections/{id}/children` | Display as a browsable section in sidebar or as a filter mode |
-
-**Confidence:** HIGH -- these features are universally present in all serious Plex clients (official app, PlexKodiConnect, Jellyfin clients). Endpoints verified against Plexopedia and plexapi.dev documentation.
+Everything listed under "Already Built" in PROJECT.md is treated as existing infrastructure, not a deliverable. Features below are only the delta for v1.1.
 
 ---
 
-## Differentiators
+## Feature Landscape
 
-Features that set SimPlex apart from the official Plex Roku app. Not expected, but highly valued -- especially given user complaints about the official app's redesign.
+### Table Stakes (Users Expect These)
 
-| Feature | Value Proposition | Complexity | Plex API Endpoints | Notes |
-|---------|-------------------|------------|-------------------|-------|
-| **Sidebar navigation** | The #1 complaint about the new Plex Roku app is removing the sidebar. SimPlex's entire identity is this. | Already built | N/A | This is the core competitive advantage. Never remove it. |
-| **Fast grid browsing** | Official app is slow; SimPlex should feel instant | Already built (optimize) | Pagination via `X-Plex-Container-Start`/`X-Plex-Container-Size` | Focus on perceived performance: prefetch next page, image cache warming |
-| **Intro skip button** | Beloved feature; official app has it but SimPlex showing it proves feature parity | Med | `GET /library/metadata/{id}?includeMarkers=1` -- look for `type="intro"` markers with `startTimeOffset`/`endTimeOffset` | Show "Skip Intro" button overlay during intro marker timespan |
-| **Credits skip / auto-next** | Trigger next episode at credits rather than waiting for end | Med | `type="credits"` markers from same endpoint as intros | At credits marker start, show "Next Episode" / "Watch Credits" overlay |
-| **Playlists** | Many users curate playlists; official Roku app support is inconsistent | Med | `GET /playlists` (all), `GET /playlists/{id}/items` (contents), `POST /playQueues?type=video&uri=...` | Browse and play; creating/editing playlists is lower priority |
-| **Grid/list view toggle** | Some users prefer list view for TV shows, grid for movies | Low | N/A (UI concern) | Simple toggle on HomeScreen; persist preference per library type |
-| **Managed user switching** | Households with multiple profiles | Med | `GET https://plex.tv/api/v2/home/users` (list users), `POST https://plex.tv/api/v2/home/users/{id}/switch?pin={pin}` | User picker at startup or from settings; PIN dialog if user has PIN |
-| **Pre-roll / cinema trailers** | Enhances the "cinema experience" feel some users love | Low | Pre-rolls configured server-side; client creates PlayQueue with `extras` param to include them | Detect via server settings; PlayQueue handles the sequencing |
-| **Keyboard / search speed** | Official app search is reported as broken/slow | Already built (polish) | `/hubs/search?query={term}&limit=10` | Already have debounced search; ensure results render fast |
-| **Music playback** | Official Roku app removed music; no Plexamp on TV platforms. This is a gap. | High | `GET /library/sections/{id}/all` (artists), `/library/metadata/{id}/children` (albums then tracks); music library type=8 | Artist > Album > Track browsing; now-playing bar; background playback is the hard part on Roku |
-| **Photo browsing** | Niche but valued by photo-heavy users | Med | Photo library type=13; `GET /library/sections/{id}/all` (albums), `/library/metadata/{id}/children` (photos) | Grid view, full-screen viewer, slideshow with timer |
+Features users assume exist. Missing these makes v1.1 feel like it didn't address the right things.
 
-**Confidence:** HIGH for sidebar/speed (verified via user complaints on Plex forums). MEDIUM for music (Roku background audio has platform limitations). HIGH for API endpoints (verified against Python PlexAPI docs and Plexopedia).
+| Feature | Why Expected | Complexity | Notes |
+|---------|--------------|------------|-------|
+| **Show → Season list → Episode grid navigation** | Every TV media client (Netflix, Plex, Emby, Infuse) uses this three-level hierarchy. A flat episode list is disorienting for shows with 5+ seasons. | MEDIUM | Already have the two-panel layout (season LabelList + episode MarkupList). The overhaul is about adding a proper season-as-poster grid before the episode list, with the show still acting as the entry point. Season selection should jump to that season's episode list. |
+| **Episode thumbnail, number, and duration in list** | Users scan episode lists by thumbnail and episode number. Without these, the list is unusable for long-running shows. | LOW | EpisodeItem.xml already has thumbnail, title, summary, duration, and progress bar. The format string "E3 - Title" is already applied. The gap is showing watched badges reliably and ensuring the thumbnail loads. |
+| **Watched state accurate after playback** | After marking an episode watched or finishing it, the episode list must update immediately without requiring a manual reload. | MEDIUM | Two known gaps: (1) auto-play wiring: `grandparentRatingKey` never set so countdown never fires; (2) `watchStateChanged` from DetailScreen never observed by HomeScreen grid. Both are documented bugs, not new features. |
+| **Auto-play next episode working end-to-end** | Users binge TV shows. Auto-play is expected to work if it appears in the UI at all. The countdown overlay exists in VideoPlayer but is unreachable because callers never set `grandparentRatingKey`. | MEDIUM | Fix: both `EpisodeScreen.startPlayback()` and `DetailScreen.startPlayback()` must set `parentRatingKey`, `grandparentRatingKey`, `episodeIndex`, and `seasonIndex` on the VideoPlayer node before calling `control = "play"`. Already documented in CONCERNS.md. |
+| **Search results grouped or typed** | Searching a library with movies, shows, and episodes mixed into one undifferentiated poster grid is confusing. Users expect to see at minimum a "Movies" section and a "TV Shows" section. | MEDIUM | Current SearchScreen flattens all hub results into one PosterGrid with no section headers. The Plex search API returns hub-structured results (`MediaContainer.Hub[]`) with `type` on each hub. Group results by hub type or show a type badge (movie/show/episode) on each poster. |
+| **App icons at correct Roku dimensions** | Roku expects specific dimensions for `mm_icon_focus_fhd` (540x405px), `mm_icon_focus_hd` (290x218px), `mm_icon_side_fhd` (540x405px), and `mm_icon_side_hd` (290x218px). Wrong sizes appear blurry or cropped. | LOW | Current manifest references HD icons that may not exist at correct dimensions. Splash at 1920x1080 JPG is correct. Focus icons are the "large" channel art; side icons are the smaller thumbnail seen in the channel store list. Both need gradient background and legible "SimPlex" text. |
+| **Splash screen branding** | Splash must convey product identity in the 1.5 seconds it's visible. Current `splash_fhd.jpg` exists but branding quality is unknown. | LOW | Target: dark gradient background (matching BG_PRIMARY `0x1A1A2EFF`), large bold "SimPlex" wordmark with gray stroke, subtle Plex-gold accent. No animation — static JPG. |
+| **Codebase free of orphaned files** | Orphaned code creates confusion for contributors and breaks the promise of a published open-source channel. `normalizers.brs` and `capabilities.brs` contain 9 functions that are never called. | LOW | Delete both files. They are unimported and untested. If capabilities detection is needed later, rebuild from scratch using the Plex API response at connect time. |
 
----
+### Differentiators (Competitive Advantage)
 
-## Anti-Features
+Features that make v1.1 better than leaving v1.0 as-is.
 
-Features to explicitly NOT build. Each wastes development time or degrades the user experience.
+| Feature | Value Proposition | Complexity | Notes |
+|---------|-------------------|------------|-------|
+| **Season poster grid before episode list** | Most clients show seasons as a horizontal scroll or a simple text list. A poster grid with season artwork (using season thumb) gives shows a richer, more premium feel. | MEDIUM | Requires a new SeasonScreen or promoting the season selection to its own screen. The current single-screen two-panel layout (LabelList + MarkupList) can stay as a fallback for shows with many seasons. Season thumbnails come from `season.thumb` in `/library/metadata/{showRatingKey}/children`. |
+| **Continue Watching routes directly to playback** | The current HomeScreen routes Continue Watching items to DetailScreen, adding a friction click. Any show or movie with `viewOffset > 0` should launch playback directly with a resume prompt. | MEDIUM | Already documented as a UX gap in CONCERNS.md. Requires distinguishing "resume" hub items from "new" hub items by checking `viewOffset > 0` in `HomeScreen.startPlaybackFromHub()`. |
+| **Collections accessible without library selection** | Collections are a dead-end in the current sidebar — clicking Collections requires a library to be selected first but provides no feedback. Adding a top-level collections view that calls `/library/collections` fixes a visible broken feature. | MEDIUM | Documented in CONCERNS.md as UX gap. The fix is adding an "All Collections" path in the sidebar that doesn't require a library context. |
+| **Bolder icon/splash branding** | PROJECT.md explicitly names this as a v1.1 target: "bolder font with gray stroke, gradient backgrounds on icon/splash." A professionally branded icon distinguishes the channel in the Roku home screen among other sideloaded apps. | LOW | Icon design work, not code work. Deliverable is replacement PNG files at correct Roku dimensions (540x405 FHD focus, 290x218 HD focus, matching side icon variants) and updated splash JPG. |
+| **GitHub-publishable documentation** | Publishing to GitHub creates a community around the project and lets others contribute. Without a README, setup guide, and architecture doc, nobody can run the project from source. | LOW | Required files: `README.md` (what it is, screenshots, install via sideload), `CONTRIBUTING.md` (dev environment, BrighterScript setup, F5 deploy), and in-code architecture doc or link to `.planning/codebase/ARCHITECTURE.md`. |
+| **Search results with type context** | Showing a "TV Show" or "Movie" label below each poster in search results lets users orient immediately, especially when a search term returns both (e.g., "The Office" returns the show AND episodes). | LOW | Can be a small text label under the poster title in PosterGridItem, drawn from the `type` field on each result node. Low complexity given the data is already available. |
 
-| Anti-Feature | Why Avoid | What to Do Instead |
-|--------------|-----------|-------------------|
-| **Plex Discover / streaming service integration** | SimPlex is for personal media only; Discover adds complexity for content the user doesn't own | Show only local library content; no streaming service links |
-| **Ad-supported content (Plex Free Movies & TV)** | Irrelevant to a personal server client; adds clutter | Omit entirely; don't hit the `/hubs/promoted` endpoint |
-| **Social features (friends activity, Watch Together)** | Complexity with no value for a personal/household app | Omit entirely |
-| **Cloud relay playback** | PROJECT.md explicitly scopes to direct server connection; relay adds latency and complexity | Connect local > remote only; skip relay connections |
-| **Multi-server browsing** | Scoped to single personal server | Support server switching in settings, but only one active server |
-| **Parental controls / content restrictions** | Deferred to v2 per PROJECT.md; Plex server handles this at the user level anyway | Rely on managed user permissions set on the server |
-| **Channel store certification** | Sideload only; certification adds UI/UX constraints that conflict with the classic feel | Distribute as .zip for sideloading |
-| **Fancy animations / transitions** | The official app's "gorgeous animations" are exactly what makes it feel slow on Roku | Instant screen transitions; focus goes where expected; no slide-in panels |
-| **Horizontal tab navigation** | The official app's switch to top tabs is the #1 user complaint | Keep the sidebar; this is the product identity |
-| **Offline downloads** | Roku has no filesystem for media storage; this is a mobile-only feature | Omit entirely |
-| **DVR management / recording scheduling** | High complexity, niche use case, requires tuner hardware | If Live TV is added, browse recordings only; no schedule management |
+### Anti-Features (Commonly Requested, Often Problematic)
+
+| Feature | Why Requested | Why Problematic | Alternative |
+|---------|---------------|-----------------|-------------|
+| **Animated season transitions** | Feels polished on mobile/web | Roku's animation system is brittle; SOURCE of the BusySpinner SIGSEGV crash. Adding SceneGraph animations risks new firmware crashes. | Static screen transitions. Focus goes where expected instantly. No slide-ins or crossfades. |
+| **Custom episode sorting / filtering** | Power users want to reorder or filter episode lists | Episode ordering is always by episode number — Plex API returns them sorted; adding custom sort adds UI complexity with near-zero benefit | Rely on Plex server ordering; let users configure sort on the server side |
+| **Server switching UI overhaul** | Multiple servers means all content accessible | PROJECT.md: single personal server only. Multi-server is explicitly out of scope. | Fix or cleanly remove the server-switching dead code rather than building it out |
+| **Loading animations / spinners** | Users want visual feedback during loads | BusySpinner causes SIGSEGV firmware crash (confirmed in bisection). Static loading text is safe. | Show "Loading..." label text or a simple static graphic during API calls. No BusySpinner. |
+| **Season-level mark all watched** | Bulk watched marking is convenient | Requires a `/library/metadata/{seasonKey}/children` fetch + N scrobble calls; adds UI complexity for a rare action | Mark individual episodes from the options menu. Bulk actions are a v2 feature if ever. |
 
 ---
 
 ## Feature Dependencies
 
 ```
-Resume Playback --> Watch Progress Indicators (both read viewOffset)
-Hub Rows --> On Deck (On Deck is a hub type)
-Filter/Sort --> Library Browsing (already built; filters layer on top)
-Intro Skip --> Credits Skip (same marker API, same overlay pattern)
-Credits Skip --> Auto-play Next Episode (credits trigger the "next" prompt)
-Auto-play Next --> Playlists (playlist playback uses same sequential logic)
-Audio Track Selection --> Subtitle Selection (same UI pattern, same media metadata)
-Managed Users --> PIN Entry (users may have PINs)
-Pre-rolls --> PlayQueue API (pre-rolls use PlayQueue extras)
-Music Playback --> Playlists (music playlists reuse playlist infrastructure)
-Collections --> Filter/Sort (collections can be a filter type within a library)
+Auto-play next episode fix
+    └──requires──> grandparentRatingKey set in EpisodeScreen.startPlayback()
+    └──requires──> grandparentRatingKey set in DetailScreen.startPlayback()
+    └──enables──>  Watch state propagation refresh after auto-play
+
+Watch state propagation fix
+    └──requires──> HomeScreen observes watchStateChanged from child screens
+    └──enhances──> Episode list accuracy after marking watched on DetailScreen
+
+Search results with type grouping
+    └──requires──> SearchScreen processes Hub[] array (already available)
+    └──enhances──> User orientation in mixed-type results
+
+Season poster grid
+    └──requires──> Season thumb URLs from /library/metadata/{id}/children
+    └──may split into──> SeasonScreen (new) + EpisodeScreen (existing)
+
+Continue Watching direct playback
+    └──requires──> HomeScreen hub item routing logic update
+    └──requires──> Resume dialog (already exists in EpisodeScreen — reuse pattern)
+
+Collections top-level
+    └──requires──> /library/collections endpoint (new API call)
+    └──requires──> Sidebar adds Collections entry without library context
+
+Icon/splash refresh
+    └──independent──> All other features (purely asset replacement)
+
+GitHub documentation
+    └──independent──> All other features (written last, after code is final)
+
+Codebase cleanup (orphaned files)
+    └──independent──> But should be first — reduces confusion during other work
 ```
 
-### Dependency Ordering (build bottom-up):
+### Dependency Notes
 
-1. **Resume + Watch Progress** (foundation for all playback features)
-2. **Hub Rows + On Deck** (home screen becomes useful for daily workflow)
-3. **Filter/Sort** (large library usability)
-4. **Audio/Subtitle Selection** (playback completeness)
-5. **Intro/Credits Skip** (playback polish)
-6. **Auto-play Next Episode** (TV workflow)
-7. **Collections + Playlists** (content organization)
-8. **Managed Users** (household support)
-9. **Music + Photos** (additional media types)
-10. **Pre-rolls** (nice-to-have polish)
+- **Auto-play fix requires** both callers (EpisodeScreen AND DetailScreen) to be updated — fixing only one leaves the other path still broken.
+- **Watch state propagation** is separate from auto-play fix but both affect episode list freshness. Do them in the same phase to avoid double-patching.
+- **Season poster grid** may require a new SeasonScreen component. If so, EpisodeScreen continues to exist as the episode-level screen; SeasonScreen becomes the intermediate step between DetailScreen and EpisodeScreen.
+- **Cleanup should be first** — removing orphaned files before making changes avoids confusion about whether normalizers.brs is a dependency.
 
 ---
 
-## MVP Recommendation
+## MVP Definition
 
-The existing scaffold handles auth, browsing, playback. The next priority tier should focus on making the app usable as a **daily driver** -- replacing the official app entirely.
+### The v1.1 milestone ships when:
 
-### Priority 1: Daily Driver (must complete before anyone would switch from official app)
+- [ ] **Auto-play end-to-end works** — countdown fires, advances to next episode, cancels correctly — this is the highest-value fix because it closes the only "unsatisfied" requirements from v1.0
+- [ ] **Watch state propagates** from DetailScreen back to grid/hub rows after marking watched/unwatched
+- [ ] **TV show navigation** feels complete — Show detail → Seasons → Episode list without dead ends
+- [ ] **Search results** are legible with type context (at minimum a label, ideally grouped by hub)
+- [ ] **Icons and splash** replaced with properly-sized, visually distinct assets
+- [ ] **Orphaned files deleted** and codebase compiles cleanly
+- [ ] **README published** — someone new can sideload the channel in under 10 minutes following the instructions
 
-1. **Resume playback from last position** -- without this, users restart every movie/episode
-2. **Watch progress indicators** -- users can't tell what they've seen
-3. **Mark watched/unwatched** -- basic library hygiene
-4. **Hub rows (Continue Watching + Recently Added)** -- home screen must surface "what's next"
-5. **On Deck** -- TV watchers need next-episode awareness
-6. **Error states** -- without these, any API hiccup feels like a crash
+### Add After Validation (v1.x)
 
-### Priority 2: Feature Parity (makes the app competitive with official app)
+- [ ] Continue Watching direct playback — valuable but lower urgency than the bug fixes
+- [ ] Collections top-level access — currently a dead-end but not a crash
+- [ ] Season poster grid — current two-panel layout works; grid is an upgrade
 
-7. **Filter and sort** -- essential for large libraries
-8. **Audio track selection** -- multi-language households
-9. **Subtitle selection** -- accessibility and foreign content
-10. **Auto-play next episode** -- binge watching
-11. **Intro/credits skip** -- expected polish
+### Future Consideration (v2+)
 
-### Priority 3: Differentiation (makes the app better than official app)
+- [ ] Music library browsing and playback
+- [ ] Photo grid and slideshow
+- [ ] Live TV / EPG
+- [ ] Grid/list view toggle per library type
 
-12. **Collections** -- organization users set up on their server
-13. **Playlists** -- curated playback
-14. **Managed users** -- household with kids/partners
-15. **Music playback** -- fills the gap left by official app removing music
+---
 
-### Defer: Explicitly push to later
+## Feature Prioritization Matrix
 
-- **Photos/Slideshow** -- niche; most users access photos on mobile
-- **Live TV / DVR** -- requires tuner hardware; tiny user base
-- **Pre-rolls** -- fun but zero impact on daily usability
-- **Grid/list toggle** -- nice polish but not blocking adoption
+| Feature | User Value | Implementation Cost | Priority |
+|---------|------------|---------------------|----------|
+| Auto-play next episode (wire fix) | HIGH | LOW (known exact fix) | P1 |
+| Watch state propagation | HIGH | LOW (known exact fix) | P1 |
+| Orphaned file cleanup | MEDIUM | LOW | P1 |
+| TV show navigation overhaul | HIGH | MEDIUM | P1 |
+| Search results with type context | MEDIUM | LOW | P1 |
+| Icon/splash branding refresh | MEDIUM | LOW (asset work) | P1 |
+| GitHub README + docs | HIGH (for publishability) | LOW | P1 |
+| Continue Watching direct playback | HIGH | MEDIUM | P2 |
+| Collections top-level access | MEDIUM | MEDIUM | P2 |
+| Season poster grid | MEDIUM | MEDIUM | P2 |
+| Server switching cleanup | LOW | LOW (remove it) | P2 |
+| LoadingSpinner replacement | MEDIUM | MEDIUM (crash risk if done wrong) | P2 |
+
+**Priority key:**
+- P1: Must have for v1.1 milestone completion
+- P2: Should have if time allows, can slip to v1.2
+- P3: Future milestone
+
+---
+
+## Competitor Feature Analysis
+
+How other TV media clients handle the specific areas this milestone addresses:
+
+| Feature | Official Plex Roku App | Infuse (Apple TV) | Jellyfin Roku | SimPlex v1.0 | SimPlex v1.1 Target |
+|---------|----------------------|-------------------|---------------|--------------|---------------------|
+| Season navigation | Seasons as horizontal tab row across top of screen | Season picker dropdown overlaid on episode list | Season list + episode grid (two panels) | Two-panel: LabelList (seasons) + MarkupList (episodes) | Same two-panel but ensure layout handles 10+ seasons; consider season poster grid |
+| Episode display | Episode grid with thumbnails + title + runtime | Compact list with thumbnail, S01E01 format, duration | Episode list with thumbnail, title, description | MarkupList rows: thumbnail, "E3 - Title", summary, duration, progress bar | Same layout; fix watched badge rendering |
+| Search results | Hub-grouped results with section headers ("Movies", "TV Shows") | Flat grid, type badge on each tile | Flat grid | Flat PosterGrid, no type labels | Add type label below each poster OR split into sections by hub |
+| Auto-play | Countdown overlay with cancel, advances to next episode | System-level next episode via ATV queue | Countdown + skip | Countdown exists in VideoPlayer but unreachable | Wire `grandparentRatingKey` so countdown fires |
+| Channel icon | Official Plex branding | N/A (not on Roku) | Jellyfin logo on dark background | Current placeholder icon | Bold "SimPlex" wordmark with gradient background, gold accent |
+| Documentation | Official Plex support docs | N/A | DEVGUIDE.md + contributing.md | None | README.md + CONTRIBUTING.md |
+
+---
+
+## Roku Icon Specifications (Research Findings)
+
+Confidence: MEDIUM (from Roku community forum threads, Zype support, Roku developer help pages; official spec page returned 403)
+
+| Asset | Manifest Key | Dimensions | Format |
+|-------|-------------|------------|--------|
+| Focus icon FHD | `mm_icon_focus_fhd` | 540x405px | PNG |
+| Focus icon HD | `mm_icon_focus_hd` | 290x218px | PNG |
+| Side icon FHD | `mm_icon_side_fhd` | 540x405px | PNG |
+| Side icon HD | `mm_icon_side_hd` | 290x218px | PNG |
+| Splash FHD | `splash_screen_fhd` | 1920x1080px | JPG |
+
+Current manifest already references all five assets. The focus icon is the large poster shown when channel is highlighted; the side icon is the small thumbnail in the channel list. Both should carry the same branding but side icons need to be legible at smaller size.
+
+Note: The current images directory contains `icon_focus_hd.png` and `icon_side_hd.png` as new untracked files — these may already be the replacement assets.
+
+---
+
+## GitHub Documentation Requirements
+
+Based on review of the Jellyfin Roku repo (the most directly comparable published Roku media client) and general open source norms:
+
+### README.md (required)
+
+- Project name, tagline, screenshot or demo GIF
+- What it is and what it is NOT (Plex required, sideload only, single server)
+- Prerequisites (Roku device in developer mode, Plex Media Server, BrighterScript for dev)
+- Installation: two paths — (1) download release .zip and sideload, (2) clone + build from source
+- Features list (bullet points matching v1.1 state)
+- License
+
+### CONTRIBUTING.md (required for dev onboarding)
+
+- Dev environment: VSCode + BrighterScript extension + Roku VSCode extension
+- F5 deploy workflow
+- Project structure explanation (mirrors CLAUDE.md)
+- Code conventions (commit format, BrightScript patterns, no roUrlTransfer on render thread)
+- Known limitations and out-of-scope features
+
+### Optional but valuable
+
+- `docs/ARCHITECTURE.md` (or link to `.planning/codebase/ARCHITECTURE.md`)
+- GitHub releases with tagged .zip attachments for no-build installs
 
 ---
 
 ## Sources
 
-- [Plex Roku app backlash and missing features](https://piunikaweb.com/2025/09/17/plex-roku-update-backlash/) -- MEDIUM confidence (news reporting)
-- [Plex sidebar removal complaint thread](https://forums.plex.tv/t/roku-plex-ui-regression-sidebar-removed-top-tabs-now-request-classic-sidebar-toggle/935370) -- HIGH confidence (direct user feedback)
-- [Plex API: Mark Watched endpoint](https://www.plexopedia.com/plex-media-server/api/library/media-mark-watched/) -- HIGH confidence (API reference)
-- [Plex API: Get Global Hubs](https://plexapi.dev/api-reference/hubs/get-global-hubs) -- HIGH confidence (API reference)
-- [Plex API: Get On Deck](https://plexapi.dev/api-reference/library/get-on-deck) -- HIGH confidence (API reference)
-- [Plex API: Collections](https://python-plexapi.readthedocs.io/en/latest/modules/collection.html) -- HIGH confidence (Python PlexAPI docs)
-- [Plex API: Music tracks](https://www.plexopedia.com/plex-media-server/api/library/music-albums-tracks/) -- HIGH confidence (API reference)
-- [Plex Skip Intro/Credits markers](https://support.plex.tv/articles/skip-content/) -- HIGH confidence (official Plex support)
-- [Plex Managed Users and Fast User Switching](https://support.plex.tv/articles/204232453-fast-user-switching/) -- HIGH confidence (official Plex support)
-- [Plex Extras / Pre-rolls](https://support.plex.tv/articles/202920803-extras/) -- HIGH confidence (official Plex support)
-- [Plex Playlists API](https://plexapi.dev/api-reference/playlists/get-all-playlists) -- HIGH confidence (API reference)
-- [RARflix community Roku client](https://github.com/ljunkie/rarflix) -- MEDIUM confidence (historical reference)
-- [Plex official Roku app "ruined" thread](https://forums.plex.tv/t/plex-just-ruined-their-roku-app/931058) -- HIGH confidence (direct user feedback)
+- Codebase analysis: `SimPlex/components/screens/EpisodeScreen.brs`, `DetailScreen.brs`, `SearchScreen.brs`, `SearchScreen.xml`, `EpisodeScreen.xml`, `EpisodeItem.xml`
+- Known bugs: `.planning/codebase/CONCERNS.md`, `.planning/milestones/v1.0-MILESTONE-AUDIT.md`
+- Project scope: `.planning/PROJECT.md`
+- Roku icon dimensions: [Roku Community Forum thread](https://community.roku.com/t5/Roku-Developer-Program/mm-icon-focus-fhd-resolution/td-p/492827), [Zype Roku App Images guide](https://support.zype.com/hc/en-us/articles/216101428-Roku-App-Images)
+- TV UX patterns: [8 UX/UI best practices for Smart TV apps](https://spyro-soft.com/blog/media-and-entertainment/8-ux-ui-best-practices-for-designing-user-friendly-tv-apps)
+- Competitor reference: [Jellyfin Roku GitHub](https://github.com/jellyfin/jellyfin-roku) — README structure, DEVGUIDE pattern, BrighterScript usage
+- Plex search hub structure: Plex API returns `MediaContainer.Hub[]` from `/hubs/search` — confirmed by reading `SearchScreen.brs` processSearchResults() which iterates `hubs` array
+- Plex forum feedback on TV navigation: [Roku Plex season/episode bug thread](https://forums.plex.tv/t/roku-app-when-going-into-a-season-it-shows-all-episodes-but-also-season-as-one-of-the-episodes/936141)
+
+---
+
+*Feature research for: SimPlex v1.1 Polish & Navigation*
+*Researched: 2026-03-13*

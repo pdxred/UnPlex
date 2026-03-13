@@ -1,353 +1,323 @@
-# Domain Pitfalls
+# Pitfalls Research
 
-**Domain:** Roku Plex Media Server Client (BrightScript / SceneGraph)
-**Researched:** 2026-03-08
-**Overall confidence:** HIGH (grounded in Roku platform docs, Plex API references, and existing codebase analysis)
+**Domain:** Roku/BrightScript Plex client — v1.1 Polish & Navigation milestone
+**Researched:** 2026-03-13
+**Confidence:** HIGH (all findings grounded in existing codebase, known firmware behavior, and Roku platform constraints)
 
 ---
 
 ## Critical Pitfalls
 
-Mistakes that cause rewrites, crashes, or fundamentally broken features.
+### Pitfall 1: EpisodeScreen Navigation Refactor Severs VideoPlayer Context Fields
 
-### Pitfall 1: Roku Cannot Render PGS or Bitmap Subtitles -- Burn-In Is the Only Path
+**What goes wrong:**
+`EpisodeScreen` already implements a combined season/episode screen. If the refactor splits it into separate Season and Episode screens pushed onto the stack, the VideoPlayer launch in `startPlayback()` stops receiving the five context fields it needs: `grandparentRatingKey`, `parentRatingKey`, `episodeIndex`, `seasonIndex`, and `mediaKey`. Auto-play next episode silently stops working — `onNextEpisodeStarted` fires but the wrong season reloads, or auto-play does nothing.
 
-**What goes wrong:** PGS (Presentation Graphic Stream) subtitles are the default format for Blu-ray rips in MKV containers. Roku has zero support for PGS rendering. If the client requests direct play with PGS subtitles selected, the user sees no subtitles at all -- no error, just silence. This is the single most common Plex+Roku complaint.
+**Why it happens:**
+The EpisodeScreen holds `m.seasons`, `m.currentSeasonIndex`, and `m.top.ratingKey` (the show's ratingKey) all in one component. A new SeasonScreen sitting between HomeScreen and EpisodeScreen would own the season array but not the episode list, creating a boundary that severs the season-to-VideoPlayer context chain. The existing `startPlayback()` at EpisodeScreen.brs line 408 depends on `m.seasons` and `m.currentSeasonIndex` being in scope.
 
-**Why it happens:** Roku's Video node only supports text-based subtitle formats: SRT (universally supported), TTML/SMPTE-TT, WebVTT (HLS-embedded), and EIA-608/708 (embedded in video stream). PGS is image-based and requires the decoder to composite bitmaps onto the video frame, which Roku's hardware pipeline does not support.
+**How to avoid:**
+Audit whether three separate screens are necessary before committing to the structure. If EpisodeScreen can be enhanced in-place (larger season list, season artwork column), prefer that over splitting. If splitting is required, the screen that launches the VideoPlayer must own or receive all five context fields. After refactoring, run a focused test: play episode from season 2, let auto-play fire, verify it advances within season 2 and not season 1.
 
-**Consequences:** Users with anime, foreign films, or Blu-ray rips will see "subtitles available" in the UI but get nothing on screen. This is a silent failure -- no error is thrown.
+**Warning signs:**
+- Auto-play next episode fires but jumps back to season 1 episode 1
+- `VideoPlayer.grandparentRatingKey` is `""` or `"0"` after the refactor
+- `nextEpisodeStarted` event fires but `loadEpisodes` reloads the wrong season
 
-**Prevention:**
-1. When building subtitle track selection, inspect each stream's `codec` field from the Plex API response. PGS streams have codec `"pgs"`, ASS/SSA have `"ass"`, SRT has `"srt"`.
-2. For PGS, ASS, or any bitmap/styled format: force transcode with `subtitles=burn` in the transcode URL. Do not attempt direct play.
-3. For SRT: use sidecar delivery via `SubtitleTracks` content metadata on the ContentNode. SRT can be direct-played.
-4. Show a visual indicator in the subtitle picker distinguishing "direct" vs "burn-in (slower start)" tracks.
-5. The current `buildTranscodeUrl()` uses `subtitles=auto` which may not reliably burn in PGS. Change to `subtitles=burn&subtitleStreamID={id}` when a bitmap subtitle is selected.
-
-**Detection:** Test with an MKV containing PGS subtitles. If subtitles appear with no video re-buffering, something is wrong (PGS requires transcoding). If they do not appear at all, burn-in is not being triggered.
-
-**Phase relevance:** Subtitle track selection phase. This must be the first thing validated.
-
-**Sources:**
-- [Roku Closed Caption docs](https://developer.roku.com/docs/developer-program/media-playback/closed-caption.md)
-- [PGS subtitle Plex+Roku pain](https://www.howtogeek.com/as-a-plex-user-im-begging-roku-to-support-pgs-subtitles/)
+**Phase to address:** TV Show Navigation Overhaul
 
 ---
 
-### Pitfall 2: Rendezvous Timeouts from Observer Callback Cascades
+### Pitfall 2: Focus Recovery After VideoPlayer Closure Breaks Under Navigation Refactor
 
-**What goes wrong:** When a Task node completes and fires an observer callback on the render thread, that callback runs on the render thread. If the callback creates ContentNode trees, sets multiple fields, or triggers further observer chains, it blocks the render thread. On lower-end Roku hardware, cascading observer callbacks (e.g., hub row data loading triggering 8+ row population callbacks in quick succession) cause rendezvous timeouts and app crashes.
+**What goes wrong:**
+`VideoPlayer` is appended directly to the scene root (`m.top.getScene().appendChild(m.player)`) — it bypasses the `pushScreen`/`popScreen` focus stack entirely. After playback, `onPlaybackComplete` calls `m.episodeList.setFocus(true)`. If a SeasonScreen is added as a proper stack entry and EpisodeScreen is popped before VideoPlayer completes, then `m.episodeList` is already removed from the scene when the callback fires. `setFocus(true)` on a detached node is a silent no-op — the user has no focus.
 
-**Why it happens:** Each Task-to-render-thread communication is a rendezvous. Setting fields on SceneGraph nodes from the render thread is fine, but doing it in bulk (creating 200+ ContentNodes in a single callback) or triggering observer chains (setting a field that triggers another observer that sets more fields) creates a blocking cascade. Roku's rendezvous has a timeout; exceed it and the app crashes.
+**Why it happens:**
+The VideoPlayer lifecycle is outside the screen stack. Any navigation refactor that changes which screen owns the episode list invalidates the hardcoded focus restore target in `onPlaybackComplete`.
 
-**Consequences:** App crash with no user-visible error. On low-end Roku devices (Express, Streaming Stick), this happens more frequently and earlier. The crash is non-deterministic, making it hard to reproduce.
+**How to avoid:**
+Keep the VideoPlayer lifecycle independent of the screen stack (append to scene root, remove on complete). After playback, focus must be restored to whatever the current top-of-stack screen considers its "default focus target" via `getCurrentScreen().setFocus(true)`, not to a specific node that may no longer be in scope. Alternatively, have each screen implement a `restoreFocus()` callFunc that MainScene invokes after VideoPlayer removes itself.
 
-**Prevention:**
-1. Build ContentNode trees entirely within the Task thread, then pass the completed tree to the render thread via a single field assignment. One rendezvous for the whole tree, not one per node.
-2. Use `setFields()` instead of multiple individual field assignments (one rendezvous instead of N).
-3. For hub rows: load rows sequentially with small delays (`Timer` node with 100-200ms between row loads) rather than firing all row requests simultaneously.
-4. Never create SceneGraph nodes (other than ContentNode) inside Task threads -- only ContentNode trees are safe to build in tasks and pass across.
-5. Profile with `channelperf` debug port and Roku Resource Monitor to identify rendezvous hotspots.
+**Warning signs:**
+- Back button after playback does nothing (no focused component)
+- Remote buttons unresponsive after returning from video
+- Debug console shows focus set to a node that returns `invalid` from `findNode`
 
-**Detection:** Enable the BrightScript debug console and look for "rendezvous" warnings. Test on the lowest-end supported Roku device.
-
-**Phase relevance:** Hub rows phase (loading multiple hub endpoints), filter/sort phase (rebuilding grids), any phase that populates large ContentNode trees.
-
-**Sources:**
-- [Roku SceneGraph Threads](https://sdkdocs-archive.roku.com/SceneGraph-Threads_4262152.html)
-- [Rendezvous explanation](https://medium.com/@amitdogra70512/rendezevous-in-roku-bd55d81fc994)
+**Phase to address:** TV Show Navigation Overhaul
 
 ---
 
-### Pitfall 3: Memory Pressure from ContentNode Trees in Large Libraries
+### Pitfall 3: Watch State Propagation Does Not Reach Hub Rows
 
-**What goes wrong:** With tens of thousands of items in a library, naive approaches (loading all items, keeping all ContentNode trees in memory for back-navigation) exhaust Roku's available memory. Roku devices have limited RAM (256MB-1.5GB depending on model), and texture memory is capped at approximately 95MB shared with the OS. The app gets killed by the OS with no crash dialog.
+**What goes wrong:**
+`m.global.watchStateUpdate` propagates from DetailScreen. `HomeScreen.onWatchStateUpdate` exists but only patches the poster grid ContentNodes. Hub row ContentNodes (the RowList populated by `loadHubs`) are a separate ContentNode tree and are not walked by the current handler. After marking an episode watched in DetailScreen and returning to HomeScreen, "Continue Watching" still shows the episode and the progress bar is still visible on its hub row poster.
 
-**Why it happens:** Each ContentNode with custom fields costs significant memory. Benchmarks show 2,000 extended ContentNodes take ~1,324ms to create and consume substantial heap. Poster images at full resolution (even when displayed at 240x360) consume texture memory at `width * height * 4 bytes`. A grid page of 50 posters at 480x720 source resolution uses ~66MB of texture memory.
+**Why it happens:**
+Hub rows are loaded into a dynamically-created RowList whose content is built in `processHubs()`. The poster grid and the hub RowList are two separate ContentNode trees. `onWatchStateUpdate` was written to patch the poster grid. Extending it to walk the hub RowList requires iterating `m.hubRowList.content` children and their children, which is a different tree shape.
 
-**Consequences:** OS kills the channel silently. User sees "channel closed" or a reboot on very low-end devices. This is the hardest bug to diagnose because there is no error callback.
+**How to avoid:**
+Fix watch state propagation before adding more navigation depth. The hub row walker needs to: (1) iterate each hub row ContentNode, (2) for each row, iterate its child ContentNodes, (3) match on `ratingKey`, (4) update `viewCount`, `viewOffset`, and `watched` fields. Add a test: mark watched in Detail; return to Home; "Continue Watching" hub must not show that item (either removed or shows watched badge).
 
-**Prevention:**
-1. Paginate aggressively: 50 items per page maximum, which the existing code already does.
-2. When navigating away from a screen (popping the screen stack), explicitly release ContentNode trees by setting the grid's `content` field to `invalid` in the cleanup function. Do not rely on garbage collection.
-3. Request poster images at the exact display size via Plex's `/photo/:/transcode?width=240&height=360` -- the existing code does this, but verify all new image-loading paths follow this pattern.
-4. For hub rows: limit to 20 items per row initially (Plex hub endpoints return limited results by default -- do not override with large container sizes).
-5. Use Roku Resource Monitor during development to track system memory, texture memory, and node count.
-6. Use `addFields` instead of `extends` when creating ContentNode subtypes -- `extends` is significantly more expensive.
+**Warning signs:**
+- "Continue Watching" shows a just-finished episode
+- Progress bar persists on hub row poster after watching from Detail
+- On Deck shows an episode that was marked watched
 
-**Detection:** Monitor memory via `sgnodes all` in the debug console. Watch for increasing node counts after navigation (indicates leaks). Test with libraries of 10,000+ items.
-
-**Phase relevance:** Every phase, but especially hub rows (many concurrent data sources), music (album art grids), and photo browsing (high-resolution images).
-
-**Sources:**
-- [Roku Memory Management](https://developer.roku.com/docs/developer-program/performance-guide/memory-management.md)
-- [ContentNode benchmarks](https://medium.com/dazn-tech/rokus-scenegraph-benchmarks-aa-vs-node-9be5158474c1)
+**Phase to address:** Bug Fixes — Watch State Propagation
 
 ---
 
-### Pitfall 4: Music Playback Cannot Survive Screen Navigation with Current Architecture
+### Pitfall 4: Collections Handler Dispatch Mismatch Sends Users to Wrong Screen
 
-**What goes wrong:** The current VideoPlayer is appended directly to the scene and removed when playback completes. Music playback requires audio to continue while the user browses other screens (album art, queue, library). If the Audio node is owned by a screen that gets popped from the stack, playback stops.
+**What goes wrong:**
+When a collection is selected from the poster grid, `HomeScreen.onGridItemSelected` fires. If `itemType` is `"collection"`, MainScene routes it to `showDetailScreen`. DetailScreen's `buildButtons()` only explicitly handles `item.type = "show"` — everything else falls to the movie/episode branch which shows "Play" (not "Browse Collection"). Collections are not playable; pressing "Play" on a collection causes an error or sends `mediaKey` for a collection ratingKey to VideoPlayer, which fails.
 
-**Why it happens:** Roku's SceneGraph node tree is the DOM -- removing a node from the tree stops its playback. The Audio node must remain in the scene tree for the duration of playback. The current architecture has no concept of a persistent, cross-screen playback component.
+**Why it happens:**
+The Plex API returns `type: "collection"` for collection items, but `buildButtons()` in DetailScreen has no branch for it. The `browseSeasons` action path only fires for `type = "show"`. There is no `browseCollection` action defined in either DetailScreen or MainScene.
 
-**Consequences:** Music stops every time the user navigates. The app feels broken for music use. Retrofitting this after building music screens is a significant refactor.
+**How to avoid:**
+Add an explicit `type = "collection"` branch in `buildButtons()` showing a "Browse Collection" button with `action: "browseCollection"`. Add a handler in MainScene `onItemSelected` for `action: "browseCollection"` that calls `showHomeScreen()` in collection mode by passing `collectionRatingKey`. HomeScreen already has `m.isCollectionsView` and `m.collectionRatingKey` — wire them from the navigation action. Verify the full loop: Home → collection item → Detail → "Browse Collection" → collection contents → item Detail.
 
-**Prevention:**
-1. Create the Audio node as a child of MainScene (the root), not any individual screen. It persists across all screen stack operations.
-2. Build a `NowPlayingBar` widget that is always visible at the bottom of MainScene when audio is playing. This bar shows track info, progress, and play/pause.
-3. The NowPlayingBar observes fields on the persistent Audio node. Screens can interact with the Audio node via `m.global` fields (e.g., `m.global.audioQueue`, `m.global.audioControl`).
-4. Design this architecture before building any music screens. Retrofitting is painful.
-5. The Audio node playlist cannot be modified after playback starts -- build the full queue ContentNode tree before calling `control = "play"`.
+**Warning signs:**
+- Selecting a collection shows "Play" as the only action button
+- "Play" on a collection causes a VideoPlayer error
+- `isCollectionsView` never evaluates to `true` via navigation
 
-**Detection:** Navigate away from the music player screen. If audio stops, the node is parented incorrectly.
-
-**Phase relevance:** Music phase. This architecture decision must be made at the start of the music phase, not mid-implementation.
-
-**Sources:**
-- [Roku Audio node](https://developer.roku.com/docs/references/scenegraph/media-playback-nodes/audio.md)
+**Phase to address:** Bug Fixes — Collections Handler
 
 ---
 
-### Pitfall 5: Intro Skip Button Timing Is a Race Condition Without Marker Pre-Fetch
+### Pitfall 5: Search Grid Shows Stretched Episode Thumbnails Alongside Portrait Posters
 
-**What goes wrong:** The intro skip button must appear at a precise timestamp (e.g., second 32) and disappear at another (e.g., second 91). Developers fetch the marker data from `/library/metadata/{id}?includeMarkers=1` after playback starts, but the API call takes 200-500ms. If the intro starts at second 0 (cold opens), the marker data arrives after the intro has already begun, and the skip button appears late or not at all.
+**What goes wrong:**
+Search results mix movies (2:3 portrait), TV shows (2:3 portrait), and episodes (16:9 landscape) in a single MarkupGrid with `itemSize: [240, 360]`. Episode `thumb` values are built with `BuildPosterUrl(item.thumb, 320, 180)` in `processSearchResults()` but assigned to `HDPosterUrl` on a 240x360 cell. The Roku image scaler stretches the 16:9 thumbnail to fill the 2:3 cell, producing distorted episode thumbnails.
 
-**Why it happens:** The Plex API returns intro/credits markers as part of the metadata response, but only when `includeMarkers=1` is included in the request. The current `processMediaInfo()` does not request markers. Even when markers are requested, network latency means marker data arrives after playback has already started.
+**Why it happens:**
+`processSearchResults()` in SearchScreen.brs line 149 builds all posters with `c.POSTER_WIDTH, c.POSTER_HEIGHT` (240x360) regardless of item type. Episode thumbnails are inherently landscape. The grid itemSize assumes portrait.
 
-**Consequences:** Skip button appears 0.5-2 seconds late, or the intro window is already past when the button renders. For short intros (15-20 seconds), the button may never appear.
+**How to avoid:**
+For search result items where `item.type = "episode"`, use `item.parentThumb` (the parent show's poster, portrait art) instead of `item.thumb`. If `parentThumb` is absent, fall back to `thumb` at portrait dimensions and accept letterboxing. The Plex API search response always includes `parentThumb` for episode results — use `hub.Metadata[i].parentThumb`. This eliminates the ratio mismatch without changing grid layout.
 
-**Prevention:**
-1. Fetch markers during the `loadMedia()` phase, before playback starts. The metadata endpoint already returns markers when `includeMarkers=1` is added -- bundle it with the existing media info fetch, not as a separate request.
-2. Parse the `Marker` array from the metadata response. Each marker has `type` ("intro", "credits"), `startTimeOffset` (ms), and `endTimeOffset` (ms).
-3. Store markers in `m.markers` before calling `m.video.control = "play"`.
-4. In `onPositionChange()`, compare current position against stored marker ranges. Show/hide the skip button based on the pre-fetched data. No async call needed at playback time.
-5. Credits skip is the same mechanism but triggers the "next episode" flow instead of seeking.
+**Warning signs:**
+- Episode results in search appear taller than wide but distorted
+- Movie and show results look correct but episode results look squashed
+- Different item rows in the search grid have visually inconsistent poster sizes
 
-**Detection:** Test with an episode whose intro starts at 0:00. If the skip button does not appear within the first second, markers are being fetched too late.
-
-**Phase relevance:** Intro/credits skip phase, auto-play next episode phase.
-
-**Sources:**
-- [Plex marker types](https://forums.plex.tv/t/question-about-markers-and-manipulating-them/931778)
-- [Plex skip content docs](https://support.plex.tv/articles/skip-content/)
+**Phase to address:** Bug Fixes — Search Layout
 
 ---
 
-## Moderate Pitfalls
+### Pitfall 6: Deleting Orphaned BRS Files Crashes the Channel If Any XML Still References Them
 
-### Pitfall 6: SubtitleTracks vs SubtitleConfig Confusion Breaks Auto-Selection
+**What goes wrong:**
+Deleting `normalizers.brs` or `capabilities.brs` (documented orphans in PROJECT.md) causes a black screen on next launch if any `.xml` component still has `<script type="text/brightscript" uri="pkg:/source/normalizers.brs" />`. BrightScript compile errors on Roku do not produce a BrightScript stack trace — the channel simply fails to start with "compile error: file not found" in the debug console.
 
-**What goes wrong:** Roku has two subtitle configuration mechanisms: `SubtitleTracks` (content metadata that lists available tracks with language/description) and `SubtitleConfig` (overrides automatic track selection). Developers commonly set `SubtitleConfig` thinking it enables subtitles, but this actually disables Roku's automatic language-based selection, breaking the user's system-level caption preference.
+**Why it happens:**
+SceneGraph XML components reference `.brs` source files via `<script>` tags. These are checked at compile time. Removing a file without removing all its XML references is a hard compile failure. The error is easy to miss if the developer does not check the debug console after the sideload.
 
-**Prevention:**
-1. Always populate `SubtitleTracks` on the ContentNode with all available subtitle streams from the Plex API response.
-2. Only use `SubtitleConfig` when the user explicitly selects a specific track from your UI picker.
-3. Map Plex stream data to Roku's expected format: `{ "TrackName": "srt/path", "Language": "eng", "Description": "English" }`.
-4. For sidecar SRT files, the `TrackName` must be the full URL to the SRT file served by the Plex server: `{serverUri}/library/streams/{streamId}?X-Plex-Token={token}`.
+**How to avoid:**
+Before deleting any `.brs` file: (1) search all `.xml` files for the filename, (2) search all `.brs` files for any function names defined in the target file. Delete only after confirming zero references. After deletion, do a full sideload and check the debug console on port 8085 for compile errors before proceeding. Treat each file deletion as a separate deploy-test cycle.
 
-**Phase relevance:** Subtitle track selection phase.
+**Warning signs:**
+- Channel shows black screen immediately on launch after cleanup
+- Debug console (port 8085) shows "compile error" or "file not found"
+- No BrightScript error — pure compilation failure
 
-**Sources:**
-- [Roku SubtitleTracks docs](https://developer.roku.com/docs/developer-program/media-playback/closed-caption.md)
-
----
-
-### Pitfall 7: Managed User Token Swap Invalidates All Active Tasks
-
-**What goes wrong:** When switching managed users via the Plex Home API (`POST /api/home/users/{id}/switch`), a new auth token is returned. Any in-flight API tasks using the old token will receive 401 responses. If the app does not cancel all active tasks and update the stored token atomically, some requests succeed with the new token while others fail with the old one, creating inconsistent state.
-
-**Prevention:**
-1. When switching users: stop all active Task nodes first (set `control = "stop"` on every task).
-2. Update the token in registry AND in `m.global.authToken` atomically (single function call).
-3. Clear all cached data (library sections, hub rows, on-deck) -- the new user may have different library access.
-4. Pop all screens and push a fresh HomeScreen. Do not try to refresh screens in place.
-5. The switch endpoint returns a token for the managed user, but managed user tokens cannot manage PINs. Store the admin token separately if PIN management is needed later.
-
-**Phase relevance:** Managed users phase.
-
-**Sources:**
-- [Plex managed user switch API](https://www.plexopedia.com/plex-media-server/api-plextv/managed-user-add/)
-- [Plex fast user switching](https://support.plex.tv/articles/204232453-fast-user-switching/)
+**Phase to address:** Codebase Cleanup
 
 ---
 
-### Pitfall 8: RowList Vertical Lazy Loading Causes Visible Scroll Stutters
+### Pitfall 7: Removing Server Switching Requires Touching Four Codepaths Simultaneously
 
-**What goes wrong:** When using RowList for hub rows on the home screen, scrolling down triggers lazy loading of the next row's data. During the load, the scroll animation freezes visibly. The user experiences the UI "sticking" for 200-500ms at each row boundary. This is especially noticeable on lower-end devices.
+**What goes wrong:**
+Server switching logic is distributed across four places: (1) `MainScene.navigateToServerList()` called from the disconnect dialog, (2) `onDisconnectDialogButton` index 1 routing, (3) `onPINScreenState` in MainScene when `servers.count() > 1` (after initial auth), (4) `PINScreen.brs` own post-auth routing. If server switching is removed by deleting `ServerListScreen` without patching all four paths, any path that previously routed to `ServerListScreen` either crashes (calls a missing `showServerListScreen` sub) or silently fails to navigate.
 
-**Prevention:**
-1. Pre-fetch 2-3 rows ahead of the current visible area. Use the RowList's `rowItemFocused` field to detect which row is focused and trigger loading for `focusedRow + 2` and `focusedRow + 3`.
-2. Populate rows with placeholder ContentNodes (empty titles, placeholder poster URLs) immediately, then update with real data when the API response arrives. This prevents the RowList from resizing during scroll.
-3. Consider using MarkupGrid instead of RowList for the main library view -- benchmarks show 50% better scroll performance in some configurations.
-4. Build the entire ContentNode subtree for a row in the Task thread, then assign it to the RowList content with a single `replaceChild()` call. Do not append children one at a time.
+**Why it happens:**
+There is no single "server switching module." The logic is woven into auth flow, disconnect recovery, and PINScreen state management. It looks removable by deleting the screen, but the call sites remain.
 
-**Phase relevance:** Hub rows phase.
+**How to avoid:**
+Removal sequence: (1) patch `onPINScreenState` to auto-connect to `servers[0]` regardless of count (log a warning if count > 1 but proceed), (2) replace the "Server List" button in the disconnect dialog with "Sign Out" or remove it, (3) delete `showServerListScreen` and `navigateToServerList` subs, (4) delete `ServerListScreen.xml/.brs`. Only delete the screen after all call sites are patched. Do a full auth flow test with a plex.tv account that has two registered servers.
 
-**Sources:**
-- [RowList lazy loading issues](https://community.roku.com/t5/Roku-Developer-Program/Problem-with-vertical-lazy-loading-in-RowList/td-p/1014936)
-- [MarkupGrid vs RowList performance](https://community.roku.com/discussions/developer/markupgrid-or-rowlist-what-should-i-use/480811)
+**Warning signs:**
+- Auth flow crashes immediately after authenticating with a multi-server plex.tv account
+- "Server List" button in disconnect dialog routes to blank screen
+- `showServerListScreen` call appears in a file after the sub is deleted
 
----
-
-### Pitfall 9: Live TV HLS Streams Require Different Buffering and Error Handling
-
-**What goes wrong:** Live TV streams from Plex DVR tuners behave differently from VOD streams. The HLS manifest is a live sliding window (no duration, no seekability). Developers reuse the same Video node configuration as VOD, resulting in: seek buttons that crash or show errors, progress bars that display nonsensical durations, and buffering that never recovers when the tuner has a momentary signal loss.
-
-**Prevention:**
-1. Detect live streams from the Plex API response: live sessions have `live="1"` in the metadata, and the stream URL is a live HLS manifest (`EVENT` or `LIVE` type, not `VOD`).
-2. Disable seek controls (forward/back keys) in `onKeyEvent` for live streams.
-3. Hide the progress bar or show a "LIVE" indicator instead of elapsed/remaining time.
-4. Set `m.video.bufferingBar.visible = true` with appropriate buffering thresholds. Live streams need higher buffer tolerance (2-5 seconds) compared to VOD.
-5. Handle the `error` state more gracefully for live streams -- a tuner glitch may resolve in seconds. Implement auto-retry with a 3-second delay before showing an error dialog.
-6. The Plex live TV API uses `/livetv/sessions` for tuner management. Each tuner session must be explicitly started and stopped. Failing to stop a session when the user navigates away leaves the tuner locked, blocking other recordings.
-
-**Phase relevance:** Live TV phase.
-
-**Sources:**
-- [Roku streaming specifications](https://developer.roku.com/docs/specs/media/streaming-specifications.md)
-- [Plex Live TV & DVR docs](https://support.plex.tv/articles/225877347-live-tv-dvr/)
+**Phase to address:** Server Switching — Fix or Remove
 
 ---
 
-### Pitfall 10: Focus Traps in Overlay UI (Subtitle Picker, Skip Button, Settings Dialogs)
+### Pitfall 8: BusySpinner SIGSEGV Root Cause Is Still Unconfirmed
 
-**What goes wrong:** When an overlay UI element (subtitle track picker, audio track picker, intro skip button) is shown on top of the video player, focus management becomes complex. If the overlay consumes the "back" key to close itself but does not properly restore focus to the Video node, the video becomes uncontrollable -- the user cannot pause, seek, or exit playback. On Roku, a focus-less screen is a dead end requiring the Home button.
+**What goes wrong:**
+The UAT debug context documents an active firmware crash: `BusySpinner` (or its associated fade animations) causes SIGSEGV signal 11 on the test Roku. All production screens already have `m.loadingSpinner = invalid` with comments. However, `LoadingSpinner.xml/.brs` still exists. TEST4b (fade animations, no spinner) was pending at the time of the v1.0 close. If either BusySpinner or animated Group nodes are re-added to any v1.1 screen without resolving the root cause, that screen will SIGSEGV within 3-5 seconds of init.
 
-**Why it happens:** `onKeyEvent` propagates up the node tree. An overlay that returns `true` for "back" to close itself prevents the Video node (its parent or sibling) from ever receiving that key. After the overlay is removed, if `setFocus(true)` is not called on the Video node, focus falls to the scene root or nowhere.
+**Why it happens:**
+Roku firmware has known stability issues with `BusySpinner` on certain firmware versions and with animated SceneGraph Group nodes that use `Animation` nodes containing `Vector2DFieldInterpolator`. The exact trigger is not yet pinned.
 
-**Prevention:**
-1. Every overlay component must call `m.top.getParent().setFocus(true)` or a designated focus target after removing itself.
-2. Test the sequence: open overlay -> close overlay -> verify all remote buttons still work (play, pause, back, directional).
-3. The intro skip button should auto-dismiss (hide, not remove from tree) after the intro window passes. Do not remove nodes from the tree during playback -- just toggle visibility.
-4. Use a focus management pattern: store the "focus return target" before showing any overlay, restore it on overlay dismissal.
+**How to avoid:**
+Do not add `BusySpinner` or `Animation` nodes to any screen in v1.1 until the root cause is confirmed. For loading feedback, use a static `Label` with text toggled visible/invisible — zero crash risk. If animation is desired, use a `Timer` node that cycles a label through "Loading.", "Loading..", "Loading..." text states. The crash is blocking and must be resolved in the first v1.1 phase before any other screen work.
 
-**Phase relevance:** Subtitle selection phase, intro skip phase, audio track selection phase, any phase adding playback overlays.
+**Warning signs:**
+- SIGSEGV signal 11 in debug console (not a BrightScript error — native firmware crash)
+- Crash occurs 3-5 seconds after screen init, not immediately
+- Crash does not produce a BrightScript stack trace; channel silently exits
 
-**Sources:**
-- [Roku focus handling guide](https://www.tothenew.com/blog/mastering-focus-handling-in-roku-a-comprehensive-guide-to-focus-handling-through-mapping/)
-- [Roku onKeyEvent docs](https://developer.roku.com/docs/references/scenegraph/component-functions/onkeyevent.md)
-
----
-
-## Minor Pitfalls
-
-### Pitfall 11: Plex API `/hubs` Response Structure Varies by Library Type
-
-**What goes wrong:** The `/hubs` endpoint returns different hub types depending on the library type (movie, show, music, photo). Developers build a single hub row renderer and it breaks when music hubs return `artist` items instead of `movie`/`show` items, or when photo hubs return items with no `thumb` field (they use `art` instead).
-
-**Prevention:**
-1. Build the hub row data normalizer to handle all item types: `movie`, `show`, `season`, `episode`, `artist`, `album`, `track`, `photo`, `clip`.
-2. Use a type-based poster URL builder: movies/shows use `thumb`, artists/albums use `thumb`, photos use `art` or the first `Media[0].Part[0].key`.
-3. Use the existing `normalizers.brs` module (currently unused) as the foundation -- extend it to handle all types.
-
-**Phase relevance:** Hub rows phase, music phase, photos phase.
+**Phase to address:** Must be resolved in Phase 1 before all other screen work
 
 ---
 
-### Pitfall 12: Audio Node Playlist Is Immutable After Playback Starts
+### Pitfall 9: Auto-Play Wiring Gap Remains in DetailScreen Even Though EpisodeScreen Was Fixed
 
-**What goes wrong:** Developers build a music queue, start playback, then try to add/remove tracks from the queue by modifying the Audio node's content ContentNode. Changes are silently ignored. The queue appears to update in the UI but the Audio node continues playing the original playlist.
+**What goes wrong:**
+PROJECT.md documents the auto-play gap as a known issue. Checking the code: `EpisodeScreen.startPlayback()` now sets all five VideoPlayer context fields (line 416–432, fix already present). However, `DetailScreen.startPlayback()` sets only `ratingKey`, `mediaKey`, `startOffset`, and `itemTitle`. When an episode is played from DetailScreen (e.g., via "Go to Details" from EpisodeScreen's resume dialog, or via direct DetailScreen navigation for an episode ratingKey), VideoPlayer receives no `grandparentRatingKey` and auto-play cannot find the next episode.
 
-**Prevention:**
-1. To modify a music queue mid-playback: note the current track index and position, stop the Audio node, rebuild the entire ContentNode playlist tree, re-assign it to the Audio node, seek to the saved position.
-2. Build a queue management layer in BrightScript (an array of track metadata) that is the source of truth. The Audio node's ContentNode is rebuilt from this array whenever the queue changes.
-3. For "play next" and "add to queue" features: modify the BrightScript queue array, then rebuild and re-assign the ContentNode.
+**Why it happens:**
+DetailScreen handles both movies and episodes with the same `startPlayback()` sub. Movies don't need parent/grandparent context. The episode-specific context was never added to DetailScreen, only to EpisodeScreen.
 
-**Phase relevance:** Music phase (playback queue management).
+**How to avoid:**
+In `DetailScreen.startPlayback()`, check `m.itemData.type`. If `"episode"`, populate `grandparentRatingKey` from `m.itemData.grandparentRatingKey`, `parentRatingKey` from `m.itemData.parentRatingKey`, `episodeIndex` from `m.itemData.index`, and `seasonIndex` by fetching the season's index from `m.itemData.parentIndex`. The metadata response already includes these fields — they just need to be passed forward. Verify by playing an episode from DetailScreen and checking that auto-play advances correctly.
 
----
+**Warning signs:**
+- Auto-play works when playing from EpisodeScreen but not from DetailScreen
+- `onNextEpisodeStarted` never fires after playing from DetailScreen
+- VideoPlayer `grandparentRatingKey` field is `""` when launched from Detail
 
-### Pitfall 13: Single Shared API Task Causes Request Collisions
-
-**What goes wrong:** The current codebase uses one `m.apiTask` per screen. If the user triggers a second API request before the first completes (e.g., rapid sidebar navigation, or loading detail metadata while hub rows are still fetching), the task's `endpoint` field is overwritten. The first request's response handler processes the second request's data, or vice versa.
-
-**Why it happens:** BrightScript Task nodes can only run one request at a time. Setting new fields on a running task overwrites the pending request. The `m.isLoading` guard in HomeScreen mitigates this partially but not completely.
-
-**Prevention:**
-1. Create a new Task node instance for each API request. Task nodes are lightweight; creating one per request avoids all collision issues.
-2. Alternatively, implement a request queue in the screen that serializes requests and processes responses in order.
-3. For screens that genuinely need multiple concurrent requests (hub rows loading 8 endpoints), create multiple Task instances (one per hub row).
-
-**Phase relevance:** Hub rows phase (multiple concurrent requests), filter/sort phase (rapid re-queries).
-
-**Note:** This is already documented in CONCERNS.md as a fragile area. Fixing it in the hub rows phase prevents compounding issues in later phases.
+**Phase to address:** Bug Fixes — Auto-Play Wiring
 
 ---
 
-### Pitfall 14: EPG Grid for Live TV Is a Custom Component Nightmare
+### Pitfall 10: Icon/Splash Branding Requires All Four Variants Updated Simultaneously
 
-**What goes wrong:** Roku has no built-in EPG (Electronic Program Guide) grid component. Developers must build a custom scrolling time-based grid from scratch using Group/Rectangle/Label nodes. This is the most complex custom UI component in any Roku app and is extremely prone to: focus management bugs, memory leaks (thousands of program cells), scroll performance issues, and time-zone rendering errors.
+**What goes wrong:**
+The manifest references four icon files: `icon_focus_fhd.png` (540x405), `icon_side_fhd.png` (248x140), `icon_focus_hd.png` (336x240), `icon_side_hd.png` (210x120). The splash is `splash_fhd.jpg` (must be exactly 1920x1080). If only the FHD variants are updated and the HD variants are left unchanged, the Roku home screen shows mismatched branding — old icon on HD-resolution Roku devices, new icon on FHD. Even for a sideloaded channel, the home screen pulls the appropriate resolution variant automatically.
 
-**Prevention:**
-1. Start with the simplest possible EPG: a LabelList of channels, and when a channel is focused, show the current/next program info in a detail panel. This avoids the full grid entirely for v1.
-2. If a full grid is required: limit the visible time window to 2 hours, virtualize the grid (only render visible cells), and use `Timer` nodes to shift the time window rather than re-rendering the entire grid.
-3. Time zone handling: Plex EPG data uses UTC timestamps. Convert to local time using `CreateObject("roDateTime")` and its `toLocalTime()` method. Do not do string-based time math.
-4. Limit the EPG data fetch to the current 4-hour window. Do not pre-fetch a full day's guide data.
+**Why it happens:**
+FHD is the target development resolution so FHD icons are naturally updated first. HD variants are easy to forget because no dev testing is done on HD displays. The Roku firmware silently falls back to HD icons when FHD is not found — or vice versa — making the mismatch non-obvious until tested on a different device.
 
-**Phase relevance:** Live TV phase.
+**How to avoid:**
+Export all four icon sizes from the same source file in a single pass every time branding changes. Use a single Figma/Sketch/Inkscape source file with named export presets for all four sizes. Splash must be exactly 1920x1080 JPEG — verify pixel dimensions before sideloading. After any branding change, test on the actual Roku device and view the home screen channel tile.
 
----
+**Warning signs:**
+- Channel icon looks different on the test TV vs. another Roku in the house
+- Icon appears blurry or wrong aspect ratio on the Roku home screen tile
+- Splash shows black bars, crops, or stretching artifacts on first load
 
-### Pitfall 15: GetConstants() Called on Every Key Event Creates GC Pressure
-
-**What goes wrong:** The existing `GetConstants()` function in `constants.brs` allocates a new `roAssociativeArray` every time it is called. In `VideoPlayer.brs`, it is called on every key press and every position change callback. Under rapid key repeat (holding fast-forward), this creates hundreds of allocations per second, contributing to garbage collection pauses that cause visible playback stutters.
-
-**Prevention:**
-1. Cache constants in `m.global` during app initialization. Access via `m.global.constants` everywhere.
-2. This is already documented in CONCERNS.md. Fix it before adding more constant-heavy features (subtitle picker, intro skip, music playback controls).
-
-**Phase relevance:** Should be fixed in the first phase as infrastructure cleanup. Affects every subsequent phase.
+**Phase to address:** App Branding
 
 ---
 
-## Phase-Specific Warnings
+## Technical Debt Patterns
 
-| Phase Topic | Likely Pitfall | Mitigation |
-|-------------|---------------|------------|
-| Hub Rows | Rendezvous cascade from 8+ concurrent hub row loads (#2) | Stagger row loads with 100-200ms Timer delays; build ContentNode trees in Task threads |
-| Hub Rows | Single shared API task collisions (#13) | Create one Task per hub row request |
-| Hub Rows | RowList scroll stutter (#8) | Pre-fetch 2-3 rows ahead, use placeholder ContentNodes |
-| Filters/Sort | Rebuilding grid with 1000+ items blocks render thread (#2) | Build new ContentNode tree in Task, swap atomically |
-| Subtitle Selection | PGS/bitmap subtitles show nothing on direct play (#1) | Detect codec, force burn-in transcode for non-SRT formats |
-| Subtitle Selection | SubtitleTracks vs SubtitleConfig confusion (#6) | Use SubtitleTracks for listing, SubtitleConfig only for user override |
-| Subtitle Selection | Focus trap in subtitle picker overlay (#10) | Store focus target, restore on overlay dismiss |
-| Intro Skip | Marker data arrives after intro starts (#5) | Pre-fetch markers with media metadata before playback |
-| Intro Skip | Skip button overlay focus issues (#10) | Auto-hide (visibility toggle), do not remove from tree |
-| Audio Track Selection | Focus trap in audio picker overlay (#10) | Same pattern as subtitle picker |
-| Music Playback | Audio stops on screen navigation (#4) | Parent Audio node to MainScene, not to any screen |
-| Music Playback | Immutable playlist after play starts (#12) | Rebuild entire ContentNode on queue change |
-| Live TV | VOD-style controls break on live streams (#9) | Detect `live="1"`, disable seek, show LIVE indicator |
-| Live TV | EPG grid custom component complexity (#14) | Start with simple channel list, not full grid |
-| Live TV | Tuner session not released on navigate-away (#9) | Explicitly stop tuner session in screen cleanup |
-| Managed Users | Token swap invalidates active tasks (#7) | Stop all tasks, update token atomically, clear caches, reset screen stack |
-| All Phases | Memory pressure from ContentNode accumulation (#3) | Release content on screen pop, request sized images, monitor with Resource Monitor |
-| All Phases | GetConstants() GC pressure (#15) | Cache in m.global before starting feature work |
+| Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
+|----------|-------------------|----------------|-----------------|
+| `ratingKey` type-coercion repeated in every screen (6+ identical blocks) | Defensive; works regardless of API return type | Any change to the pattern requires 6+ edits; `getRatingKeyString()` already exists in `DetailScreen.brs` but is not shared | Extract to `utils.brs` — one refactor, done |
+| Duplicate `showErrorDialog`/`showInlineRetry` in every screen | Each screen self-contained | Same ~40-line block in 6+ screens; fixing a dialog bug requires 6 changes | Acceptable for v1.1; extract to shared utility in v1.2 |
+| `BuildPosterUrl` reads registry on every call | No setup needed | 2 registry reads per image URL; on a 300-item grid that's 600 registry reads per load | Cache `serverUri` and `authToken` at screen init; pass as parameters |
+| Task nodes created but never explicitly released | Simple; Roku handles GC | Task node count grows during paginated browsing; potential memory pressure on low-RAM devices (Roku Express: 256MB) | Acceptable for short-lived tasks; add explicit cleanup for pagination tasks |
+| `m.global.watchStateUpdate` as a single shared event | Simple propagation | Does not reach hub row ContentNode trees; any observer fires on every update regardless of relevance | Fix hub row coverage before adding more navigation depth |
+
+---
+
+## Integration Gotchas
+
+| Integration | Common Mistake | Correct Approach |
+|-------------|----------------|------------------|
+| Plex API — Collections | Routing `type: "collection"` to DetailScreen and expecting play buttons | Add explicit `type = "collection"` branch in `buildButtons()`; show "Browse Collection" routed to collection contents endpoint |
+| Plex API — Search results | Using `item.thumb` for episodes produces 16:9 thumbnails in a 2:3 grid | Use `item.parentThumb` for `type: "episode"` search results to get the parent show's portrait poster |
+| Plex API — Episode metadata | Assuming `grandparentRatingKey` is always present | Check for `invalid` before use; some library configurations omit it. Fall back to re-fetching the show via `/library/metadata/{parentRatingKey}` |
+| Roku manifest — Icon filenames | Renaming icon files without updating manifest paths | Manifest hardcodes exact filenames; always update manifest and image file together |
+| roRegistrySection — Sign-out gaps | `ClearAuthData()` deletes a fixed list of keys; new keys added in v1.1 are not in that list | Maintain a canonical key list or use `deleteSection()` as the nuclear option |
+| GitHub publish — HAR files | `plex.owlfarm.ad.har` is in the untracked files list; HAR files contain full HTTP sessions including auth tokens | Add `*.har` to `.gitignore` before first push; never commit HAR files |
+
+---
+
+## Performance Traps
+
+| Trap | Symptoms | Prevention | When It Breaks |
+|------|----------|------------|----------------|
+| Season navigation fires `loadEpisodes` on every focus event | Network spam when arrowing through seasons; brief grid flicker | Guard exists (`index <> m.currentSeasonIndex`) — do not remove this guard during refactor | With 10+ seasons and rapid navigation, 10+ in-flight requests stack up |
+| `m.episodeList.content = m.episodeList.content` to force re-render | Visible flash on episode list update for watched state toggle | Update individual ContentNode child directly; MarkupList observes child field changes | Visible flash on 20+ episode lists; cascades if called multiple times |
+| `BuildPosterUrl` reads registry per call | Slow grid initial load; noticeable on Roku Express | Cache `serverUri` and `authToken` in `m` at screen init | Noticeable on grids > 100 items on devices with slow flash storage |
+| Observer accumulation on global fields | Callbacks fire for all screens in stack, not just the top screen | Unobserve global fields when screen is hidden; re-observe when focused | Hard to detect; symptom is multiple screens updating on a single watchStateUpdate |
+
+---
+
+## Security Mistakes
+
+| Mistake | Risk | Prevention |
+|---------|------|------------|
+| Auth token visible in poster image URLs in debug logs | If anyone reads the Roku debug console output (port 8085), auth tokens in poster URLs expose credentials | Never log full `BuildPosterUrl` results; log only the path without query string |
+| `LogEvent` calls left in production code | Auth headers and server URIs may appear in debug logs accessible to anyone on the local network | Audit all `LogEvent` calls before GitHub publish; remove or conditionalize verbose logging |
+| `plex.owlfarm.ad.har` committed to GitHub | HAR files contain full HTTP request/response logs including X-Plex-Token values for every request captured during the session | Add `*.har` to `.gitignore` immediately; if already tracked, use `git rm --cached` |
+
+---
+
+## UX Pitfalls
+
+| Pitfall | User Impact | Better Approach |
+|---------|-------------|-----------------|
+| Season list shows only one horizontal row (LabelList `numRows="1"`) | For shows with 10+ seasons, user must scroll horizontally with no count indicator | Add season count label; consider showing all seasons in a scrollable list with the count visible |
+| Auto-play countdown fires while user is actively browsing episode list | User is startled by sudden playback beginning while navigating | Auto-play countdown must cancel immediately on any key press or focus move to episode list |
+| "Mark as Watched" optimistic update allows double-tap race condition | Two toggles in flight produce final state opposite of intent | Disable button (or set flag) during in-flight API call; re-enable in `onWatchedStateChange` |
+| Episode thumbnails in search (16:9) distort the grid layout | Visual inconsistency makes search results look broken for TV shows | Use `parentThumb` for episode search results — portrait poster gives consistent grid |
+
+---
+
+## "Looks Done But Isn't" Checklist
+
+- [ ] **TV show navigation:** Episode playback from BOTH `EpisodeScreen` AND `DetailScreen` passes all five VideoPlayer context fields — `grandparentRatingKey`, `parentRatingKey`, `episodeIndex`, `seasonIndex` are non-empty for every episode play path
+- [ ] **Auto-play next episode:** Works correctly after playing from EpisodeScreen; also works after playing from DetailScreen via "Go to Details" path
+- [ ] **Collections fix:** Selecting a collection from BOTH HomeScreen poster grid AND SearchScreen routes to collection contents — verify both entry points
+- [ ] **Watch state propagation:** Mark watched in DetailScreen; return to HomeScreen; "Continue Watching" hub row must not show that item (hub row ContentNodes must be walked, not just the poster grid)
+- [ ] **Server switching removal:** Full auth flow tested with a plex.tv account that has multiple servers registered — flow completes without crash or hang
+- [ ] **BusySpinner crash:** Root cause confirmed (BusySpinner vs. Animation nodes); any new screens in v1.1 use safe loading feedback pattern (Label toggle, not BusySpinner)
+- [ ] **Branding update:** All four icon variants updated and verified on actual Roku hardware home screen; splash exactly 1920x1080
+- [ ] **File deletion cleanup:** Full sideload test after EACH file deletion; debug console checked for compile errors before proceeding to next deletion
+- [ ] **GitHub publish:** `*.har` in `.gitignore`; no auth tokens in any committed file; `LogEvent` calls audited for credential leakage
+
+---
+
+## Recovery Strategies
+
+| Pitfall | Recovery Cost | Recovery Steps |
+|---------|---------------|----------------|
+| Broken `<script>` reference after file deletion | LOW | Re-add deleted file or remove XML reference; sideload to confirm; re-delete correctly |
+| Focus permanently lost after navigation refactor | MEDIUM | Add `LogEvent` to all `onFocusChange` observers; trace focus chain; revert last focus-related change; re-apply incrementally |
+| Auto-play broken by navigation refactor | MEDIUM | Log all VideoPlayer fields at `control = "play"` time; compare pre/post refactor to identify which context field is now missing |
+| SIGSEGV from adding new component | HIGH | Revert to last known-good state; use bisection pattern from UAT debug context (TEST1→TEST2→etc.); test one new SceneGraph node type at a time |
+| Collections dispatch loop | LOW | Add `LogEvent` to `onItemSelected` in MainScene; log `data.action` and `data.itemType` for every selection; trace the full dispatch chain |
+| HAR file accidentally committed | HIGH | Before repo is public: `git filter-repo` to remove from history; rotate exposed auth token via plex.tv account settings immediately |
+
+---
+
+## Pitfall-to-Phase Mapping
+
+| Pitfall | Prevention Phase | Verification |
+|---------|------------------|--------------|
+| VideoPlayer context severed by navigation refactor | TV Show Navigation Overhaul | Auto-play fires correctly from all episode play entry points |
+| Focus lost after playback closure | TV Show Navigation Overhaul | Back from player restores focus to last-focused episode; remote buttons respond |
+| Watch state not propagating to hub rows | Bug Fixes — Watch State | Mark watched in Detail; "Continue Watching" hub row removes item on return to Home |
+| Collections handler dispatch mismatch | Bug Fixes — Collections | Collections accessible from both HomeScreen grid and SearchScreen |
+| Search grid mixed aspect ratios | Bug Fixes — Search Layout | Episode results in search show portrait posters, not stretched thumbnails |
+| Orphaned file deletion crashes compile | Codebase Cleanup | Sideload test after each deletion; zero compile errors in debug console |
+| Server switching partial removal | Server Switching Phase | Full auth flow with multi-server account completes without crash |
+| Icon/splash variant mismatch | App Branding | All four icon variants visually correct on actual Roku home screen |
+| BusySpinner SIGSEGV unresolved | Phase 1 — must precede all other work | 10-minute session with no SIGSEGV in any screen |
+| Auto-play gap in DetailScreen | Bug Fixes — Auto-Play | Episode played from DetailScreen auto-plays next episode correctly |
+| HAR file in repo | Documentation / GitHub Phase | `*.har` in `.gitignore`; `git status` shows no HAR files tracked |
 
 ---
 
 ## Sources
 
-- [Roku Closed Caption Support](https://developer.roku.com/docs/developer-program/media-playback/closed-caption.md) -- subtitle format support, SubtitleTracks/SubtitleConfig
-- [Roku Video Node Reference](https://developer.roku.com/docs/references/scenegraph/media-playback-nodes/video.md) -- availableSubtitleTracks, subtitleTrack fields
-- [Roku Audio Node Reference](https://developer.roku.com/docs/references/scenegraph/media-playback-nodes/audio.md) -- playlist behavior, content field
-- [Roku SceneGraph Threads](https://sdkdocs-archive.roku.com/SceneGraph-Threads_4262152.html) -- rendezvous mechanics
-- [Roku Memory Management](https://developer.roku.com/docs/developer-program/performance-guide/memory-management.md) -- memory limits, optimization
-- [Roku Data Management](https://developer.roku.com/docs/developer-program/performance-guide/data-management.md) -- ContentNode best practices
-- [Roku Streaming Specifications](https://developer.roku.com/docs/specs/media/streaming-specifications.md) -- HLS, format support
-- [Roku Focus Handling Guide](https://www.tothenew.com/blog/mastering-focus-handling-in-roku-a-comprehensive-guide-to-focus-handling-through-mapping/)
-- [ContentNode Benchmarks (DAZN Engineering)](https://medium.com/dazn-tech/rokus-scenegraph-benchmarks-aa-vs-node-9be5158474c1)
-- [Rendezvous Explained](https://medium.com/@amitdogra70512/rendezevous-in-roku-bd55d81fc994)
-- [PGS Subtitles on Roku (How-To Geek)](https://www.howtogeek.com/as-a-plex-user-im-begging-roku-to-support-pgs-subtitles/)
-- [Plex Skip Content](https://support.plex.tv/articles/skip-content/) -- marker types, intro/credits detection
-- [Plex Marker API Discussion](https://forums.plex.tv/t/question-about-markers-and-manipulating-them/931778)
-- [Plex Live TV & DVR](https://support.plex.tv/articles/225877347-live-tv-dvr/)
-- [Plex Fast User Switching](https://support.plex.tv/articles/204232453-fast-user-switching/)
-- [Plex Managed User API](https://www.plexopedia.com/plex-media-server/api-plextv/managed-user-add/)
-- [RowList Lazy Loading Issues](https://community.roku.com/t5/Roku-Developer-Program/Problem-with-vertical-lazy-loading-in-RowList/td-p/1014936)
-- [Roku Resource Monitor](https://blog.roku.com/developer/resource-monitor)
+- Direct codebase analysis: `EpisodeScreen.brs`, `DetailScreen.brs`, `MainScene.brs`, `SearchScreen.brs`, `VideoPlayer.brs`, `utils.brs`, `constants.brs`, `HomeScreen.brs`, `PosterGrid.brs`, all `.xml` layouts
+- `.planning/PROJECT.md` — documented known gaps (auto-play wiring, watch state propagation, orphaned files, collections bug)
+- `.planning/UAT-DEBUG-CONTEXT.md` — BusySpinner SIGSEGV active investigation, bisection results (TEST4b pending), crash characteristics
+- Roku SceneGraph documentation — focus chain behavior, `BusySpinner` instability notes, `Animation` node constraints
+- Plex API field reference — `parentThumb` vs. `thumb` for search results, collection endpoint structure, episode metadata fields
 
 ---
-
-*Pitfalls audit: 2026-03-08*
+*Pitfalls research for: SimPlex v1.1 Polish & Navigation — Roku/BrightScript Plex client*
+*Researched: 2026-03-13*
