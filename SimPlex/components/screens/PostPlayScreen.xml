@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component name="PostPlayScreen" extends="Group">
+    <interface>
+        <field id="itemTitle" type="string" />
+        <field id="ratingKey" type="string" />
+        <field id="grandparentRatingKey" type="string" />
+        <field id="hasNextEpisode" type="boolean" value="false" />
+        <field id="nextEpisodeInfo" type="assocarray" />
+        <field id="viewOffset" type="integer" value="0" />
+        <field id="duration" type="integer" value="0" />
+        <field id="isPlaylist" type="boolean" value="false" />
+        <field id="action" type="string" alwaysNotify="true" />
+        <field id="navigateBack" type="boolean" value="false" alwaysNotify="true" />
+    </interface>
+
+    <script type="text/brightscript" uri="pkg:/source/utils.brs" />
+    <script type="text/brightscript" uri="pkg:/source/constants.brs" />
+    <script type="text/brightscript" uri="PostPlayScreen.brs" />
+
+    <children>
+        <!-- Full screen semi-transparent dark overlay -->
+        <Rectangle
+            id="overlay"
+            width="1920"
+            height="1080"
+            color="0x000000CC"
+        />
+
+        <!-- Centered content group -->
+        <Group id="contentGroup" translation="[560, 280]">
+            <!-- Title -->
+            <Label
+                id="titleLabel"
+                translation="[0, 0]"
+                text="Playback Complete"
+                font="font:LargeBoldSystemFont"
+                color="0xFFFFFFFF"
+                width="800"
+                horizAlign="left"
+            />
+
+            <!-- Item title (subtitle) -->
+            <Label
+                id="subtitleLabel"
+                translation="[0, 60]"
+                text=""
+                font="font:MediumSystemFont"
+                color="0xA0A0B0FF"
+                width="800"
+                horizAlign="left"
+                maxLines="2"
+            />
+
+            <!-- Button group -->
+            <ButtonGroup
+                id="buttonGroup"
+                translation="[0, 140]"
+            />
+        </Group>
+    </children>
+</component>

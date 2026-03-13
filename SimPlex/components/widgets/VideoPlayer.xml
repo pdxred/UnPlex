@@ -18,6 +18,7 @@
         <field id="playlistItems" type="array" />
         <field id="playlistIndex" type="integer" value="-1" />
         <field id="playlistAdvanced" type="boolean" alwaysNotify="true" />
+        <field id="playbackResult" type="assocarray" alwaysNotify="true" />
     </interface>
 
     <script type="text/brightscript" uri="pkg:/source/utils.brs" />
