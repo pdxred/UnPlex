@@ -530,6 +530,13 @@ sub scrobble()
         "key": m.top.ratingKey
     }
     task.control = "run"
+
+    ' Broadcast watch state update to all visible screens
+    m.global.watchStateUpdate = {
+        ratingKey: m.top.ratingKey
+        viewCount: 1
+        viewOffset: 0
+    }
 end sub
 
 sub stopPlayback()
@@ -571,6 +578,15 @@ sub stopPlayback()
 end sub
 
 sub signalPlaybackComplete(reason as String)
+    ' Emit final watch state for stopped/cancelled (finished is handled by scrobble())
+    if reason = "stopped" or reason = "cancelled"
+        m.global.watchStateUpdate = {
+            ratingKey: m.top.ratingKey
+            viewCount: 0
+            viewOffset: m.currentPosition
+        }
+    end if
+
     ' Build structured result and emit via playbackResult field
     hasNext = (m.nextEpisodeInfo <> invalid)
     result = {

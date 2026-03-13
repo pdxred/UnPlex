@@ -5,6 +5,8 @@ sub init()
     m.progressFill = m.top.findNode("progressFill")
     m.unwatchedBadge = m.top.findNode("unwatchedBadge")
     m.unwatchedCount = m.top.findNode("unwatchedCount")
+    m.watchedBadge = m.top.findNode("watchedBadge")
+    m.watchedBadgeBg = m.top.findNode("watchedBadgeBg")
 
     ' Cache constants and set badge tint color
     m.constants = m.global.constants
@@ -67,6 +69,8 @@ sub updateBadge(content as Object)
     if m.progressTrack.visible = true
         m.unwatchedBadge.visible = false
         m.unwatchedCount.visible = false
+        m.watchedBadge.visible = false
+        m.watchedBadgeBg.visible = false
         return
     end if
 
@@ -76,23 +80,29 @@ sub updateBadge(content as Object)
         watched = true
     end if
 
-    ' Fully watched: clean poster
+    ' Fully watched: show checkmark badge
     if watched
         m.unwatchedBadge.visible = false
         m.unwatchedCount.visible = false
+        m.watchedBadge.visible = true
+        m.watchedBadgeBg.visible = true
         return
     end if
 
-    ' Unwatched: show badge
+    ' Unwatched: show badge, hide watched badge
     m.unwatchedBadge.visible = true
+    m.watchedBadge.visible = false
+    m.watchedBadgeBg.visible = false
 
     ' TV shows: show unwatched episode count
     if content.itemType <> invalid and content.itemType = "show" and content.leafCount <> invalid and content.viewedLeafCount <> invalid
         unwatchedEpisodes = content.leafCount - content.viewedLeafCount
         if unwatchedEpisodes <= 0
-            ' Fully watched show
+            ' Fully watched show - show checkmark
             m.unwatchedBadge.visible = false
             m.unwatchedCount.visible = false
+            m.watchedBadge.visible = true
+            m.watchedBadgeBg.visible = true
             return
         end if
         m.unwatchedCount.text = unwatchedEpisodes.ToStr()

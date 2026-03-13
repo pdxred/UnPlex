@@ -16,11 +16,10 @@
             id="titleLabel"
             translation="[0, 365]"
             width="240"
-            font="font:SmallSystemFont"
+            font="font:SmallestSystemFont"
             color="0xFFFFFFFF"
             horizAlign="center"
-            maxLines="2"
-            wrap="true"
+            maxLines="1"
         />
         <Rectangle
             id="progressTrack"
@@ -35,7 +34,7 @@
             translation="[0, 354]"
             width="0"
             height="6"
-            color="0xE5A00DFF"
+            color="0xF3B125FF"
             visible="false"
         />
         <Poster
@@ -54,6 +53,24 @@
             visible="false"
             horizAlign="right"
             width="18"
+        />
+        <Rectangle
+            id="watchedBadgeBg"
+            translation="[200, 0]"
+            width="40"
+            height="32"
+            color="0x00000088"
+            visible="false"
+        />
+        <Label
+            id="watchedBadge"
+            translation="[200, 2]"
+            text="&#x2713;"
+            font="font:SmallestSystemFont"
+            color="0xF3B125FF"
+            visible="false"
+            width="40"
+            horizAlign="center"
         />
     </children>
 </component>
