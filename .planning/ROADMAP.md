@@ -63,11 +63,11 @@ Plans:
   2. Playing an episode from EpisodeScreen and reaching the threshold also triggers the countdown
   3. User can press any remote button during the countdown to cancel and stay on the post-play screen
   4. Marking an episode watched from EpisodeScreen updates the badge on the poster in the library grid and in the Continue Watching hub row
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 12-01: Wire grandparentRatingKey in DetailScreen and fix auto-play countdown
-- [ ] 12-02: Add hub row ContentNode walker for watch state propagation
+- [ ] 12-01-PLAN.md — Wire auto-play from both entry points with PostPlayScreen, season-boundary support, and cancellable countdown
+- [ ] 12-02-PLAN.md — Add watch state emission from VideoPlayer and checkmark badge to PosterGridItem
 
 ### Phase 13: Search, Collections, and Thumbnails
 **Goal**: Search results are legible and navigable, collections are reachable from the sidebar, and thumbnails use correct aspect ratios
