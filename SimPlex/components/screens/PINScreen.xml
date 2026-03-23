@@ -18,7 +18,7 @@
             id="background"
             width="1920"
             height="1080"
-            color="0x1A1A2EFF" />
+            color="0x000000FF" />
 
         <!-- Main container centered -->
         <Group id="container" translation="[960, 340]">
@@ -44,7 +44,7 @@
                 horizAlign="center"
                 vertAlign="center"
                 font="font:LargeSystemFont"
-                color="0xE5A00DFF" />
+                color="0xF3B125FF" />
 
             <!-- Loading indicator -->
             <Label
@@ -56,7 +56,7 @@
                 horizAlign="center"
                 vertAlign="center"
                 font="font:LargeBoldSystemFont"
-                color="0xE5A00DFF"
+                color="0xF3B125FF"
                 visible="false" />
 
             <!-- Status text -->

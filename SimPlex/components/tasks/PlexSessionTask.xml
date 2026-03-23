@@ -3,7 +3,7 @@
     <interface>
         <field id="ratingKey" type="string" />
         <field id="mediaKey" type="string" />
-        <field id="state" type="string" />
+        <field id="playbackState" type="string" />
         <!-- "playing", "paused", "stopped" -->
         <field id="time" type="integer" />
         <!-- Current position in ms -->

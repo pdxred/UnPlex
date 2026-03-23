@@ -9,6 +9,9 @@ sub init()
     m.grid.itemSize = [c.POSTER_WIDTH + 20, c.POSTER_HEIGHT + 50]
     m.grid.itemSpacing = [c.GRID_H_SPACING, c.GRID_V_SPACING]
 
+    ' Set numRows so MarkupGrid renders multiple visible rows and scrolls
+    m.grid.numRows = 2
+
     ' Observe gridWidth changes for dynamic recalculation (e.g. search layout toggle)
     m.top.observeField("gridWidth", "onGridWidthChange")
 

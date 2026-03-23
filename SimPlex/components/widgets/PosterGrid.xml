@@ -16,10 +16,10 @@
             id="grid"
             itemComponentName="PosterGridItem"
             numColumns="6"
-            itemSize="[260, 410]"
-            itemSpacing="[20, 40]"
+            itemSize="[240, 390]"
+            itemSpacing="[12, 40]"
             drawFocusFeedback="true"
-            focusBitmapBlendColor="0xE5A00DFF"
+            focusBitmapBlendColor="0xF3B125FF"
         />
     </children>
 </component>

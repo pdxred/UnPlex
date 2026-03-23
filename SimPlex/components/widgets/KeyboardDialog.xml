@@ -21,7 +21,7 @@
             translation="[460, 240]"
             width="1000"
             height="600"
-            color="0x232342FF"
+            color="0x121314FF"
         />
         <Label
             id="titleLabel"

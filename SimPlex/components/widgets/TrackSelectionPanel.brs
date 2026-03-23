@@ -27,6 +27,10 @@ end sub
 
 sub onAudioStreamsChange(event as Object)
     streams = event.getData()
+    renderAudioStreams(streams)
+end sub
+
+sub renderAudioStreams(streams as Object)
     if streams = invalid then return
 
     content = CreateObject("roSGNode", "ContentNode")
@@ -61,6 +65,10 @@ end sub
 
 sub onSubtitleStreamsChange(event as Object)
     streams = event.getData()
+    renderSubtitleStreams(streams)
+end sub
+
+sub renderSubtitleStreams(streams as Object)
     if streams = invalid then return
 
     content = CreateObject("roSGNode", "ContentNode")
@@ -107,16 +115,12 @@ end sub
 
 sub onSelectedAudioIdChange(event as Object)
     ' Re-render audio list to update checkmark
-    if m.top.audioStreams <> invalid
-        onAudioStreamsChange({ getData: function() : return m.top.audioStreams : end function })
-    end if
+    renderAudioStreams(m.top.audioStreams)
 end sub
 
 sub onSelectedSubtitleIdChange(event as Object)
     ' Re-render subtitle list to update checkmark
-    if m.top.subtitleStreams <> invalid
-        onSubtitleStreamsChange({ getData: function() : return m.top.subtitleStreams : end function })
-    end if
+    renderSubtitleStreams(m.top.subtitleStreams)
 end sub
 
 sub repositionSubtitleSection()
@@ -142,7 +146,7 @@ sub onShowPanelChange(event as Object)
     if isVisible
         m.top.visible = true
         ' Slide in from right
-        m.slideInterpolator.keyValue = [1920.0, 1480.0]
+        m.slideInterpolator.keyValue = [[1920.0, 0.0], [1480.0, 0.0]]
         m.slideAnimation.control = "start"
 
         ' Focus the audio list
@@ -150,7 +154,7 @@ sub onShowPanelChange(event as Object)
         m.focusedList = "audio"
     else
         ' Slide out to right
-        m.slideInterpolator.keyValue = [1480.0, 1920.0]
+        m.slideInterpolator.keyValue = [[1480.0, 0.0], [1920.0, 0.0]]
         m.slideAnimation.control = "start"
         m.top.visible = false
     end if
@@ -199,7 +203,7 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
     if not press then return false
 
     if key = "back" or key = "options"
-        m.top.visible = false
+        m.top.showPanel = false
         return true
     end if
 

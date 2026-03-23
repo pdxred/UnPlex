@@ -13,7 +13,8 @@ sub run()
     requestUrl = serverUri + "/:/timeline"
     requestUrl = requestUrl + "?ratingKey=" + m.top.ratingKey
     requestUrl = requestUrl + "&key=" + UrlEncode(m.top.mediaKey)
-    requestUrl = requestUrl + "&state=" + m.top.state
+    requestUrl = requestUrl + "&identifier=com.plexapp.plugins.library"
+    requestUrl = requestUrl + "&state=" + m.top.playbackState
     requestUrl = requestUrl + "&time=" + m.top.time.ToStr()
     requestUrl = requestUrl + "&duration=" + m.top.duration.ToStr()
     requestUrl = requestUrl + "&X-Plex-Client-Identifier=" + deviceId
@@ -32,10 +33,10 @@ sub run()
 
     ' Make PUT request (using POST with method override as Roku doesn't support PUT directly)
     url.AddHeader("X-HTTP-Method-Override", "PUT")
-    response = url.PostFromString("")
+    responseCode = url.PostFromString("")
 
-    if response = "" and url.GetResponseCode() <> 200
-        m.top.error = "Timeline update failed: " + url.GetFailureReason()
+    if responseCode < 200 or responseCode >= 300
+        m.top.error = "Timeline update failed (HTTP " + responseCode.ToStr() + ")"
         m.top.taskState = "error"
         return
     end if

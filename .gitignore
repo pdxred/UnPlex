@@ -1,5 +1,6 @@
 # Build artifacts
 *.zip
+*.zip.old
 out/
 
 # Dependencies
@@ -58,3 +59,7 @@ tmp/
 CLAUDE.md
 # Asset generation scripts (require Pillow, not needed by users)
 scripts/
+# GSD migration artifacts
+.gsd.migrating/
+# Project planning briefs
+simplex-project-brief.md

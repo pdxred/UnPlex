@@ -126,8 +126,22 @@ sub run()
         return
     end if
 
-    if response = "" or responseCode < 0
+    if responseCode < 0
         errorMsg = "Request failed: " + url.GetFailureReason()
+        LogError("API error: " + errorMsg)
+        m.top.error = errorMsg
+        m.top.status = "error"
+        return
+    end if
+
+    ' Some endpoints (scrobble, unscrobble, timeline) return empty 200 responses
+    if response = "" and responseCode >= 200 and responseCode < 300
+        LogEvent("API complete: " + endpoint + " (empty " + responseCode.ToStr() + ")")
+        m.top.response = {}
+        m.top.status = "completed"
+        return
+    else if response = ""
+        errorMsg = "Empty response (HTTP " + responseCode.ToStr() + ")"
         LogError("API error: " + errorMsg)
         m.top.error = errorMsg
         m.top.status = "error"

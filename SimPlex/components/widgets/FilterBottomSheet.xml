@@ -14,19 +14,19 @@
     <script type="text/brightscript" uri="FilterBottomSheet.brs" />
 
     <children>
-        <Group id="sheetGroup" translation="[280, 1080]" visible="false">
+        <Group id="sheetGroup" translation="[340, 1080]" visible="false">
             <Rectangle
                 id="sheetBg"
-                width="1640"
+                width="1580"
                 height="500"
-                color="0x1E1E3AFF"
+                color="0x121314FF"
             />
             <Rectangle
                 id="handleBar"
-                translation="[770, 8]"
+                translation="[740, 8]"
                 width="100"
                 height="4"
-                color="0x505070FF"
+                color="0x505050FF"
             />
 
             <Group id="controlsGroup" translation="[40, 40]">
@@ -35,7 +35,7 @@
                     id="sortHeader"
                     text="Sort"
                     font="font:SmallBoldSystemFont"
-                    color="0xE5A00DFF"
+                    color="0xF3B125FF"
                     translation="[0, 0]"
                 />
                 <RadioButtonList
@@ -44,7 +44,7 @@
                     itemSize="[350, 48]"
                     numRows="8"
                     drawFocusFeedback="true"
-                    focusBitmapBlendColor="0xE5A00DFF"
+                    focusBitmapBlendColor="0xF3B125FF"
                 />
 
                 <!-- Unwatched Column -->
@@ -52,7 +52,7 @@
                     id="unwatchedHeader"
                     text="Unwatched"
                     font="font:SmallBoldSystemFont"
-                    color="0xE5A00DFF"
+                    color="0xF3B125FF"
                     translation="[400, 0]"
                 />
                 <LabelList
@@ -61,7 +61,7 @@
                     itemSize="[350, 48]"
                     numRows="2"
                     drawFocusFeedback="true"
-                    focusBitmapBlendColor="0xE5A00DFF"
+                    focusBitmapBlendColor="0xF3B125FF"
                 />
 
                 <!-- Genre Column -->
@@ -69,7 +69,7 @@
                     id="genreHeader"
                     text="Genre"
                     font="font:SmallBoldSystemFont"
-                    color="0xE5A00DFF"
+                    color="0xF3B125FF"
                     translation="[400, 140]"
                 />
                 <CheckList
@@ -78,7 +78,7 @@
                     itemSize="[350, 48]"
                     numRows="6"
                     drawFocusFeedback="true"
-                    focusBitmapBlendColor="0xE5A00DFF"
+                    focusBitmapBlendColor="0xF3B125FF"
                 />
 
                 <!-- Year Column -->
@@ -86,7 +86,7 @@
                     id="yearHeader"
                     text="Year"
                     font="font:SmallBoldSystemFont"
-                    color="0xE5A00DFF"
+                    color="0xF3B125FF"
                     translation="[800, 0]"
                 />
                 <LabelList
@@ -95,7 +95,7 @@
                     itemSize="[350, 48]"
                     numRows="8"
                     drawFocusFeedback="true"
-                    focusBitmapBlendColor="0xE5A00DFF"
+                    focusBitmapBlendColor="0xF3B125FF"
                 />
 
                 <!-- Clear All -->
@@ -110,7 +110,7 @@
                 <Vector2DFieldInterpolator
                     id="slideUpInterp"
                     key="[0.0, 1.0]"
-                    keyValue="[[280, 1080], [280, 580]]"
+                    keyValue="[[340, 1080], [340, 580]]"
                     fieldToInterp="sheetGroup.translation"
                 />
             </Animation>
@@ -118,7 +118,7 @@
                 <Vector2DFieldInterpolator
                     id="slideDownInterp"
                     key="[0.0, 1.0]"
-                    keyValue="[[280, 580], [280, 1080]]"
+                    keyValue="[[340, 580], [340, 1080]]"
                     fieldToInterp="sheetGroup.translation"
                 />
             </Animation>

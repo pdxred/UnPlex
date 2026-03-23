@@ -19,7 +19,7 @@
             id="background"
             width="1620"
             height="50"
-            color="0x232342FF"
+            color="0x121314FF"
         />
         <Label
             id="summaryLabel"
@@ -30,7 +30,7 @@
         />
         <Label
             id="countLabel"
-            translation="[1500, 12]"
+            translation="[1520, 12]"
             font="font:MediumSystemFont"
             color="0x808090FF"
             horizAlign="right"

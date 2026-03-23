@@ -1,21 +1,21 @@
 function GetConstants() as Object
     return {
         ' Colors (0xRRGGBBAA)
-        BG_PRIMARY: "0x1A1A2EFF"
-        BG_SIDEBAR: "0x0F0F1AFF"
-        BG_CARD: "0x232342FF"
+        BG_PRIMARY: "0x000000FF"
+        BG_SIDEBAR: "0x121314FF"
+        BG_CARD: "0x121314FF"
         TEXT_PRIMARY: "0xFFFFFFFF"
         TEXT_SECONDARY: "0xA0A0B0FF"
-        ACCENT: "0xE5A00DFF"
-        SEPARATOR: "0x2A2A4AFF"
-        FOCUS_RING: "0xE5A00DFF"
+        ACCENT: "0xF3B125FF"
+        SEPARATOR: "0x404040FF"
+        FOCUS_RING: "0xF3B125FF"
 
         ' Layout (FHD 1920x1080)
-        SIDEBAR_WIDTH: 280
+        SIDEBAR_WIDTH: 340
         POSTER_WIDTH: 240
         POSTER_HEIGHT: 360
         GRID_COLUMNS: 6
-        GRID_H_SPACING: 20
+        GRID_H_SPACING: 12
         GRID_V_SPACING: 40
         FILTER_BAR_HEIGHT: 60
 

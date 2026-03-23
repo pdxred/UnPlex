@@ -15,7 +15,7 @@
             translation="[10, 10]"
             width="180"
             height="180"
-            color="0x333355FF"
+            color="0x333333FF"
         />
         <!-- Avatar image -->
         <Poster
@@ -53,7 +53,7 @@
             height="40"
             text="PIN"
             font="font:SmallSystemFont"
-            color="0xE5A00DFF"
+            color="0xF3B125FF"
             horizAlign="center"
             vertAlign="center"
             visible="false"

@@ -40,7 +40,7 @@
                     itemSize="[392, 56]"
                     numRows="8"
                     itemSpacing="[0, 4]"
-                    focusedColor="0xE5A00DFF"
+                    focusedColor="0xF3B125FF"
                     color="0xFFFFFFFF"
                     drawFocusFeedback="true"
                     focusBitmapBlendColor="0xE5A00D40"
@@ -53,7 +53,7 @@
                     translation="[0, 540]"
                     width="392"
                     height="1"
-                    color="0x2A2A4AFF"
+                    color="0x404040FF"
                 />
 
                 <!-- Subtitle Section -->
@@ -71,7 +71,7 @@
                     itemSize="[392, 56]"
                     numRows="8"
                     itemSpacing="[0, 4]"
-                    focusedColor="0xE5A00DFF"
+                    focusedColor="0xF3B125FF"
                     color="0xFFFFFFFF"
                     drawFocusFeedback="true"
                     focusBitmapBlendColor="0xE5A00D40"
@@ -86,11 +86,11 @@
             duration="0.25"
             easeFunction="inOutQuad"
         >
-            <FloatFieldInterpolator
+            <Vector2DFieldInterpolator
                 id="slideInterpolator"
                 key="[0.0, 1.0]"
-                keyValue="[1920.0, 1480.0]"
-                fieldToInterp="panelContainer.translation.x"
+                keyValue="[[1920.0, 0.0], [1480.0, 0.0]]"
+                fieldToInterp="panelContainer.translation"
             />
         </Animation>
     </children>
