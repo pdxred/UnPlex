@@ -45,7 +45,7 @@
 
 ## Tasks
 
-- [ ] **T01: Bundle Inter Bold font and wire into Sidebar title** `est:20m`
+- [x] **T01: Bundle Inter Bold font and wire into Sidebar title** `est:20m`
   - Why: BRAND-01 requires Inter Bold for app branding. The font must be bundled in the app package and wired into the Sidebar title labels. Build config must include the fonts directory.
   - Files: `SimPlex/fonts/Inter-Bold.ttf`, `bsconfig.json`, `SimPlex/components/widgets/Sidebar.xml`
   - Do: Download Inter-Bold.ttf (static weight, ~300KB) from Google Fonts or copy from system. Create `SimPlex/fonts/` directory. Add `"fonts/**/*"` to `bsconfig.json` files array. In Sidebar.xml, replace `font="font:LargeBoldSystemFont"` on titleSim and titlePlex with child `<Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="36" />` nodes. Add shadow Label nodes (offset 2px, color `0x666666FF`) behind each title label for subtle depth effect. The `font=` attribute must be REMOVED when using child Font nodes — they are mutually exclusive.

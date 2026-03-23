@@ -31,3 +31,5 @@
 - **ServerListScreen deleted in S15.** All server switching UI and codepaths removed. `discoverServers()` in SettingsScreen is preserved — it serves auth recovery and PIN completion, NOT server switching. Don't remove it.
 - **SettingsScreen menu indices after S15:** 0=user label, 1=Hub Libraries, 2=Sidebar Libraries, 3=Switch User, 4=Sign Out. Any new menu item should insert before Sign Out and bump its index.
 - **HAR file in project root** (`plex.owlfarm.ad.har`, 17 MB) contains live auth tokens. Added to .gitignore 2026-03-22 but the file itself still exists on disk — never commit it.
+- **Google Fonts GitHub raw URLs return HTML, not font files** — Git LFS stores font binaries as pointers, so `github.com/google/fonts/raw/...` returns an HTML page. Use the gstatic CDN URL (e.g. `fonts.gstatic.com/s/inter/v18/...`) to download the actual TTF binary.
+- **SceneGraph Font child nodes conflict with font= attribute** — When using `<Font role="font" uri="..." />` inside a Label, the `font="font:LargeBoldSystemFont"` attribute MUST be removed entirely. Both present = undefined behavior (firmware may ignore the child node).

@@ -48,6 +48,13 @@ Download the Inter Bold static font file and integrate it into the SimPlex app p
 - `grep -c "LargeBoldSystemFont" SimPlex/components/widgets/Sidebar.xml` — should return 0 (system font fully replaced)
 - `grep -c "titleSimShadow\|titlePlexShadow" SimPlex/components/widgets/Sidebar.xml` — should return 2+ (shadow labels present)
 
+## Observability Impact
+
+- **Font load success/failure:** Roku firmware logs font path resolution failures to the BrightScript debugger console (`pkg:/fonts/Inter-Bold.ttf`). If the font file is missing or the URI is wrong, labels silently fall back to the system font — visible as unchanged Sidebar title text style on device.
+- **Build config:** A missing `fonts/**/*` glob in bsconfig.json means the font file won't deploy to the device staging directory. Inspect `out/staging/fonts/` after build to confirm the font was included.
+- **Shadow label rendering:** If shadow Label nodes have incorrect IDs or are not found by `findNode()` in Sidebar.brs, the shadow positioning code silently fails (no crash, but no shadow visible). Visual inspection on device confirms.
+- **Pre-deploy validation:** `test -f SimPlex/fonts/Inter-Bold.ttf` and `grep -q "Inter-Bold" SimPlex/components/widgets/Sidebar.xml` catch the most common integration failures before side-loading.
+
 ## Inputs
 
 - `SimPlex/components/widgets/Sidebar.xml` — current title label markup to modify

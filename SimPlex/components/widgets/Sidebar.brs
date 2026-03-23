@@ -10,6 +10,12 @@ sub init()
     simBounds = titleSim.boundingRect()
     titlePlex.translation = [20 + simBounds.width, 25]
 
+    ' Position shadow labels with 2px offset for depth effect
+    titleSimShadow = m.top.findNode("titleSimShadow")
+    titlePlexShadow = m.top.findNode("titlePlexShadow")
+    titleSimShadow.translation = [22, 27]
+    titlePlexShadow.translation = [22 + simBounds.width, 27]
+
     m.navList = m.top.findNode("navList")
     m.navList.itemSize = [c.SIDEBAR_WIDTH, 76]
     m.navList.numRows = 12
