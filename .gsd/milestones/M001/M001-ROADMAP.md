@@ -1,4 +1,4 @@
-# M001: SimPlex v1.1 — Polish & Navigation
+# M001: SimPlex v1.1 - Polish & Navigation
 
 **Vision:** A full-featured, personal-use Plex Media Server client for Roku 4K TV, side-loaded as a developer channel.
 
