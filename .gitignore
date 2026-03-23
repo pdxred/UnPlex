@@ -12,8 +12,7 @@ node_modules/
 nul
 
 # IDE/Editor
-.vscode/*
-!.vscode/launch.json
+.vscode/
 *.swp
 *.swo
 *~
@@ -41,3 +40,21 @@ vendor/
 coverage/
 .cache/
 tmp/
+
+# ── Internal tooling & sensitive files ──
+# HTTP archive files (may contain live Plex auth tokens)
+*.har
+# Backup files from debugging sessions
+*.bak
+# Internal planning documentation
+.planning/
+# GSD project management infrastructure
+.gsd/
+# Claude Code agent configuration
+.claude/
+# Background shell session state
+.bg-shell/
+# AI assistant guidance file
+CLAUDE.md
+# Asset generation scripts (require Pillow, not needed by users)
+scripts/
