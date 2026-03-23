@@ -33,7 +33,7 @@
   - Verify: `grep -c "gridWidth" SimPlex/components/widgets/PosterGrid.brs` returns ≥3 (field read + observer + handler). `grep -c "grandparentThumb" SimPlex/components/screens/SearchScreen.brs` returns ≥1.
   - Done when: PosterGrid dynamically computes columns from gridWidth, SearchScreen collapses/expands keyboard on focus transitions, and episode search results use portrait poster thumbs.
 
-- [ ] **T02: Fix collections navigation — auto-select first library when none active** `est:15m`
+- [x] **T02: Fix collections navigation — auto-select first library when none active** `est:15m`
   - Why: Addresses FIX-04 (collections menu item silently fails when no library selected). Requires exposing Sidebar's loaded libraries to HomeScreen.
   - Files: `SimPlex/components/widgets/Sidebar.xml`, `SimPlex/components/widgets/Sidebar.brs`, `SimPlex/components/screens/HomeScreen.brs`
   - Do: (1) Add `libraries` assocarray field to Sidebar.xml interface. (2) In Sidebar.brs processLibraries(), after building m.libraries array, set m.top.libraries to expose it. (3) In HomeScreen.brs onSpecialAction("viewCollections"), when m.currentSectionId is empty, read m.sidebar.libraries to get the first library's sectionId/sectionType, set m.currentSectionId and m.currentSectionType, then proceed with loadCollections(). Guard against empty libraries (fetch still loading).

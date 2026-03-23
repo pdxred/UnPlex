@@ -88,6 +88,14 @@ sub processLibraries()
     end if
 
     m.libraryCount = m.libraries.count()
+
+    ' Expose libraries for HomeScreen collections fallback
+    libList = []
+    for each lib in m.libraries
+        libList.push({ key: lib.key, type: lib.type, title: lib.title })
+    end for
+    m.top.libraries = { items: libList }
+
     buildNavContent()
 end sub
 

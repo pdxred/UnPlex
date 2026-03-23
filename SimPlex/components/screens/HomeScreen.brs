@@ -505,6 +505,16 @@ sub onSpecialAction(event as Object)
         m.filterBar.visible = true
         onViewModeChanged()
     else if action = "viewCollections"
+        ' Auto-select first library if none active (FIX-04)
+        if m.currentSectionId = ""
+            sidebarLibs = m.sidebar.libraries
+            if sidebarLibs <> invalid and sidebarLibs.items <> invalid and sidebarLibs.items.count() > 0
+                firstLib = sidebarLibs.items[0]
+                m.currentSectionId = firstLib.key
+                m.currentSectionType = firstLib.type
+                print "Collections auto-selected library: " + firstLib.title + " (section " + firstLib.key + ")"
+            end if
+        end if
         if m.currentSectionId <> ""
             m.isCollectionsView = true
             m.collectionRatingKey = ""

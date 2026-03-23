@@ -95,3 +95,10 @@ The fix: expose Sidebar's loaded libraries via a new interface field, then in Ho
 - `SimPlex/components/widgets/Sidebar.xml` — new `libraries` interface field
 - `SimPlex/components/widgets/Sidebar.brs` — sets m.top.libraries after library fetch
 - `SimPlex/components/screens/HomeScreen.brs` — auto-select first library for collections when none active
+
+## Observability Impact
+
+- **New diagnostic print:** When auto-selecting the first library for collections, a `print` statement emits `"Collections auto-selected library: {title} (section {key})"` to the Roku debug console. This confirms the fallback fired and which library was chosen.
+- **Inspectable state:** `m.sidebar.libraries` (assocarray with `.items` array) is observable in the SceneGraph inspector. If it's `invalid`, libraries haven't loaded yet. If `.items` is empty, the server returned no supported libraries.
+- **Failure path:** If `m.sidebar.libraries` is `invalid` or empty when Collections is tapped, the handler remains a no-op (same as before the fix). No error dialog is shown — this is intentional since it means the sidebar fetch is still in progress. The user can retry by tapping Collections again once libraries load.
+- **Redaction:** Only library section IDs and titles are printed — no auth tokens or user data.

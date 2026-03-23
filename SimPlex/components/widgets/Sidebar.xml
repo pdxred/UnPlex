@@ -3,6 +3,7 @@
     <interface>
         <field id="selectedLibrary" type="assocarray" alwaysNotify="true" />
         <field id="specialAction" type="string" alwaysNotify="true" />
+        <field id="libraries" type="assocarray" alwaysNotify="true" />
         <function name="cleanup" />
     </interface>
 
