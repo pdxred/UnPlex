@@ -138,7 +138,23 @@ sub processSearchResults()
                 })
 
                 if item.thumb <> invalid and item.thumb <> ""
-                    node.HDPosterUrl = BuildPosterUrl(item.thumb, c.POSTER_WIDTH, c.POSTER_HEIGHT)
+                    node.addFields({
+                        thumb: item.thumb
+                    })
+                end if
+
+                ' Use grandparentThumb → parentThumb → thumb fallback for poster
+                ' This ensures episodes show the show/season poster, not the landscape screenshot
+                posterThumb = invalid
+                if item.grandparentThumb <> invalid and item.grandparentThumb <> ""
+                    posterThumb = item.grandparentThumb
+                else if item.parentThumb <> invalid and item.parentThumb <> ""
+                    posterThumb = item.parentThumb
+                else if item.thumb <> invalid and item.thumb <> ""
+                    posterThumb = item.thumb
+                end if
+                if posterThumb <> invalid
+                    node.HDPosterUrl = BuildPosterUrl(posterThumb, c.POSTER_WIDTH, c.POSTER_HEIGHT)
                 end if
 
                 hasResults = true
@@ -238,10 +254,24 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
         m.top.navigateBack = true
         return true
     else if key = "right" and m.focusOnKeyboard
+        ' Collapse keyboard and expand grid to fill screen
+        m.keyboard.visible = false
+        m.resultsGrid.translation = [80, 200]
+        m.resultsGrid.gridWidth = 1760
+        m.searchQueryLabel.translation = [80, 120]
+        m.emptyState.translation = [960, 440]
+        m.retryGroup.translation = [960, 440]
         m.focusOnKeyboard = false
         m.resultsGrid.setFocus(true)
         return true
     else if key = "left" and not m.focusOnKeyboard
+        ' Restore keyboard and shrink grid
+        m.keyboard.visible = true
+        m.resultsGrid.translation = [700, 200]
+        m.resultsGrid.gridWidth = 1140
+        m.searchQueryLabel.translation = [700, 120]
+        m.emptyState.translation = [1270, 440]
+        m.retryGroup.translation = [1270, 440]
         m.focusOnKeyboard = true
         m.keyboard.setFocus(true)
         return true

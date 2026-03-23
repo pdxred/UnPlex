@@ -102,3 +102,11 @@ The fix has three parts:
 
 - `SimPlex/components/widgets/PosterGrid.brs` — dynamic column count from gridWidth with observer
 - `SimPlex/components/screens/SearchScreen.brs` — keyboard collapse/expand in onKeyEvent + thumb fallback in processSearchResults
+
+## Observability Impact
+
+- **New signal:** `m.grid.numColumns` is now dynamically computed and observable in SceneGraph inspector — reflects actual column count based on current gridWidth rather than a static constant.
+- **New signal:** `m.keyboard.visible` is toggled on focus transitions — visible in SceneGraph inspector and Roku debug console focus chain output.
+- **Inspection surface:** When debugging thumbnail selection, inspect any search result ContentNode's `HDPosterUrl` — the URL path will contain `/grandparentThumb/`, `/parentThumb/`, or `/thumb/` indicating which fallback was selected.
+- **Failure state:** If gridWidth is set to 0 or negative, `Int()` will produce 0 columns. The code guards against this by only recalculating when gridWidth > 0.
+- **No new error paths:** All changes are UI layout adjustments and data mapping — no new HTTP calls or async flows introduced.

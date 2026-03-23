@@ -2,10 +2,15 @@ sub init()
     c = m.global.constants
     m.grid = m.top.findNode("grid")
 
-    ' Configure grid dimensions
-    m.grid.numColumns = c.GRID_COLUMNS
+    ' Configure grid dimensions — compute column count dynamically from gridWidth
+    numColumns = Int(m.top.gridWidth / (c.POSTER_WIDTH + c.GRID_H_SPACING))
+    if numColumns < 1 then numColumns = 1
+    m.grid.numColumns = numColumns
     m.grid.itemSize = [c.POSTER_WIDTH + 20, c.POSTER_HEIGHT + 50]
     m.grid.itemSpacing = [c.GRID_H_SPACING, c.GRID_V_SPACING]
+
+    ' Observe gridWidth changes for dynamic recalculation (e.g. search layout toggle)
+    m.top.observeField("gridWidth", "onGridWidthChange")
 
     ' Observe grid selection
     m.grid.observeField("itemSelected", "onItemSelected")
@@ -22,6 +27,17 @@ sub onFocusChange(event as Object)
     ' When PosterGrid is in focus chain but no child has focus, delegate to grid
     if m.top.isInFocusChain() and m.top.focusedChild = invalid
         m.grid.setFocus(true)
+    end if
+end sub
+
+sub onGridWidthChange(event as Object)
+    ' Recalculate column count when gridWidth changes dynamically
+    c = m.global.constants
+    gridWidth = event.getData()
+    if gridWidth > 0
+        numColumns = Int(gridWidth / (c.POSTER_WIDTH + c.GRID_H_SPACING))
+        if numColumns < 1 then numColumns = 1
+        m.grid.numColumns = numColumns
     end if
 end sub
 
@@ -45,8 +61,7 @@ sub onItemFocused(event as Object)
     m.lastFocusedIndex = index
 
     ' Check if we need to load more (within 2 rows of the end)
-    c = m.global.constants
-    itemsPerRow = c.GRID_COLUMNS
+    itemsPerRow = m.grid.numColumns
     threshold = m.totalItems - (itemsPerRow * 2)
 
     if index >= threshold and m.totalItems > 0
