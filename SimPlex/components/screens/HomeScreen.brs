@@ -420,6 +420,13 @@ sub onHubItemSelected(event as Object)
             itemType: itemContent.itemType
             viewOffset: itemContent.viewOffset
         }
+    else if itemContent.itemType = "show"
+        ' TV shows: go directly to EpisodeScreen
+        m.top.itemSelected = {
+            action: "episodes"
+            ratingKey: itemContent.ratingKey
+            title: itemContent.title
+        }
     else
         ' All other hubs: open detail screen
         m.top.itemSelected = {
@@ -1043,11 +1050,20 @@ sub onGridItemSelected(event as Object)
             end if
         end if
 
-        m.top.itemSelected = {
-            action: "detail"
-            ratingKey: item.ratingKey
-            itemType: item.itemType
-        }
+        ' TV shows: go directly to EpisodeScreen
+        if item.itemType = "show"
+            m.top.itemSelected = {
+                action: "episodes"
+                ratingKey: item.ratingKey
+                title: item.title
+            }
+        else
+            m.top.itemSelected = {
+                action: "detail"
+                ratingKey: item.ratingKey
+                itemType: item.itemType
+            }
+        end if
     end if
 end sub
 
@@ -1146,7 +1162,11 @@ sub showOptionsMenu(item as Object)
         end if
     end if
 
-    dialog.buttons = [watchedLabel, "Cancel"]
+    if item.itemType = "show"
+        dialog.buttons = [watchedLabel, "Show Info", "Cancel"]
+    else
+        dialog.buttons = [watchedLabel, "Cancel"]
+    end if
     dialog.observeField("buttonSelected", "onOptionsMenuButton")
     dialog.observeField("wasClosed", "onOptionsMenuClosed")
     m.top.getScene().dialog = dialog
@@ -1173,6 +1193,13 @@ sub onOptionsMenuButton(event as Object)
 
         ' Force grid re-render by re-assigning content
         m.posterGrid.content = m.posterGrid.content
+    else if index = 1 and m.pendingOptionsItem.itemType = "show"
+        ' "Show Info" — navigate to DetailScreen for this show
+        m.top.itemSelected = {
+            action: "detail"
+            ratingKey: m.pendingOptionsItem.ratingKey
+            itemType: "show"
+        }
     end if
 
     restoreFocusAfterDialog()

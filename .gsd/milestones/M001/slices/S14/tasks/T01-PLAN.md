@@ -86,3 +86,10 @@ MainScene already handles `action: "episodes"` (line 445-446, dispatches to `sho
 ## Expected Output
 
 - `SimPlex/components/screens/HomeScreen.brs` — modified with show-specific routing in grid/hub handlers and "Show Info" in options menu
+
+## Observability Impact
+
+- **New signal:** `onGridItemSelected` and `onHubItemSelected` now emit `action: "episodes"` for show items, observable via MainScene's `onItemSelected` handler.
+- **New UI surface:** Options dialog for show items gains a "Show Info" button at index 1. Pressing it emits `action: "detail"` with `itemType: "show"`.
+- **Failure state:** If a show's `itemType` field is not `"show"` (missing or wrong), the item falls through to the default detail path — no crash, just wrong screen. Diagnosis: inspect the content node's `itemType` in `onGridItemSelected` / `onHubItemSelected`.
+- **Inspection:** `grep -c "action.*episodes" SimPlex/components/screens/HomeScreen.brs` confirms wiring. Expected: 2 (one per handler).
