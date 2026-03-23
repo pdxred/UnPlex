@@ -71,37 +71,41 @@ All 4 codepaths referencing server switching patched (no crash on multi-server a
 
 ### BRAND-01 — App icon and splash screen use a bolder font (Inter Bold or similar)
 
-- Status: active
+- Status: validated
 - Class: core-capability
 - Source: inferred
-- Primary Slice: none yet
+- Primary Slice: S16
+- Validation: Inter-Bold.ttf bundled in SimPlex/fonts/, Sidebar.xml uses Font child nodes with pkg:/fonts/Inter-Bold.ttf URI, all icon/splash images generated with Inter Bold text via scripts/generate_branding.py.
 
 App icon and splash screen use a bolder font (Inter Bold or similar)
 
 ### BRAND-02 — Icon/splash text has gray external stroke visible against dark background
 
-- Status: active
+- Status: validated
 - Class: core-capability
 - Source: inferred
-- Primary Slice: none yet
+- Primary Slice: S16
+- Validation: All icon and splash images rendered with gray (#666666) stroke outline using full-offset grid technique in generate_branding.py. Stroke visible against dark gradient background in generated assets.
 
 Icon/splash text has gray external stroke visible against dark background
 
 ### BRAND-03 — Icon and splash screen backgrounds have subtle corner-to-corner black-to-charcoal gradient
 
-- Status: active
+- Status: validated
 - Class: core-capability
 - Source: inferred
-- Primary Slice: none yet
+- Primary Slice: S16
+- Validation: All four assets use diagonal gradient (#1A1A2E → #0A0A14) via (x+y)/(w+h) interpolation. bg_gradient.png (1920×1080) wired into MainScene.xml as Poster node replacing solid Rectangle.
 
 Icon and splash screen backgrounds have subtle corner-to-corner black-to-charcoal gradient
 
 ### BRAND-04 — All icon variants updated (focus FHD 540x405, side FHD, HD variants)
 
-- Status: active
+- Status: validated
 - Class: core-capability
 - Source: inferred
-- Primary Slice: none yet
+- Primary Slice: S16
+- Validation: icon_focus_fhd.png at 540×405, icon_side_fhd.png at 246×140, splash_fhd.jpg at 1920×1080 — all dimensions verified via PIL Image.open().size assertions.
 
 All icon variants updated (focus FHD 540x405, side FHD, HD variants)
 

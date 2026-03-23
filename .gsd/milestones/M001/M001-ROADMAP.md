@@ -37,7 +37,7 @@
   > Grid tap on TV shows goes directly to EpisodeScreen; DetailScreen accessible via options key "Show Info" action from HomeScreen and EpisodeScreen.
 - [x] **S15: Server Switching Removal — completed 2026 03 23** `risk:medium` `depends:[S14]`
   > Removed "Switch Server" from SettingsScreen, patched all 4 codepaths, deleted ServerListScreen, simplified to single-server design.
-- [ ] **S16: App Branding** `risk:medium` `depends:[S15]`
+- [x] **S16: App Branding — completed 2026 03 23** `risk:medium` `depends:[S15]`
   > Bolder Inter Bold font, gray stroke on icon/splash text, gradient backgrounds, all icon variants updated.
 - [ ] **S17: Documentation and GitHub** `risk:medium` `depends:[S16]`
   > Full README with user guide, developer/architecture docs, .gitignore cleanup, publish to GitHub.

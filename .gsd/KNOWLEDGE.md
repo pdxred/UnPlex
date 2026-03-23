@@ -23,6 +23,8 @@
 - **Search layout two-state toggle:** `m.keyboard.visible` tracks state. When adding new elements to SearchScreen, provide positioning for both keyboard-visible (grid at x=700, gridWidth=1140) and keyboard-hidden (grid at x=80, gridWidth=1760) states.
 - **Options menu button index shifting:** When inserting type-specific buttons (e.g. "Show Info" for shows), Cancel shifts to a higher index. Cancel needs no explicit handler — dialog close fires before index checks and `restoreFocusAfterDialog()` / `setFocus(true)` runs unconditionally at function end. Pattern used in both HomeScreen and EpisodeScreen options menus.
 - **itemType-based routing:** Grid/hub selection handlers check `itemType` before the catch-all `action: "detail"` block. Shows emit `action: "episodes"`; everything else falls through to detail. Safe degradation — missing or unrecognized itemType gets default detail routing, never crashes.
+- **Reproducible branding asset generation:** `scripts/generate_branding.py` regenerates all branded images (icons, splash, bg_gradient) deterministically from Inter-Bold.ttf + Pillow. Run it any time branding parameters change — font size, colors, gradient direction. Self-verifies dimensions after save.
+- **Poster node replaces Rectangle for image backgrounds:** In MainScene.xml, use `<Poster uri="pkg:/images/bg_gradient.png" />` instead of `<Rectangle color="0x1A1A2EFF" />` for gradient/image backgrounds. Poster nodes render images; Rectangle nodes only render solid colors.
 
 ## Gotchas
 
