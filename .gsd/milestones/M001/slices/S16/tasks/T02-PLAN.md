@@ -87,3 +87,10 @@ Generate all branded image assets using Python/Pillow: focus icon (540×405), si
 - `SimPlex/images/bg_gradient.png` — new gradient background for in-app use
 - `SimPlex/components/MainScene.xml` — modified to use Poster with gradient bg
 - `scripts/generate_branding.py` — new generation script for reproducibility
+
+## Observability Impact
+
+- **New signals:** The `bg_gradient.png` Poster node in MainScene.xml will produce a visible gradient background on app launch. Missing or corrupt PNG will show as a magenta placeholder or blank background — immediately visible during visual inspection.
+- **Icon/splash signals:** Roku firmware silently scales/crops incorrectly-sized icons on the home screen. The Python dimension-check script (`scripts/generate_branding.py` self-verifies) and slice verification commands provide pre-deploy validation.
+- **Regeneration:** Running `python scripts/generate_branding.py` from the project root regenerates all four assets deterministically. Any changes to the design spec can be verified by re-running the script and checking output dimensions.
+- **Failure visibility:** If the gradient background fails to load at runtime, the Poster node renders transparent (showing Scene default black). The BrightScript debugger console may log image load failures for `pkg:/images/bg_gradient.png`.

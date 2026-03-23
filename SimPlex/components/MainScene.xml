@@ -13,11 +13,11 @@
     <script type="text/brightscript" uri="MainScene.brs" />
 
     <children>
-        <Rectangle
+        <Poster
             id="background"
             width="1920"
             height="1080"
-            color="0x1A1A2EFF"
+            uri="pkg:/images/bg_gradient.png"
         />
         <Group id="screenContainer" />
     </children>

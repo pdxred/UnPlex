@@ -52,7 +52,7 @@
   - Verify: `test -f SimPlex/fonts/Inter-Bold.ttf && grep -q "fonts" bsconfig.json && grep -q "Inter-Bold" SimPlex/components/widgets/Sidebar.xml`
   - Done when: Inter-Bold.ttf exists in fonts/, bsconfig includes fonts glob, Sidebar.xml uses Font child nodes with pkg:/fonts/Inter-Bold.ttf URI, shadow labels present
 
-- [ ] **T02: Generate branded icon, splash, and gradient background assets** `est:30m`
+- [x] **T02: Generate branded icon, splash, and gradient background assets** `est:30m`
   - Why: BRAND-01 through BRAND-04 require all icon/splash images regenerated with branded design (Inter Bold text, gray stroke, gradient bg) at correct Roku dimensions. BRAND-03 extends to an in-app gradient background.
   - Files: `SimPlex/images/icon_focus_fhd.png`, `SimPlex/images/icon_side_fhd.png`, `SimPlex/images/splash_fhd.jpg`, `SimPlex/images/bg_gradient.png`, `SimPlex/components/MainScene.xml`
   - Do: Write a Python/Pillow script that generates all four images: (1) icon_focus_fhd.png at 540×405, (2) icon_side_fhd.png at 246×140, (3) splash_fhd.jpg at 1920×1080, (4) bg_gradient.png at 1920×1080. Design: black-to-charcoal diagonal gradient background (#1A1A2E → #0A0A14), centered "SimPlex" text in Inter Bold with "Sim" in white and "Plex" in gold (#F3B125), gray (#666666) stroke/outline on text. Scale font size proportionally per image. In MainScene.xml, replace `<Rectangle id="background">` with `<Poster id="background" uri="pkg:/images/bg_gradient.png" width="1920" height="1080" />`.
