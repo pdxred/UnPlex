@@ -33,8 +33,8 @@
   > After this: Wire auto-play next episode from both entry points (DetailScreen and EpisodeScreen) with a cancellable 30-second countdown, create PostPlayScreen for consistent post-playback navigation, and add season-boundary auto-play.
 - [x] **S13: Search, Collections, and Thumbnails — completed 2026 03 23** `risk:medium` `depends:[S12]`
   > Fixed search keyboard collapse/expand with dynamic grid columns, collections auto-select first library, and episode thumbnail fallback for portrait posters.
-- [ ] **S14: TV Show Navigation Overhaul** `risk:medium` `depends:[S13]`
-  > Grid tap on TV shows goes directly to EpisodeScreen; DetailScreen accessible via options key "Info" action.
+- [x] **S14: TV Show Navigation Overhaul — completed 2026 03 23** `risk:medium` `depends:[S13]`
+  > Grid tap on TV shows goes directly to EpisodeScreen; DetailScreen accessible via options key "Show Info" action from HomeScreen and EpisodeScreen.
 - [ ] **S15: Server Switching Removal** `risk:medium` `depends:[S14]`
   > Remove "Switch Server" from SettingsScreen, patch all 4 codepaths, simplify to single-server design.
 - [ ] **S16: App Branding** `risk:medium` `depends:[S15]`

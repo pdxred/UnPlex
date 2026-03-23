@@ -21,6 +21,8 @@
 - **PosterGrid dynamic resize:** Set `gridWidth` on PosterGrid and columns recalculate automatically via observer (`Int(gridWidth / (POSTER_WIDTH + GRID_H_SPACING))`). Default library width 1620px → 6 cols. Any parent can resize at runtime.
 - **Sidebar.libraries interface field:** Read-only assocarray `{ items: [{key, title, type}, ...] }` populated after library API response. Use for cross-component library metadata access without reaching into Sidebar internals.
 - **Search layout two-state toggle:** `m.keyboard.visible` tracks state. When adding new elements to SearchScreen, provide positioning for both keyboard-visible (grid at x=700, gridWidth=1140) and keyboard-hidden (grid at x=80, gridWidth=1760) states.
+- **Options menu button index shifting:** When inserting type-specific buttons (e.g. "Show Info" for shows), Cancel shifts to a higher index. Cancel needs no explicit handler — dialog close fires before index checks and `restoreFocusAfterDialog()` / `setFocus(true)` runs unconditionally at function end. Pattern used in both HomeScreen and EpisodeScreen options menus.
+- **itemType-based routing:** Grid/hub selection handlers check `itemType` before the catch-all `action: "detail"` block. Shows emit `action: "episodes"`; everything else falls through to detail. Safe degradation — missing or unrecognized itemType gets default detail routing, never crashes.
 
 ## Gotchas
 
