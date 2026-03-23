@@ -40,13 +40,7 @@ Fast, intuitive library browsing and playback on a single personal Plex server w
 
 **Goal:** Fix v1.0 bugs, overhaul TV show navigation, clean up codebase, refresh branding, and document for GitHub.
 
-**Target features:**
-- TV show navigation overhaul (Show → Season list → Episode grid)
-- Bug fixes: collections, search layout, thumbnail aspect ratios, auto-play wiring, watch state propagation
-- Server switching: fix or remove cleanly
-- App branding: bolder font with gray stroke, gradient backgrounds on icon/splash
-- Codebase cleanup: orphaned code, brittle patterns, inefficiencies
-- Full documentation (user guide + developer/architecture), publish to GitHub
+**Progress:** S01–S13 complete. Search layout fixed (keyboard collapse/expand, dynamic grid columns), collections auto-select first library, episode thumbnails use portrait poster fallback. Next: S14 (TV Show Navigation Overhaul).
 
 **Future Features**
 - [ ] Music: album/artist browse, track list, playback queue, now-playing bar

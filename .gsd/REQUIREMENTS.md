@@ -2,32 +2,7 @@
 
 ## Active
 
-### FIX-04 — Collections menu item navigates to collections browsing screen
-
-- Status: active
-- Class: core-capability
-- Source: inferred
-- Primary Slice: none yet
-
-Collections menu item navigates to collections browsing screen
-
-### FIX-05 — Search results display without occluding search controls and are navigable
-
-- Status: active
-- Class: core-capability
-- Source: inferred
-- Primary Slice: none yet
-
-Search results display without occluding search controls and are navigable
-
-### FIX-06 — Thumbnail aspect ratio adapts based on image type — detect whether Plex is serving a poster (2:3) or screen grab (16:9) and size the grid item accordingly, rather than hardcoding by library type
-
-- Status: active
-- Class: core-capability
-- Source: inferred
-- Primary Slice: none yet
-
-Thumbnail aspect ratio adapts based on image type — detect whether Plex is serving a poster (2:3) or screen grab (16:9) and size the grid item accordingly, rather than hardcoding by library type
+### FIX-08 — Subtitle/audio track selection panel must be accessible during playback — trigger with down arrow key (options key intercepted by Roku firmware on Video node; keep built-in trickplay bar)
 
 ### FIX-08 — Subtitle/audio track selection panel must be accessible during playback — trigger with down arrow key (options key intercepted by Roku firmware on Video node; keep built-in trickplay bar)
 
@@ -228,6 +203,36 @@ Watch state changes propagate to parent screens (poster grids and hub rows)
 - Primary Slice: none yet
 
 Progress bar width uses constant instead of hardcoded 240px
+
+### FIX-04 — Collections menu item navigates to collections browsing screen
+
+- Status: validated
+- Class: core-capability
+- Source: inferred
+- Primary Slice: S13
+- Validation: HomeScreen auto-selects first library when m.currentSectionId is empty; Sidebar.libraries interface field exposes loaded library list. grep confirms wiring in Sidebar.brs and HomeScreen.brs.
+
+Collections menu item navigates to collections browsing screen
+
+### FIX-05 — Search results display without occluding search controls and are navigable
+
+- Status: validated
+- Class: core-capability
+- Source: inferred
+- Primary Slice: S13
+- Validation: SearchScreen keyboard collapses on right-nav (grid expands to 6 cols), reappears on left-nav (grid shrinks to 4 cols). PosterGrid computes columns dynamically from gridWidth. No Animation nodes.
+
+Search results display without occluding search controls and are navigable
+
+### FIX-06 — Thumbnail aspect ratio adapts based on image type
+
+- Status: validated
+- Class: core-capability
+- Source: inferred
+- Primary Slice: S13
+- Validation: SearchScreen processSearchResults() applies grandparentThumb → parentThumb → thumb fallback chain for HDPosterUrl. Episodes show portrait show poster instead of stretched 16:9 screenshot.
+
+Thumbnail aspect ratio adapts based on image type — detect whether Plex is serving a poster (2:3) or screen grab (16:9) and size the grid item accordingly, rather than hardcoding by library type
 
 ## Deferred
 

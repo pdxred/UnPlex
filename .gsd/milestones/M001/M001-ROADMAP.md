@@ -31,8 +31,8 @@
   > After this: Confirm BusySpinner SIGSEGV root cause, replace the crashed component with a safe loading indicator, assess VideoPlayer's transcodingSpinner, and delete confirmed orphaned files.
 - [x] **S12: Auto Play And Watch State** `risk:medium` `depends:[S11]`
   > After this: Wire auto-play next episode from both entry points (DetailScreen and EpisodeScreen) with a cancellable 30-second countdown, create PostPlayScreen for consistent post-playback navigation, and add season-boundary auto-play.
-- [ ] **S13: Search, Collections, and Thumbnails** `risk:medium` `depends:[S12]`
-  > Fix search layout (keyboard collapse, column count), collections sidebar navigation, and episode thumbnail aspect ratios.
+- [x] **S13: Search, Collections, and Thumbnails — completed 2026 03 23** `risk:medium` `depends:[S12]`
+  > Fixed search keyboard collapse/expand with dynamic grid columns, collections auto-select first library, and episode thumbnail fallback for portrait posters.
 - [ ] **S14: TV Show Navigation Overhaul** `risk:medium` `depends:[S13]`
   > Grid tap on TV shows goes directly to EpisodeScreen; DetailScreen accessible via options key "Info" action.
 - [ ] **S15: Server Switching Removal** `risk:medium` `depends:[S14]`
