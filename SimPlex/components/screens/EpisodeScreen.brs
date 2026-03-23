@@ -334,7 +334,7 @@ sub showEpisodeOptionsMenu(episode as Object)
         watchedLabel = "Mark as Watched"
     end if
 
-    dialog.buttons = [watchedLabel, "Cancel"]
+    dialog.buttons = [watchedLabel, "Show Info", "Cancel"]
     dialog.observeField("buttonSelected", "onEpisodeOptionsButton")
     dialog.observeField("wasClosed", "onEpisodeOptionsClosed")
     m.top.getScene().dialog = dialog
@@ -369,6 +369,13 @@ sub onEpisodeOptionsButton(event as Object)
 
         ' Force episode list re-render
         m.episodeList.content = m.episodeList.content
+    else if index = 1
+        ' Navigate to show detail screen
+        m.top.itemSelected = {
+            action: "detail"
+            ratingKey: m.top.ratingKey
+            itemType: "show"
+        }
     end if
 
     m.episodeList.setFocus(true)

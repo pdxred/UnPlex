@@ -53,7 +53,7 @@ grep -n 'CreateObject.*Animation' SimPlex/components/screens/HomeScreen.brs SimP
   - Verify: `grep -c "action.*episodes" SimPlex/components/screens/HomeScreen.brs` returns >= 2; `grep -c "Show Info" SimPlex/components/screens/HomeScreen.brs` returns >= 1
   - Done when: TV show items in grid and hub rows emit episodes action; options menu offers "Show Info" for shows; non-show routing unchanged.
 
-- [ ] **T02: Add "Show Info" option to EpisodeScreen options menu** `est:15m`
+- [x] **T02: Add "Show Info" option to EpisodeScreen options menu** `est:15m`
   - Why: DetailScreen must remain accessible from EpisodeScreen for users who want full show metadata.
   - Files: `SimPlex/components/screens/EpisodeScreen.brs`
   - Do: In `showEpisodeOptionsMenu()`, add "Show Info" button between the watched toggle and "Cancel" (buttons become `[watchedLabel, "Show Info", "Cancel"]`). In `onEpisodeOptionsButton()`, handle the new index 1 by emitting `{ action: "detail", ratingKey: m.top.ratingKey, itemType: "show" }` via `m.top.itemSelected`. Shift the existing cancel logic to index 2. No Animation nodes.
