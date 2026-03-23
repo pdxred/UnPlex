@@ -54,7 +54,7 @@
   - Verify: `grep -c "Switch Server" SimPlex/components/screens/SettingsScreen.brs` → 0; `grep -c "showServerListScreen\|navigateToServerList\|onServerFetchForList" SimPlex/components/MainScene.brs` → 0; `grep "index = 4" SimPlex/components/screens/SettingsScreen.brs` shows signOut
   - Done when: All 6 touchpoints patched, no references to server list navigation remain in either file, Sign Out works at index 4
 
-- [ ] **T02: Delete ServerListScreen component and run full verification** `est:15m`
+- [x] **T02: Delete ServerListScreen component and run full verification** `est:15m`
   - Why: ServerListScreen has zero callers after T01 patches — safe to delete. Full cross-file verification confirms no dangling references and preserved infrastructure is intact.
   - Files: `SimPlex/components/screens/ServerListScreen.brs`, `SimPlex/components/screens/ServerListScreen.xml`
   - Do: Delete both ServerListScreen files. Run all verification grep commands from the slice verification section. Confirm ServerConnectionTask still exists. Confirm discoverServers still present in SettingsScreen.

@@ -47,6 +47,13 @@ After T01 patched all callers, ServerListScreen has zero references anywhere in 
 - `grep -c "discoverServers" SimPlex/components/screens/SettingsScreen.brs` returns ≥3
 - `grep -c "Server List" SimPlex/components/MainScene.brs` returns 0
 
+## Observability Impact
+
+- **Signals removed:** ServerListScreen's internal logging and UI render signals no longer exist after file deletion. No external logging was referencing these files.
+- **Inspection surface:** After deletion, `grep -rn "ServerListScreen" SimPlex/` should return zero hits — confirming no dangling references. `test ! -f SimPlex/components/screens/ServerListScreen.brs` confirms removal.
+- **Failure visibility:** If any code still references ServerListScreen after deletion, it will cause a Roku compile error (missing component) visible immediately on side-load. This is the primary safety signal.
+- **Preserved signals:** All auto-connect logging (`LogEvent("Auto-connected to server")`, `LogError("Auto-connect failed:")`) and disconnect dialog behavior are unchanged by this task — they live in MainScene.brs which is read-only for T02.
+
 ## Inputs
 
 - `SimPlex/components/screens/ServerListScreen.brs` — dead component to delete (zero callers after T01)
