@@ -40,7 +40,7 @@ Fast, intuitive library browsing and playback on a single personal Plex server w
 
 **Goal:** Fix v1.0 bugs, overhaul TV show navigation, clean up codebase, refresh branding, and document for GitHub.
 
-**Progress:** S01–S14 complete. TV show navigation overhauled — grid/hub taps go directly to EpisodeScreen, DetailScreen accessible via options "Show Info". Next: S15 (Server Switching Removal).
+**Progress:** S01–S15 complete. Server switching removed — single-server-only client. Next: S16 (App Branding).
 
 **Future Features**
 - [ ] Music: album/artist browse, track list, playback queue, now-playing bar

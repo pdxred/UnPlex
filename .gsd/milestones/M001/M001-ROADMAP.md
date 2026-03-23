@@ -35,8 +35,8 @@
   > Fixed search keyboard collapse/expand with dynamic grid columns, collections auto-select first library, and episode thumbnail fallback for portrait posters.
 - [x] **S14: TV Show Navigation Overhaul — completed 2026 03 23** `risk:medium` `depends:[S13]`
   > Grid tap on TV shows goes directly to EpisodeScreen; DetailScreen accessible via options key "Show Info" action from HomeScreen and EpisodeScreen.
-- [ ] **S15: Server Switching Removal** `risk:medium` `depends:[S14]`
-  > Remove "Switch Server" from SettingsScreen, patch all 4 codepaths, simplify to single-server design.
+- [x] **S15: Server Switching Removal — completed 2026 03 23** `risk:medium` `depends:[S14]`
+  > Removed "Switch Server" from SettingsScreen, patched all 4 codepaths, deleted ServerListScreen, simplified to single-server design.
 - [ ] **S16: App Branding** `risk:medium` `depends:[S15]`
   > Bolder Inter Bold font, gray stroke on icon/splash text, gradient backgrounds, all icon variants updated.
 - [ ] **S17: Documentation and GitHub** `risk:medium` `depends:[S16]`

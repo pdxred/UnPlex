@@ -51,19 +51,21 @@ Back button navigates correctly through Show → Seasons → Episodes stack
 
 ### SRV-01 — Server switching UI and code removed cleanly from SettingsScreen
 
-- Status: active
+- Status: validated
 - Class: core-capability
 - Source: inferred
-- Primary Slice: none yet
+- Primary Slice: S15
+- Validation: grep -c "Switch Server" SettingsScreen.brs → 0. Menu item removed, index handler renumbered (Sign Out at index 4). discoverServers() preserved for auth flows (3 occurrences).
 
 Server switching UI and code removed cleanly from SettingsScreen
 
 ### SRV-02 — All 4 codepaths referencing server switching patched (no crash on multi-server accounts)
 
-- Status: active
+- Status: validated
 - Class: core-capability
 - Source: inferred
-- Primary Slice: none yet
+- Primary Slice: S15
+- Validation: All 4 codepaths patched: (1) SettingsScreen menu item removed, (2) MainScene multi-server branch auto-connects to servers[0], (3) disconnect dialog "Server List" button removed, (4) four dead navigation subs deleted. ServerListScreen files deleted with zero dangling references.
 
 All 4 codepaths referencing server switching patched (no crash on multi-server accounts)
 

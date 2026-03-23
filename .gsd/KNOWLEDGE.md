@@ -28,5 +28,6 @@
 
 - **Accent color inconsistency:** constants.brs defines ACCENT as `0xF3B125FF` but 5 files still hardcode old `0xE5A00D` values inline (EpisodeScreen.xml, SettingsScreen.brs, LibrarySettingItem.xml ×3). When changing accent color, grep for both values.
 - **HomeScreen direct playback path is not wired for auto-play.** `startPlaybackFromGrid()` uses old `playbackComplete` observer and doesn't set grandparentRatingKey/parentRatingKey. Episodes played from hub rows won't auto-advance or show PostPlayScreen.
-- **ServerListScreen still exists** even though server switching is slated for removal in S15. Don't delete it until all 4 codepaths in SettingsScreen.brs are patched.
+- **ServerListScreen deleted in S15.** All server switching UI and codepaths removed. `discoverServers()` in SettingsScreen is preserved — it serves auth recovery and PIN completion, NOT server switching. Don't remove it.
+- **SettingsScreen menu indices after S15:** 0=user label, 1=Hub Libraries, 2=Sidebar Libraries, 3=Switch User, 4=Sign Out. Any new menu item should insert before Sign Out and bump its index.
 - **HAR file in project root** (`plex.owlfarm.ad.har`, 17 MB) contains live auth tokens. Added to .gitignore 2026-03-22 but the file itself still exists on disk — never commit it.
