@@ -64,3 +64,9 @@ Remove the "Switch Server" menu item from SettingsScreen and renumber the handle
 
 - `SimPlex/components/screens/SettingsScreen.brs` — "Switch Server" removed, index handler renumbered
 - `SimPlex/components/MainScene.brs` — multi-server auto-connects to first server, disconnect dialog simplified, 4 subs deleted
+
+## Observability Impact
+
+- **Signals changed:** The existing `LogEvent("Auto-connected to server")` signal in `onAutoConnectState` now fires for both single-server and multi-server accounts (previously only single-server). `LogError("Auto-connect failed:")` similarly covers both paths.
+- **Inspection:** After side-loading, navigate to Settings to verify menu has 5 items with Sign Out at the bottom. Disconnect the server to verify the dialog shows only "Try Again".
+- **Failure visibility:** If auto-connect fails on a multi-server account, `onAutoConnectState` logs the error and falls back to the PIN screen. The disconnect dialog no longer offers a "Server List" dead-end path that would crash.

@@ -67,8 +67,8 @@ sub onPINScreenState(event as Object)
         authToken = pinScreen.authToken
 
         if servers <> invalid and servers.count() > 1
-            ' Multiple servers - show selection
-            showServerListScreen(servers, authToken)
+            ' Multiple servers - auto-connect to first server
+            autoConnectToServer(servers[0], authToken)
         else if servers <> invalid and servers.count() = 1
             ' Single server - auto-connect
             autoConnectToServer(servers[0], authToken)
@@ -84,29 +84,6 @@ sub onPINScreenState(event as Object)
             popScreen()
             showHomeScreen()
         end if
-    end if
-end sub
-
-sub showServerListScreen(servers as Object, authToken as String)
-    clearScreenStack()
-
-    serverScreen = CreateObject("roSGNode", "ServerListScreen")
-    serverScreen.servers = servers
-    serverScreen.authToken = authToken
-    serverScreen.observeField("state", "onServerListState")
-    pushScreen(serverScreen)
-end sub
-
-sub onServerListState(event as Object)
-    state = event.getData()
-
-    if state = "connected"
-        LogEvent("Server connected, showing home")
-        clearScreenStack()
-        showHomeScreen()
-    else if state = "cancelled"
-        ' Go back to PIN screen
-        showPINScreen()
     end if
 end sub
 
@@ -513,7 +490,7 @@ sub showServerDisconnectDialog()
     dialog = CreateObject("roSGNode", "StandardMessageDialog")
     dialog.title = "Server Unreachable"
     dialog.message = ["Can't connect to your Plex server. Check your network connection and try again."]
-    dialog.buttons = ["Try Again", "Server List"]
+    dialog.buttons = ["Try Again"]
     dialog.observeField("buttonSelected", "onDisconnectDialogButton")
     dialog.observeField("wasClosed", "onDisconnectDialogClosed")
     m.top.dialog = dialog
@@ -526,9 +503,6 @@ sub onDisconnectDialogButton(event as Object)
     if index = 0
         ' Try Again - re-test connectivity
         testServerConnectivity()
-    else if index = 1
-        ' Server List - navigate to server selection
-        navigateToServerList()
     end if
 end sub
 
@@ -537,35 +511,6 @@ sub onDisconnectDialogClosed(event as Object)
     currentScreen = getCurrentScreen()
     if currentScreen <> invalid
         currentScreen.setFocus(true)
-    end if
-end sub
-
-sub navigateToServerList()
-    ' Pop all screens and show server list
-    ' Need auth token and servers from plex.tv
-    clearScreenStack()
-
-    ' Fetch servers from plex.tv
-    m.serverFetchTask = CreateObject("roSGNode", "PlexApiTask")
-    m.serverFetchTask.isPlexTvRequest = true
-    m.serverFetchTask.endpoint = "https://plex.tv/api/v2/resources?includeHttps=1&includeRelay=1"
-    m.serverFetchTask.observeField("status", "onServerFetchForList")
-    m.serverFetchTask.control = "run"
-end sub
-
-sub onServerFetchForList(event as Object)
-    state = event.getData()
-    if state = "completed"
-        servers = m.serverFetchTask.response
-        if servers <> invalid
-            showServerListScreen(servers, GetAuthToken())
-        else
-            ' Fallback to PIN screen if can't fetch servers
-            showPINScreen()
-        end if
-    else
-        ' Can't reach plex.tv either - show PIN screen
-        showPINScreen()
     end if
 end sub
 

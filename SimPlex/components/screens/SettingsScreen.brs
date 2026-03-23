@@ -71,7 +71,7 @@ sub showSettingsMenu()
 
     ' Show current user name and menu options
     userName = GetActiveUserName()
-    items = ["Signed in as: " + userName, "Hub Libraries", "Sidebar Libraries", "Switch User", "Switch Server", "Sign Out"]
+    items = ["Signed in as: " + userName, "Hub Libraries", "Sidebar Libraries", "Switch User", "Sign Out"]
     for each item in items
         node = content.createChild("ContentNode")
         node.title = item
@@ -103,9 +103,6 @@ sub onSettingsItemSelected(event as Object)
         ' Switch user
         m.top.itemSelected = { action: "switchUser" }
     else if index = 4
-        ' Switch server
-        discoverServers()
-    else if index = 5
         ' Sign out
         signOut()
     end if

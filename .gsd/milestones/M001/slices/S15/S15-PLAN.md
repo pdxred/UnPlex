@@ -47,7 +47,7 @@
 
 ## Tasks
 
-- [ ] **T01: Patch all server switching codepaths in SettingsScreen and MainScene** `est:30m`
+- [x] **T01: Patch all server switching codepaths in SettingsScreen and MainScene** `est:30m`
   - Why: Remove "Switch Server" menu item, renumber indices, patch multi-server branch to auto-connect, remove disconnect dialog "Server List" button and all dead server-list navigation subs
   - Files: `SimPlex/components/screens/SettingsScreen.brs`, `SimPlex/components/MainScene.brs`
   - Do: (1) In SettingsScreen.brs — remove "Switch Server" from items array in `showSettingsMenu()`, remove `else if index = 4` block for server switching in `onSettingsItemSelected()`, change Sign Out from `index = 5` to `index = 4`. (2) In MainScene.brs — replace `showServerListScreen(servers, authToken)` with `autoConnectToServer(servers[0], authToken)` in `onPINScreenState()` multi-server branch, change disconnect dialog buttons from `["Try Again", "Server List"]` to `["Try Again"]`, remove `else if index = 1` block in `onDisconnectDialogButton()`, delete subs `showServerListScreen`, `onServerListState`, `navigateToServerList`, `onServerFetchForList`. Preserve `discoverServers()` in SettingsScreen and `ServerConnectionTask` files.
