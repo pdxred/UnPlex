@@ -22,23 +22,14 @@
         <!-- Keyboard container (all keys built dynamically in BRS) -->
         <Group id="keyboardGroup" translation="[80, 80]" />
 
-        <!-- Filter row -->
-        <ButtonGroup id="filterButtons" translation="[80, 195]"
-            buttons='["All", "TV Shows", "Movies", "Other"]'
-            textColor="0xA0A0B0FF"
-            focusedTextColor="0xFFFFFFFF"
-            focusColor="0xF3B125FF"
-            font="font:SmallBoldSystemFont"
-            focusedFont="font:SmallBoldSystemFont"
-            layoutDirection="horiz"
-            itemSpacings="[12]"
-        />
+        <!-- Filter row (built dynamically in BRS to match keyboard styling) -->
+        <Group id="filterGroup" translation="[80, 248]" />
 
         <!-- Divider below filter row -->
-        <Rectangle id="divider" translation="[80, 250]" width="1760" height="1" color="0xFFFFFF15" />
+        <Rectangle id="divider" translation="[80, 306]" width="1760" height="1" color="0xFFFFFF15" />
 
-        <!-- Results grid -->
-        <PosterGrid id="resultsGrid" translation="[80, 270]" gridWidth="1760" />
+        <!-- Results grid (horizontal single-row, full width) -->
+        <PosterGrid id="resultsGrid" translation="[80, 326]" gridWidth="1760" />
 
         <Group id="emptyState" translation="[960, 600]" visible="false">
             <Label id="emptyTitle" horizAlign="center" text="No results found"

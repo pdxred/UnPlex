@@ -11,8 +11,13 @@ sub init()
         m.grid.itemSpacing = [c.GRID_H_SPACING, c.GRID_V_SPACING]
     end if
 
-    ' Set numRows so MarkupGrid renders multiple visible rows and scrolls
-    m.grid.numRows = 2
+    ' Default numRows (2 for normal grids). Overridable via numRows interface field.
+    ' A value of 0 means "use default" (2).
+    if m.top.numRows > 0
+        m.grid.numRows = m.top.numRows
+    else
+        m.grid.numRows = 2
+    end if
 
     ' Observe gridWidth changes for dynamic recalculation (e.g. search layout toggle)
     m.top.observeField("gridWidth", "onGridWidthChange")
@@ -58,6 +63,15 @@ sub onGridWidthChange(event as Object)
         numColumns = Int(gridWidth / (c.POSTER_WIDTH + c.GRID_H_SPACING))
         if numColumns < 1 then numColumns = 1
         m.grid.numColumns = numColumns
+    end if
+end sub
+
+sub onNumRowsChange(event as Object)
+    ' Allow parent components to override the number of visible rows.
+    ' numRows=1 gives a horizontal scrolling strip (used by SearchScreen).
+    numRows = event.getData()
+    if numRows > 0
+        m.grid.numRows = numRows
     end if
 end sub
 
