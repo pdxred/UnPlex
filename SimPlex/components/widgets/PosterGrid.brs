@@ -22,6 +22,11 @@ sub init()
     ' Delegate focus to inner grid when this component receives focus
     m.top.observeField("focusedChild", "onFocusChange")
 
+    ' Also catch the case where setFocus(true) is called on this Group
+    ' directly — focusedChild stays invalid so the observer won't fire,
+    ' but the Group gains focus. Observing isInFocusChain handles this.
+    m.top.observeField("isInFocusChain", "onFocusChainChange")
+
     m.lastFocusedIndex = 0
     m.totalItems = 0
 end sub
@@ -29,6 +34,15 @@ end sub
 sub onFocusChange(event as Object)
     ' When PosterGrid is in focus chain but no child has focus, delegate to grid
     if m.top.isInFocusChain() and m.top.focusedChild = invalid
+        m.grid.setFocus(true)
+    end if
+end sub
+
+sub onFocusChainChange(event as Object)
+    ' Fires when this component enters the focus chain (e.g. setFocus(true)
+    ' called on this Group). If the Group itself has focus (not a child),
+    ' delegate to the inner MarkupGrid immediately.
+    if m.top.hasFocus()
         m.grid.setFocus(true)
     end if
 end sub

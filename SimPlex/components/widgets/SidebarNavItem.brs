@@ -43,7 +43,7 @@ sub onFocusChange(event as Object)
     m.focusAccent.visible = hasFocus
 
     if hasFocus
-        m.titleLabel.color = "0xE5A00DFF"
+        m.titleLabel.color = "0xF3B125FF"
         m.titleLabel.font = "font:SmallBoldSystemFont"
     else
         m.titleLabel.color = "0xFFFFFFFF"

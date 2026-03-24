@@ -16,7 +16,7 @@
         <Label
             id="titleSimShadow"
             translation="[22, 27]"
-            text="Sim"
+            text="Un"
             color="0x666666FF"
         >
             <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="36" />
@@ -32,7 +32,7 @@
         <Label
             id="titleSim"
             translation="[20, 25]"
-            text="Sim"
+            text="Un"
             color="0xFFFFFFFF"
         >
             <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="36" />

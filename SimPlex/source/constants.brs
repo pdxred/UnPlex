@@ -29,7 +29,7 @@ function GetConstants() as Object
 
         ' Plex API
         PLEX_TV_URL: "https://plex.tv"
-        PLEX_PRODUCT: "SimPlex"
+        PLEX_PRODUCT: "UnPlex"
         PLEX_VERSION: "1.0.0"
         PLEX_PLATFORM: "Roku"
 

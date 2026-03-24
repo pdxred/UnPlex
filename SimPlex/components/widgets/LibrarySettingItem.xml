@@ -15,7 +15,7 @@
             id="focusBg"
             width="800"
             height="64"
-            color="0xFFFFFF15"
+            color="0xFFFFFF18"
             visible="false"
         />
 
@@ -24,7 +24,7 @@
             id="movingBg"
             width="800"
             height="64"
-            color="0xE5A00D30"
+            color="0xF3B12530"
             visible="false"
         />
 
@@ -44,7 +44,7 @@
             translation="[16, 22]"
             width="20"
             height="20"
-            color="0xE5A00DFF"
+            color="0xF3B125FF"
             visible="false"
         />
 
@@ -62,7 +62,7 @@
             translation="[19, 25]"
             width="14"
             height="14"
-            color="0x1A1A2EFF"
+            color="0x121314FF"
             visible="false"
         />
 
@@ -72,7 +72,7 @@
             translation="[10, 16]"
             text="&#9650;&#9660;"
             font="font:SmallSystemFont"
-            color="0xE5A00DFF"
+            color="0xF3B125FF"
             visible="false"
         />
 

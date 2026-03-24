@@ -123,7 +123,7 @@ sub buildNavContent()
     end if
 
     ' Navigation items
-    navItems = ["Home", "Collections", "Playlists", "Search", "Settings"]
+    navItems = ["Home", "Libraries", "Collections", "Playlists", "Search", "Settings"]
     for each navItem in navItems
         node = content.createChild("ContentNode")
         node.title = navItem
@@ -169,12 +169,14 @@ sub onItemSelected(event as Object)
     else if index = navOffset
         m.top.specialAction = "viewHome"
     else if index = navOffset + 1
-        m.top.specialAction = "viewCollections"
+        m.top.specialAction = "viewLibraries"
     else if index = navOffset + 2
-        m.top.specialAction = "playlists"
+        m.top.specialAction = "viewCollections"
     else if index = navOffset + 3
-        m.top.specialAction = "search"
+        m.top.specialAction = "playlists"
     else if index = navOffset + 4
+        m.top.specialAction = "search"
+    else if index = navOffset + 5
         m.top.specialAction = "settings"
     end if
 end sub

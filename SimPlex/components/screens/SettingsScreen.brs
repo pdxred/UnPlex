@@ -176,6 +176,17 @@ sub onLibManagerSectionsLoaded(event as Object)
         end if
     end for
 
+    ' Sort server libraries alphabetically
+    for i = 1 to m.serverLibraries.count() - 1
+        key = m.serverLibraries[i]
+        j = i - 1
+        while j >= 0 and LCase(m.serverLibraries[j].title) > LCase(key.title)
+            m.serverLibraries[j + 1] = m.serverLibraries[j]
+            j = j - 1
+        end while
+        m.serverLibraries[j + 1] = key
+    end for
+
     ' Load current pinned state based on mode
     if m.libraryManagerMode = "sidebar"
         m.pinnedLibraries = GetSidebarLibraries()
@@ -234,7 +245,7 @@ sub refreshLibraryList()
     ' Update hint text
     if m.libraryManagerMoving
         m.libraryHint.text = "UP/DOWN = move  |  OK = drop  |  Back = cancel"
-        m.libraryHint.color = "0xE5A00DFF"
+        m.libraryHint.color = "0xF3B125FF"
     else
         m.libraryHint.text = "OK = toggle pin  |  Play = reorder  |  Back = return"
         m.libraryHint.color = "0x606070FF"

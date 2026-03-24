@@ -15,7 +15,7 @@
             id="focusBg"
             width="340"
             height="76"
-            color="0xFFFFFF10"
+            color="0xFFFFFF18"
             visible="false"
         />
 
@@ -24,7 +24,7 @@
             id="focusAccent"
             width="4"
             height="76"
-            color="0xE5A00DFF"
+            color="0xF3B125FF"
             visible="false"
         />
 

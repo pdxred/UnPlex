@@ -37,23 +37,24 @@
             color="0xF3B125FF"
             visible="false"
         />
-        <Poster
-            id="unwatchedBadge"
+        <Rectangle
+            id="unwatchedBadgeBg"
             translation="[200, 0]"
             width="40"
-            height="40"
-            uri="pkg:/images/badge-unwatched.png"
+            height="32"
+            color="0x00000088"
             visible="false"
         />
         <Label
             id="unwatchedCount"
-            translation="[218, 4]"
-            font="font:SmallestSystemFont"
-            color="0xFFFFFFFF"
+            translation="[200, 4]"
+            color="0xF3B125FF"
             visible="false"
-            horizAlign="right"
-            width="18"
-        />
+            horizAlign="center"
+            width="40"
+        >
+            <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="16" />
+        </Label>
         <Rectangle
             id="watchedBadgeBg"
             translation="[200, 0]"

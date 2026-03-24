@@ -385,7 +385,7 @@ end function
 
 sub showExitDialog()
     dialog = CreateObject("roSGNode", "StandardMessageDialog")
-    dialog.title = "Exit SimPlex?"
+    dialog.title = "Exit UnPlex?"
     dialog.message = ["Are you sure you want to exit?"]
     dialog.buttons = ["Exit", "Cancel"]
     dialog.observeField("buttonSelected", "onExitDialogButton")
@@ -415,7 +415,7 @@ sub onItemSelected(event as Object)
     data = event.getData()
     if data <> invalid
         if data.action = "play"
-            ' Resume playback - route to detail screen until VideoPlayer is wired
+            ' Direct playback from Continue Watching - show detail with viewOffset for resume
             showDetailScreen(data.ratingKey, data.itemType)
         else if data.action = "detail"
             showDetailScreen(data.ratingKey, data.itemType)

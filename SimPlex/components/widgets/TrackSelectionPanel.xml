@@ -43,7 +43,7 @@
                     focusedColor="0xF3B125FF"
                     color="0xFFFFFFFF"
                     drawFocusFeedback="true"
-                    focusBitmapBlendColor="0xE5A00D40"
+                    focusBitmapBlendColor="0xF3B125FF"
                     vertFocusAnimationStyle="floatingFocus"
                 />
 
@@ -74,7 +74,7 @@
                     focusedColor="0xF3B125FF"
                     color="0xFFFFFFFF"
                     drawFocusFeedback="true"
-                    focusBitmapBlendColor="0xE5A00D40"
+                    focusBitmapBlendColor="0xF3B125FF"
                     vertFocusAnimationStyle="floatingFocus"
                 />
             </Group>

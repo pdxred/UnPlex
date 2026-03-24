@@ -226,9 +226,29 @@ sub onPinnedLibLoaded(event as Object)
         if libTitle = invalid then libTitle = "Unknown"
 
         if metadata <> invalid and metadata.count() > 0
-            hubObj = { title: "Recently Added " + libTitle, Metadata: metadata, hubIdentifier: "library.pinned" }
-            m.allHubs.push(hubObj)
-            LogEvent("Hub ADDED: Recently Added " + libTitle)
+            ' Skip pinned library hub if a built-in hub already covers it
+            ' (home.movies.recent covers "Movies", home.television.recent covers "TV")
+            isDuplicate = false
+            for each existingHub in m.allHubs
+                existingTitle = ""
+                if existingHub.title <> invalid then existingTitle = LCase(existingHub.title)
+                pinnedTitle = LCase("Recently Added " + libTitle)
+                ' Check if built-in hub title matches this pinned library's content
+                if existingTitle = "recently added movies" and LCase(libTitle) = "movies"
+                    isDuplicate = true
+                    exit for
+                else if existingTitle = "recently added tv" and LCase(libTitle) = "tv"
+                    isDuplicate = true
+                    exit for
+                end if
+            end for
+            if not isDuplicate
+                hubObj = { title: "Recently Added " + libTitle, Metadata: metadata, hubIdentifier: "library.pinned" }
+                m.allHubs.push(hubObj)
+                LogEvent("Hub ADDED: Recently Added " + libTitle)
+            else
+                LogEvent("Hub SKIPPED (duplicate): Recently Added " + libTitle)
+            end if
         end if
     end if
 
@@ -303,9 +323,9 @@ sub buildHubRowContent()
     for each hub in orderedHubs
         hubTitle = hub.title
         if hubTitle = invalid or hubTitle = "" then hubTitle = "Hub"
-        addHubRow(rootContent, hubTitle, hub.Metadata, c)
         hubId = hub.hubIdentifier
         if hubId = invalid then hubId = "unknown"
+        addHubRow(rootContent, hubTitle, hub.Metadata, c, hubId)
         m.hubRowMap[rowIndex.ToStr()] = hubId
         rowIndex = rowIndex + 1
     end for
@@ -346,28 +366,55 @@ sub buildHubRowContent()
     end if
 end sub
 
-sub addHubRow(rootContent as Object, title as String, metadata as Object, c as Object)
+sub addHubRow(rootContent as Object, title as String, metadata as Object, c as Object, hubId as String)
     rowNode = rootContent.createChild("ContentNode")
     rowNode.title = title
 
+    ' Only deduplicate episodes for "recently added" type hubs, NOT for continue/ondeck
+    shouldDedup = (Instr(1, LCase(hubId), "recent") > 0 or hubId = "library.pinned")
+    seenShows = {}
+
     for each item in metadata
+        ' Deduplicate: if this is an episode in a recently-added hub and we already have this show, skip
+        if shouldDedup and item.type = "episode" and item.grandparentRatingKey <> invalid
+            showKey = GetRatingKeyStr(item.grandparentRatingKey)
+            if seenShows[showKey] = true
+                continue for
+            end if
+            seenShows[showKey] = true
+        end if
+
         itemNode = rowNode.createChild("ContentNode")
 
-        ratingKeyStr = GetRatingKeyStr(item.ratingKey)
+        ' For episodes in recently-added hubs, present as the parent show
+        isEpisodeDedup = (shouldDedup and item.type = "episode" and item.grandparentRatingKey <> invalid)
+        if isEpisodeDedup
+            ratingKeyStr = GetRatingKeyStr(item.grandparentRatingKey)
+            itemTitle = item.grandparentTitle
+            if itemTitle = invalid or itemTitle = "" then itemTitle = item.title
+            itemType = "show"
+        else
+            ratingKeyStr = GetRatingKeyStr(item.ratingKey)
+            itemTitle = item.title
+            itemType = item.type
+        end if
 
         itemNode.addFields({
-            title: item.title
+            title: itemTitle
             ratingKey: ratingKeyStr
-            itemType: item.type
+            itemType: itemType
             viewOffset: 0
             duration: 0
             viewCount: 0
             leafCount: 0
             viewedLeafCount: 0
+            isHubItem: true
         })
 
-        if item.viewOffset <> invalid then itemNode.viewOffset = item.viewOffset
-        if item.viewCount <> invalid then itemNode.viewCount = item.viewCount
+        if not isEpisodeDedup
+            if item.viewOffset <> invalid then itemNode.viewOffset = item.viewOffset
+            if item.viewCount <> invalid then itemNode.viewCount = item.viewCount
+        end if
         if item.leafCount <> invalid then itemNode.leafCount = item.leafCount
         if item.viewedLeafCount <> invalid then itemNode.viewedLeafCount = item.viewedLeafCount
         if item.duration <> invalid
@@ -547,7 +594,91 @@ sub onSpecialAction(event as Object)
         m.top.itemSelected = { action: "search" }
     else if action = "settings"
         m.top.itemSelected = { action: "settings" }
+    else if action = "viewLibraries"
+        showLibraryPickerDialog()
     end if
+end sub
+
+sub showLibraryPickerDialog()
+    sidebarLibs = m.sidebar.libraries
+    if sidebarLibs = invalid or sidebarLibs.items = invalid or sidebarLibs.items.count() = 0
+        return
+    end if
+
+    ' Fetch ALL libraries from the API (not just sidebar-pinned ones)
+    task = CreateObject("roSGNode", "PlexApiTask")
+    task.endpoint = "/library/sections"
+    task.params = {}
+    task.observeField("status", "onLibraryPickerLoaded")
+    task.control = "run"
+    m.libraryPickerTask = task
+end sub
+
+sub onLibraryPickerLoaded(event as Object)
+    if event.getData() <> "completed" then return
+    response = m.libraryPickerTask.response
+    if response = invalid or response.MediaContainer = invalid then return
+
+    directories = response.MediaContainer.Directory
+    if directories = invalid or directories.count() = 0 then return
+
+    ' Filter to supported types and build button list
+    m.libraryPickerItems = []
+    buttonLabels = []
+    for each lib in directories
+        if lib.type = "movie" or lib.type = "show"
+            m.libraryPickerItems.push({ key: lib.key, type: lib.type, title: lib.title })
+            buttonLabels.push(lib.title)
+        end if
+    end for
+
+    if buttonLabels.count() = 0 then return
+
+    ' Sort alphabetically
+    for i = 1 to m.libraryPickerItems.count() - 1
+        key = m.libraryPickerItems[i]
+        keyLabel = buttonLabels[i]
+        j = i - 1
+        while j >= 0 and LCase(m.libraryPickerItems[j].title) > LCase(key.title)
+            m.libraryPickerItems[j + 1] = m.libraryPickerItems[j]
+            buttonLabels[j + 1] = buttonLabels[j]
+            j = j - 1
+        end while
+        m.libraryPickerItems[j + 1] = key
+        buttonLabels[j + 1] = keyLabel
+    end for
+
+    dialog = CreateObject("roSGNode", "StandardMessageDialog")
+    dialog.title = "Select Library"
+    dialog.message = ["Choose a library to browse:"]
+    dialog.buttons = buttonLabels
+    dialog.observeField("buttonSelected", "onLibraryPickerButton")
+    dialog.observeField("wasClosed", "onLibraryPickerClosed")
+    m.top.getScene().dialog = dialog
+end sub
+
+sub onLibraryPickerButton(event as Object)
+    index = event.getData()
+    m.top.getScene().dialog.close = true
+
+    if index >= 0 and index < m.libraryPickerItems.count()
+        lib = m.libraryPickerItems[index]
+        m.currentSectionId = lib.key
+        m.currentSectionType = lib.type
+        m.isCollectionsView = false
+        m.collectionRatingKey = ""
+        m.isPlaylistsView = false
+        m.currentOffset = 0
+        m.viewMode = "libraryOnly"
+        onViewModeChanged()
+        m.filterBar.visible = true
+        m.alphaNav.visible = true
+        loadLibrary()
+    end if
+end sub
+
+sub onLibraryPickerClosed(event as Object)
+    focusSidebar()
 end sub
 
 sub loadLibrary()
@@ -835,6 +966,7 @@ sub onCollectionsLoaded(event as Object)
                 viewCount: 0
                 leafCount: 0
                 viewedLeafCount: 0
+                isHubItem: true
             })
 
             if item.childCount <> invalid then node.leafCount = item.childCount
@@ -969,6 +1101,7 @@ sub onPlaylistsLoaded(event as Object)
                     viewCount: 0
                     leafCount: 0
                     viewedLeafCount: 0
+                    isHubItem: true
                 })
 
                 if item.leafCount <> invalid then node.leafCount = item.leafCount

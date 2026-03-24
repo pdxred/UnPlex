@@ -38,7 +38,7 @@
             itemSize="[1760, 120]"
             itemSpacing="[0, 10]"
             drawFocusFeedback="true"
-            focusBitmapBlendColor="0xE5A00D80"
+            focusBitmapBlendColor="0xF3B125FF"
             itemComponentName="EpisodeItem"
         />
         <Group id="emptyState" translation="[960, 440]" visible="false">

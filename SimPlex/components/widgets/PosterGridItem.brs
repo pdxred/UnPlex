@@ -3,18 +3,13 @@ sub init()
     m.titleLabel = m.top.findNode("titleLabel")
     m.progressTrack = m.top.findNode("progressTrack")
     m.progressFill = m.top.findNode("progressFill")
-    m.unwatchedBadge = m.top.findNode("unwatchedBadge")
+    m.unwatchedBadgeBg = m.top.findNode("unwatchedBadgeBg")
     m.unwatchedCount = m.top.findNode("unwatchedCount")
     m.watchedBadge = m.top.findNode("watchedBadge")
     m.watchedBadgeBg = m.top.findNode("watchedBadgeBg")
 
-    ' Cache constants and set badge tint color
+    ' Cache constants
     m.constants = m.global.constants
-    if m.constants <> invalid
-        m.unwatchedBadge.blendColor = m.constants.ACCENT
-    else
-        m.unwatchedBadge.blendColor = "0xF3B125FF"
-    end if
 end sub
 
 sub onItemContentChange(event as Object)
@@ -67,48 +62,69 @@ end sub
 sub updateBadge(content as Object)
     ' Coexistence rule: progress bar showing = hide badge
     if m.progressTrack.visible = true
-        m.unwatchedBadge.visible = false
+        m.unwatchedBadgeBg.visible = false
         m.unwatchedCount.visible = false
         m.watchedBadge.visible = false
         m.watchedBadgeBg.visible = false
         return
     end if
 
-    ' Determine watched state
+    ' Hub row items: no badges (episode data is unreliable for deduped items)
+    if content.isHubItem <> invalid and content.isHubItem = true
+        m.unwatchedBadgeBg.visible = false
+        m.unwatchedCount.visible = false
+        m.watchedBadge.visible = false
+        m.watchedBadgeBg.visible = false
+        return
+    end if
+
+    ' TV shows with real episode counts: use leafCount/viewedLeafCount
+    if content.itemType <> invalid and content.itemType = "show"
+        hasLeafData = (content.leafCount <> invalid and content.leafCount > 0)
+        if hasLeafData
+            viewedLeaf = 0
+            if content.viewedLeafCount <> invalid then viewedLeaf = content.viewedLeafCount
+            unwatchedEpisodes = content.leafCount - viewedLeaf
+            if unwatchedEpisodes <= 0
+                ' Fully watched show — checkmark
+                m.unwatchedBadgeBg.visible = false
+                m.unwatchedCount.visible = false
+                m.watchedBadge.visible = true
+                m.watchedBadgeBg.visible = true
+            else
+                ' Partially watched show — unwatched episode count
+                m.unwatchedBadgeBg.visible = true
+                m.unwatchedCount.text = unwatchedEpisodes.ToStr()
+                m.unwatchedCount.visible = true
+                m.watchedBadge.visible = false
+                m.watchedBadgeBg.visible = false
+            end if
+            return
+        end if
+        ' No leaf data — hide badges
+        m.unwatchedBadgeBg.visible = false
+        m.unwatchedCount.visible = false
+        m.watchedBadge.visible = false
+        m.watchedBadgeBg.visible = false
+        return
+    end if
+
+    ' Movies, episodes, and shows without leaf data: use viewCount
     watched = false
     if content.viewCount <> invalid and content.viewCount > 0
         watched = true
     end if
 
-    ' Fully watched: show checkmark badge
     if watched
-        m.unwatchedBadge.visible = false
+        m.unwatchedBadgeBg.visible = false
         m.unwatchedCount.visible = false
         m.watchedBadge.visible = true
         m.watchedBadgeBg.visible = true
-        return
-    end if
-
-    ' Unwatched: show badge, hide watched badge
-    m.unwatchedBadge.visible = true
-    m.watchedBadge.visible = false
-    m.watchedBadgeBg.visible = false
-
-    ' TV shows: show unwatched episode count
-    if content.itemType <> invalid and content.itemType = "show" and content.leafCount <> invalid and content.viewedLeafCount <> invalid
-        unwatchedEpisodes = content.leafCount - content.viewedLeafCount
-        if unwatchedEpisodes <= 0
-            ' Fully watched show - show checkmark
-            m.unwatchedBadge.visible = false
-            m.unwatchedCount.visible = false
-            m.watchedBadge.visible = true
-            m.watchedBadgeBg.visible = true
-            return
-        end if
-        m.unwatchedCount.text = unwatchedEpisodes.ToStr()
-        m.unwatchedCount.visible = true
     else
-        ' Movies and individual episodes: triangle only, no count
+        ' Unwatched — show badge background (gold dot indicator)
+        m.unwatchedBadgeBg.visible = true
         m.unwatchedCount.visible = false
+        m.watchedBadge.visible = false
+        m.watchedBadgeBg.visible = false
     end if
 end sub

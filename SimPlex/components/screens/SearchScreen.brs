@@ -1,67 +1,147 @@
+' ===== Custom search screen with built-in keyboard grid =====
+' Three focus areas: keyGrid (custom letter grid), filterButtons, resultsGrid.
+' No native Keyboard/MiniKeyboard node — everything is our own components.
+
 sub init()
-    m.keyboard = m.top.findNode("keyboard")
-    m.searchQueryLabel = m.top.findNode("searchQueryLabel")
+    m.keyGrid = m.top.findNode("keyGrid")
+    m.queryLabel = m.top.findNode("queryLabel")
+    m.filterButtons = m.top.findNode("filterButtons")
     m.resultsGrid = m.top.findNode("resultsGrid")
     m.emptyState = m.top.findNode("emptyState")
     m.loadingSpinner = m.top.findNode("loadingSpinner")
     m.retryGroup = m.top.findNode("retryGroup")
     m.retryButton = m.top.findNode("retryButton")
 
+    m.filterIndex = 0   ' 0=All, 1=TV Shows, 2=Movies, 3=Other
     m.searchQuery = ""
-    m.debounceTimer = invalid
-    m.focusOnKeyboard = true
+    m.focusArea = "keyboard"  ' "keyboard" | "filters" | "grid"
     m.retryCount = 0
     m.retryContext = invalid
+    m.lastSearchResponse = invalid
 
-    ' Observe inline retry button
-    m.retryButton.observeField("buttonSelected", "onRetryButtonSelected")
+    ' Build keyboard content: a-z, 0-9, SPACE, DEL, CLEAR
+    buildKeyboardContent()
 
-    ' Observe server reconnected signal
-    m.global.observeField("serverReconnected", "onServerReconnected")
-
-    ' Set up search task
-    m.searchTask = CreateObject("roSGNode", "PlexSearchTask")
-    m.searchTask.observeField("status", "onSearchTaskStateChange")
-
-    ' Set up debounce timer
+    ' Debounce timer for search
     m.debounceTimer = CreateObject("roSGNode", "Timer")
-    m.debounceTimer.duration = 0.5  ' 500ms debounce
+    m.debounceTimer.duration = 0.5
     m.debounceTimer.repeat = false
     m.debounceTimer.observeField("fire", "onDebounceTimer")
 
-    ' Observe keyboard
-    m.keyboard.observeField("text", "onTextChange")
+    ' Search task
+    m.searchTask = CreateObject("roSGNode", "PlexSearchTask")
+    m.searchTask.observeField("status", "onSearchTaskStateChange")
 
-    ' Observe grid selection
+    ' Observers
+    m.keyGrid.observeField("itemSelected", "onKeySelected")
+    m.filterButtons.observeField("buttonSelected", "onFilterSelected")
     m.resultsGrid.observeField("itemSelected", "onGridItemSelected")
-
-    ' Delegate focus when screen receives focus
+    m.retryButton.observeField("buttonSelected", "onRetryButtonSelected")
+    m.global.observeField("serverReconnected", "onServerReconnected")
     m.top.observeField("focusedChild", "onFocusChange")
+
+    ' Initial focus
+    m.keyGrid.setFocus(true)
+end sub
+
+sub buildKeyboardContent()
+    content = CreateObject("roSGNode", "ContentNode")
+    ' Row 1: A-J
+    keys = "ABCDEFGHIJ"
+    for i = 0 to keys.Len() - 1
+        node = content.createChild("ContentNode")
+        node.title = keys.Mid(i, 1)
+    end for
+    ' Row 2: K-T
+    keys = "KLMNOPQRST"
+    for i = 0 to keys.Len() - 1
+        node = content.createChild("ContentNode")
+        node.title = keys.Mid(i, 1)
+    end for
+    ' Row 3: U-Z, 0-3
+    keys = "UVWXYZ0123"
+    for i = 0 to keys.Len() - 1
+        node = content.createChild("ContentNode")
+        node.title = keys.Mid(i, 1)
+    end for
+    ' Row 4: 4-9, SPACE, DEL, CLR, (padding)
+    for i = 4 to 9
+        node = content.createChild("ContentNode")
+        node.title = i.ToStr()
+    end for
+    node = content.createChild("ContentNode")
+    node.title = "SPC"
+    node = content.createChild("ContentNode")
+    node.title = "DEL"
+    node = content.createChild("ContentNode")
+    node.title = "CLR"
+    node = content.createChild("ContentNode")
+    node.title = ""
+    m.keyGrid.content = content
 end sub
 
 sub onFocusChange(event as Object)
-    ' When SearchScreen is in focus chain but no child has focus, delegate
-    if m.top.isInFocusChain() and m.top.focusedChild = invalid
-        if m.focusOnKeyboard
-            m.keyboard.setFocus(true)
+    if m.top.hasFocus() or (m.top.isInFocusChain() and m.top.focusedChild = invalid)
+        setFocusToArea(m.focusArea)
+    end if
+end sub
+
+sub setFocusToArea(area as String)
+    if area = "keyboard"
+        m.keyGrid.setFocus(true)
+    else if area = "filters"
+        m.filterButtons.setFocus(true)
+    else if area = "grid"
+        innerGrid = m.resultsGrid.findNode("grid")
+        if innerGrid <> invalid
+            innerGrid.setFocus(true)
         else
             m.resultsGrid.setFocus(true)
         end if
     end if
 end sub
 
-sub onTextChange(event as Object)
-    m.searchQuery = event.getData()
-    m.searchQueryLabel.text = "Search: " + m.searchQuery
+sub onKeySelected(event as Object)
+    index = event.getData()
+    content = m.keyGrid.content
+    if content = invalid then return
+    item = content.getChild(index)
+    if item = invalid then return
+    key = item.title
+    if key = "DEL"
+        if m.searchQuery.Len() > 0
+            m.searchQuery = m.searchQuery.Left(m.searchQuery.Len() - 1)
+        end if
+    else if key = "CLR"
+        m.searchQuery = ""
+    else if key = "SPC"
+        m.searchQuery = m.searchQuery + " "
+    else if key = ""
+        ' Empty padding cell — do nothing
+        return
+    else
+        m.searchQuery = m.searchQuery + LCase(key)
+    end if
+    updateQueryDisplay()
+    triggerSearch()
+end sub
 
-    ' Reset and start debounce timer
+sub updateQueryDisplay()
+    if m.searchQuery.Len() > 0
+        m.queryLabel.text = m.searchQuery
+    else
+        m.queryLabel.text = ""
+    end if
+end sub
+
+sub triggerSearch()
     m.debounceTimer.control = "stop"
     if m.searchQuery.Len() >= 2
         m.debounceTimer.control = "start"
     else
-        ' Clear results if query too short
         m.resultsGrid.content = invalid
         m.emptyState.visible = false
+        m.lastSearchResponse = invalid
     end if
 end sub
 
@@ -75,8 +155,6 @@ sub performSearch()
     if m.loadingSpinner <> invalid then m.loadingSpinner.showSpinner = true
     m.emptyState.visible = false
     m.retryGroup.visible = false
-
-    ' Store retry context
     m.retryContext = { query: m.searchQuery, requestType: "search" }
 
     m.searchTask = CreateObject("roSGNode", "PlexSearchTask")
@@ -91,10 +169,10 @@ sub onSearchTaskStateChange(event as Object)
         if m.loadingSpinner <> invalid then m.loadingSpinner.showSpinner = false
         m.retryCount = 0
         m.retryGroup.visible = false
+        m.lastSearchResponse = m.searchTask.response
         processSearchResults()
     else if state = "error"
         if m.loadingSpinner <> invalid then m.loadingSpinner.showSpinner = false
-        ' Search uses PlexSearchTask which may not have responseCode, treat all as HTTP errors
         if m.retryCount = 0
             m.retryCount = 1
             retryLastSearch()
@@ -106,13 +184,12 @@ sub onSearchTaskStateChange(event as Object)
 end sub
 
 sub processSearchResults()
-    response = m.searchTask.response
+    response = m.lastSearchResponse
     if response = invalid or response.MediaContainer = invalid
         m.emptyState.visible = true
         return
     end if
 
-    ' Search results come in hubs
     hubs = response.MediaContainer.Hub
     if hubs = invalid or hubs.count() = 0
         m.emptyState.visible = true
@@ -126,9 +203,9 @@ sub processSearchResults()
     for each hub in hubs
         if hub.Metadata <> invalid
             for each item in hub.Metadata
-                ' Ensure ratingKey is stored as string
-                ratingKeyStr = GetRatingKeyStr(item.ratingKey)
+                if not shouldIncludeItem(item.type) then continue for
 
+                ratingKeyStr = GetRatingKeyStr(item.ratingKey)
                 node = content.createChild("ContentNode")
                 node.addFields({
                     title: item.title
@@ -137,14 +214,6 @@ sub processSearchResults()
                     thumb: ""
                 })
 
-                if item.thumb <> invalid and item.thumb <> ""
-                    node.addFields({
-                        thumb: item.thumb
-                    })
-                end if
-
-                ' Use grandparentThumb → parentThumb → thumb fallback for poster
-                ' This ensures episodes show the show/season poster, not the landscape screenshot
                 posterThumb = invalid
                 if item.grandparentThumb <> invalid and item.grandparentThumb <> ""
                     posterThumb = item.grandparentThumb
@@ -171,6 +240,28 @@ sub processSearchResults()
     end if
 end sub
 
+function shouldIncludeItem(itemType as Dynamic) as Boolean
+    if m.filterIndex = 0 then return true
+    if itemType = invalid then return (m.filterIndex = 3)
+    if m.filterIndex = 1
+        return (itemType = "show" or itemType = "episode" or itemType = "season")
+    end if
+    if m.filterIndex = 2
+        return (itemType = "movie")
+    end if
+    if m.filterIndex = 3
+        return (itemType <> "show" and itemType <> "episode" and itemType <> "season" and itemType <> "movie")
+    end if
+    return true
+end function
+
+sub onFilterSelected(event as Object)
+    m.filterIndex = event.getData()
+    if m.lastSearchResponse <> invalid
+        processSearchResults()
+    end if
+end sub
+
 sub onGridItemSelected(event as Object)
     index = event.getData()
     content = m.resultsGrid.content
@@ -187,7 +278,6 @@ end sub
 sub retryLastSearch()
     if m.retryContext = invalid then return
     if m.loadingSpinner <> invalid then m.loadingSpinner.showSpinner = true
-
     m.searchTask = CreateObject("roSGNode", "PlexSearchTask")
     m.searchTask.observeField("status", "onSearchTaskStateChange")
     m.searchTask.query = m.retryContext.query
@@ -196,7 +286,6 @@ end sub
 
 sub showErrorDialog(title as String, message as String)
     if m.top.getScene().dialog <> invalid then return
-
     dialog = CreateObject("roSGNode", "StandardMessageDialog")
     dialog.title = title
     dialog.message = [message]
@@ -209,7 +298,6 @@ end sub
 sub onErrorDialogButton(event as Object)
     index = event.getData()
     m.top.getScene().dialog.close = true
-
     if index = 0
         retryLastSearch()
     else if index = 1
@@ -218,11 +306,7 @@ sub onErrorDialogButton(event as Object)
 end sub
 
 sub onErrorDialogClosed(event as Object)
-    if m.focusOnKeyboard
-        m.keyboard.setFocus(true)
-    else
-        m.resultsGrid.setFocus(true)
-    end if
+    setFocusToArea(m.focusArea)
 end sub
 
 sub showInlineRetry()
@@ -251,30 +335,40 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
     if not press then return false
 
     if key = "back"
+        if m.focusArea = "grid"
+            m.focusArea = "filters"
+            setFocusToArea("filters")
+            return true
+        else if m.focusArea = "filters"
+            m.focusArea = "keyboard"
+            setFocusToArea("keyboard")
+            return true
+        end if
         m.top.navigateBack = true
         return true
-    else if key = "right" and m.focusOnKeyboard
-        ' Collapse keyboard and expand grid to fill screen
-        m.keyboard.visible = false
-        m.resultsGrid.translation = [80, 200]
-        m.resultsGrid.gridWidth = 1760
-        m.searchQueryLabel.translation = [80, 120]
-        m.emptyState.translation = [960, 440]
-        m.retryGroup.translation = [960, 440]
-        m.focusOnKeyboard = false
-        m.resultsGrid.setFocus(true)
-        return true
-    else if key = "left" and not m.focusOnKeyboard
-        ' Restore keyboard and shrink grid
-        m.keyboard.visible = true
-        m.resultsGrid.translation = [700, 200]
-        m.resultsGrid.gridWidth = 1140
-        m.searchQueryLabel.translation = [700, 120]
-        m.emptyState.translation = [1270, 440]
-        m.retryGroup.translation = [1270, 440]
-        m.focusOnKeyboard = true
-        m.keyboard.setFocus(true)
-        return true
+    else if key = "down"
+        if m.focusArea = "keyboard"
+            m.focusArea = "filters"
+            setFocusToArea("filters")
+            return true
+        else if m.focusArea = "filters"
+            if m.resultsGrid.content <> invalid and m.resultsGrid.content.getChildCount() > 0
+                m.focusArea = "grid"
+                setFocusToArea("grid")
+                return true
+            end if
+        end if
+        ' grid handles its own down for scrolling
+    else if key = "up"
+        if m.focusArea = "grid"
+            m.focusArea = "filters"
+            setFocusToArea("filters")
+            return true
+        else if m.focusArea = "filters"
+            m.focusArea = "keyboard"
+            setFocusToArea("keyboard")
+            return true
+        end if
     end if
 
     return false

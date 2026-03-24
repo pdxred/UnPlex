@@ -63,3 +63,6 @@ scripts/
 .gsd.migrating/
 # Project planning briefs
 simplex-project-brief.md
+
+# ── GSD baseline (auto-generated) ──
+.gsd

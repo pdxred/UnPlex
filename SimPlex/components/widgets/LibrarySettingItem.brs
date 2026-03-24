@@ -71,6 +71,6 @@ sub onFocusChange(event as Object)
 
     ' Update focus highlight opacity
     if focusPercent > 0.5
-        m.focusBg.color = "0xFFFFFF15"
+        m.focusBg.color = "0xFFFFFF18"
     end if
 end sub
