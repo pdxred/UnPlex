@@ -3,11 +3,13 @@ sub init()
     m.grid = m.top.findNode("grid")
 
     ' Configure grid dimensions — compute column count dynamically from gridWidth
-    numColumns = Int(m.top.gridWidth / (c.POSTER_WIDTH + c.GRID_H_SPACING))
-    if numColumns < 1 then numColumns = 1
-    m.grid.numColumns = numColumns
-    m.grid.itemSize = [c.POSTER_WIDTH + 20, c.POSTER_HEIGHT + 50]
-    m.grid.itemSpacing = [c.GRID_H_SPACING, c.GRID_V_SPACING]
+    if c <> invalid
+        numColumns = Int(m.top.gridWidth / (c.POSTER_WIDTH + c.GRID_H_SPACING))
+        if numColumns < 1 then numColumns = 1
+        m.grid.numColumns = numColumns
+        m.grid.itemSize = [c.POSTER_WIDTH + 20, c.POSTER_HEIGHT + 50]
+        m.grid.itemSpacing = [c.GRID_H_SPACING, c.GRID_V_SPACING]
+    end if
 
     ' Set numRows so MarkupGrid renders multiple visible rows and scrolls
     m.grid.numRows = 2
@@ -50,6 +52,7 @@ end sub
 sub onGridWidthChange(event as Object)
     ' Recalculate column count when gridWidth changes dynamically
     c = m.global.constants
+    if c = invalid then return
     gridWidth = event.getData()
     if gridWidth > 0
         numColumns = Int(gridWidth / (c.POSTER_WIDTH + c.GRID_H_SPACING))

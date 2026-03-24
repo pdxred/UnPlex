@@ -19,10 +19,22 @@
         <Label id="queryLabel" translation="[260, 30]"
             font="font:MediumSystemFont" color="0xA0A0B0FF" width="1500" />
 
-        <!-- Keyboard container (all keys + filters built dynamically in BRS) -->
+        <!-- Keyboard container (all keys built dynamically in BRS) -->
         <Group id="keyboardGroup" translation="[80, 80]" />
 
-        <!-- Divider below keyboard zone -->
+        <!-- Filter row -->
+        <ButtonGroup id="filterButtons" translation="[80, 195]"
+            buttons='["All", "TV Shows", "Movies", "Other"]'
+            textColor="0xA0A0B0FF"
+            focusedTextColor="0xFFFFFFFF"
+            focusColor="0xF3B125FF"
+            font="font:SmallBoldSystemFont"
+            focusedFont="font:SmallBoldSystemFont"
+            layoutDirection="horiz"
+            itemSpacings="[12]"
+        />
+
+        <!-- Divider below filter row -->
         <Rectangle id="divider" translation="[80, 250]" width="1760" height="1" color="0xFFFFFF15" />
 
         <!-- Results grid -->
