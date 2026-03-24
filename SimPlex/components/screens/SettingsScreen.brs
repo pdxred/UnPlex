@@ -83,6 +83,14 @@ sub showSettingsMenu()
 end sub
 
 sub onLibraryListItemSelected(event as Object)
+    ' Guard against double-fire (some Roku firmware fires itemSelected twice per OK press)
+    now = CreateObject("roDateTime")
+    nowMs = now.AsSeconds() * 1000 + now.GetMilliseconds()
+    if m.lastLibSelectMs <> invalid and (nowMs - m.lastLibSelectMs) < 300
+        return
+    end if
+    m.lastLibSelectMs = nowMs
+
     index = event.getData()
     onLibraryItemSelected(index)
 end sub
@@ -274,8 +282,17 @@ sub onLibraryItemSelected(index as Integer)
         end for
         m.pinnedLibraries = newPinned
     else
-        ' Pin it
-        m.pinnedLibraries.push({ key: libKey, title: libTitle })
+        ' Pin it — but only if not already pinned (guard against double-fire)
+        alreadyPinned = false
+        for each existing in m.pinnedLibraries
+            if existing.key = libKey
+                alreadyPinned = true
+                exit for
+            end if
+        end for
+        if not alreadyPinned
+            m.pinnedLibraries.push({ key: libKey, title: libTitle })
+        end if
     end if
 
     savePinnedLibraries()
