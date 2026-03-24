@@ -7,77 +7,31 @@
 
     <script type="text/brightscript" uri="pkg:/source/utils.brs" />
     <script type="text/brightscript" uri="pkg:/source/constants.brs" />
+    <script type="text/brightscript" uri="pkg:/source/logger.brs" />
     <script type="text/brightscript" uri="SearchScreen.brs" />
 
     <children>
         <Rectangle id="background" width="1920" height="1080" color="0x000000FF" />
 
-        <!-- Query display -->
-        <Label
-            id="titleLabel"
-            translation="[80, 25]"
-            text="Search"
-            font="font:LargeBoldSystemFont"
-            color="0xFFFFFFFF"
-        />
-        <Label
-            id="queryLabel"
-            translation="[260, 30]"
-            font="font:MediumSystemFont"
-            color="0xA0A0B0FF"
-            width="800"
-        />
+        <!-- Header: title + live query -->
+        <Label id="titleLabel" translation="[80, 25]" text="Search"
+            font="font:LargeBoldSystemFont" color="0xFFFFFFFF" />
+        <Label id="queryLabel" translation="[260, 30]"
+            font="font:MediumSystemFont" color="0xA0A0B0FF" width="1500" />
 
-        <!-- Custom keyboard grid: 10 columns, rows for a-z, 0-9, space, del -->
-        <MarkupGrid
-            id="keyGrid"
-            translation="[80, 75]"
-            itemComponentName="SearchKeyCell"
-            numColumns="10"
-            numRows="4"
-            itemSize="[68, 56]"
-            itemSpacing="[4, 4]"
-            drawFocusFeedback="false"
-            vertFocusAnimationStyle="fixedFocus"
-        />
+        <!-- Keyboard container (all keys + filters built dynamically in BRS) -->
+        <Group id="keyboardGroup" translation="[80, 80]" />
 
-        <!-- Filter buttons row -->
-        <Label
-            id="filterLabel"
-            translation="[80, 325]"
-            text="Filter:"
-            font="font:SmallBoldSystemFont"
-            color="0x808090FF"
-        />
-        <ButtonGroup
-            id="filterButtons"
-            translation="[170, 313]"
-            buttons='["All", "TV Shows", "Movies", "Other"]'
-            textColor="0xA0A0B0FF"
-            focusedTextColor="0x000000FF"
-            focusColor="0xF3B125FF"
-        />
-
-        <!-- Divider -->
-        <Rectangle translation="[80, 370]" width="1760" height="1" color="0xFFFFFF15" />
+        <!-- Divider below keyboard zone -->
+        <Rectangle id="divider" translation="[80, 250]" width="1760" height="1" color="0xFFFFFF15" />
 
         <!-- Results grid -->
-        <PosterGrid
-            id="resultsGrid"
-            translation="[80, 385]"
-            gridWidth="1760"
-        />
+        <PosterGrid id="resultsGrid" translation="[80, 270]" gridWidth="1760" />
 
         <Group id="emptyState" translation="[960, 600]" visible="false">
-            <Label
-                id="emptyTitle"
-                horizAlign="center"
-                text="No results found"
-                font="font:MediumBoldSystemFont"
-                color="0x606070FF"
-                width="600"
-                translation="[-300, 0]"
-            />
+            <Label id="emptyTitle" horizAlign="center" text="No results found"
+                font="font:MediumBoldSystemFont" color="0x606070FF"
+                width="600" translation="[-300, 0]" />
         </Group>
 
         <Group id="retryGroup" translation="[960, 600]" visible="false">
