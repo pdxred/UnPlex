@@ -1,6 +1,6 @@
-# Contributing to SimPlex
+# Contributing to UnPlex
 
-Thank you for your interest in contributing to SimPlex! This guide covers everything you need to set up a development environment, build and deploy the app, and understand the codebase conventions.
+Thank you for your interest in contributing to UnPlex! This guide covers everything you need to set up a development environment, build and deploy the app, and understand the codebase conventions.
 
 ## Development Setup
 
@@ -18,7 +18,7 @@ Thank you for your interest in contributing to SimPlex! This guide covers everyt
 ### Clone and Install
 
 ```bash
-git clone https://github.com/your-username/SimPlex.git
+git clone https://github.com/pdxred/SimPlex.git
 cd SimPlex
 npm install
 ```
@@ -76,7 +76,7 @@ Script includes follow a standard order in each XML file:
 | Element | Convention | Example |
 |---------|-----------|---------|
 | Component files | PascalCase | `HomeScreen.brs`, `PosterGrid.xml` |
-| Utility files | camelCase | `utils.brs`, `logger.brs`, `normalizers.brs` |
+| Utility files | camelCase | `utils.brs`, `logger.brs` |
 | Functions | camelCase | `GetAuthToken()`, `BuildPlexUrl()` |
 | Event handlers | `on` prefix | `onItemSelected()`, `onTaskStateChange()` |
 | Constants | SCREAMING_SNAKE_CASE | `SIDEBAR_WIDTH`, `BG_PRIMARY` |
@@ -135,36 +135,32 @@ SimPlex/
 │   ├── main.brs                # App entry — creates roSGScreen, runs event loop
 │   ├── utils.brs               # Auth storage, URL builders, Plex headers, safe access
 │   ├── constants.brs           # Colors, layout dimensions, API metadata, pagination
-│   ├── logger.brs              # LogEvent / LogError functions
-│   ├── normalizers.brs         # JSON → ContentNode tree transformers
-│   └── capabilities.brs        # Device capability detection
+│   └── logger.brs              # LogEvent / LogError functions
 ├── components/
 │   ├── MainScene.brs/.xml      # Root scene — screen stack, auth flow, global state
 │   ├── screens/                # Full-screen views
 │   │   ├── HomeScreen          # Library browsing with sidebar + poster grid + hubs
 │   │   ├── DetailScreen        # Item metadata, play button, watch state
 │   │   ├── EpisodeScreen       # Season/episode list for TV shows
-│   │   ├── SearchScreen        # Debounced search input + results grid
+│   │   ├── SearchScreen        # Custom keyboard search with filter + results grid
 │   │   ├── PlaylistScreen      # Playlist item browsing
-│   │   ├── SettingsScreen      # User, server, and library management
+│   │   ├── SettingsScreen      # User and library management
 │   │   ├── PINScreen           # OAuth PIN code display and polling
-│   │   ├── UserPickerScreen    # Managed user selection
-│   │   └── ServerListScreen    # Server discovery and connection
+│   │   └── UserPickerScreen    # Managed user selection
 │   ├── widgets/                # Reusable UI components
-│   │   ├── Sidebar             # Library nav list (MarkupList-based)
+│   │   ├── Sidebar             # Library nav list (MarkupList + SidebarNavItem)
 │   │   ├── PosterGrid          # Movie/show poster grid with badges
 │   │   ├── VideoPlayer         # Playback, track selection, auto-play
 │   │   ├── FilterBar           # Genre/sort controls
-│   │   ├── KeyboardDialog      # Soft keyboard for text input
-│   │   ├── LoadingSpinner      # Loading indicator (currently disabled)
-│   │   └── [12 more widgets]   # TrackSelectionPanel, EpisodeItem, MediaRow, etc.
+│   │   ├── AlphaNav            # A–Z alphabetic jump navigation
+│   │   ├── LoadingSpinner      # Safe loading indicator (Label+Rectangle+Timer)
+│   │   └── [10 more widgets]   # TrackSelectionPanel, EpisodeItem, PlaylistItem, etc.
 │   └── tasks/                  # Background HTTP Task nodes
 │       ├── PlexApiTask         # General library/metadata API calls
 │       ├── PlexAuthTask        # PIN polling + plex.tv auth + server discovery
 │       ├── PlexSearchTask      # Search queries
 │       ├── PlexSessionTask     # Playback progress reporting
-│       ├── ServerConnectionTask # Server URI validation
-│       └── ImageCacheTask      # Poster image prefetching
+│       └── ServerConnectionTask # Server URI validation
 ├── fonts/                       # Bundled Inter Bold (SIL OFL licensed)
 └── images/                      # App icons (FHD + HD), splash screen
 ```
@@ -173,9 +169,8 @@ SimPlex/
 
 ## Known Limitations
 
-- **BusySpinner crash** — The Roku `BusySpinner` widget causes native firmware SIGSEGV on certain devices. LoadingSpinner is disabled in all screens as a workaround. A custom spinner replacement is needed.
-- **Auto-play next episode** — The auto-play countdown logic exists in VideoPlayer but is not fully wired. EpisodeScreen and DetailScreen do not pass the required `parentRatingKey` and `grandparentRatingKey` fields to the player.
-- **No multi-server support** — SimPlex connects to one Plex Media Server at a time. Switching servers requires re-authenticating.
+- **BusySpinner crash** — The Roku `BusySpinner` widget causes native firmware SIGSEGV on certain devices. All screens use a safe LoadingSpinner replacement (Label + Rectangle + Timer with 300ms delay).
+- **Single-server only** — UnPlex connects to one Plex Media Server. Server switching UI was intentionally removed; reconnection uses the stored server URI.
 - **Fixed FHD layout** — The UI is designed for 1920×1080 displays. HD (720p) and 4K displays are not dynamically supported.
 - **No automated tests** — Roku does not have a standard unit testing framework. Testing is manual via build-deploy-verify cycles on real hardware.
-- **Watch state propagation** — Marking an item as watched on the DetailScreen does not immediately update the parent grid. The grid refreshes on a 2-minute timer or on next navigation.
+- **HomeScreen hub playback not wired for auto-play** — Episodes played from hub rows use the old `playbackComplete` boolean and don't set grandparentRatingKey, so they won't auto-advance or show PostPlayScreen.

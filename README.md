@@ -1,6 +1,6 @@
-# SimPlex
+# UnPlex
 
-A side-loadable Roku channel that serves as a custom Plex Media Server client. SimPlex replaces the official Plex Roku app with a clean, fast, grid-based UI inspired by the classic "Plex Classic" Roku client — sidebar navigation, poster grids, and direct access to your media without fighting the interface.
+A side-loadable Roku channel that serves as a custom Plex Media Server client. UnPlex replaces the official Plex Roku app with a clean, fast, grid-based UI inspired by the classic "Plex Classic" Roku client — sidebar navigation, poster grids, and direct access to your media without fighting the interface.
 
 Built with BrightScript and Roku SceneGraph for FHD (1920×1080) displays.
 
@@ -49,17 +49,10 @@ SimPlex is installed by side-loading it onto a Roku device in developer mode. No
 Make sure you have [Node.js](https://nodejs.org/) installed, then:
 
 ```bash
-git clone https://github.com/your-username/SimPlex.git
+git clone https://github.com/pdxred/SimPlex.git
 cd SimPlex
 npm install
 npm run build
-```
-
-To create a deployable zip manually:
-
-```bash
-cd SimPlex
-zip -r ../SimPlex.zip manifest source components images fonts
 ```
 
 ### 3. Side-Load to Your Roku
@@ -80,9 +73,9 @@ This uses [roku-deploy](https://github.com/RokuCommunity/roku-deploy) to build, 
 
 ### 4. Authenticate with Plex
 
-1. On first launch, SimPlex displays a PIN code
+1. On first launch, UnPlex displays a PIN code
 2. Visit [plex.tv/link](https://www.plex.tv/link) on any device and enter the PIN
-3. SimPlex automatically discovers your Plex Media Server and begins loading your libraries
+3. UnPlex automatically discovers your Plex Media Server and begins loading your libraries
 
 ## Usage
 
@@ -122,7 +115,7 @@ This uses [roku-deploy](https://github.com/RokuCommunity/roku-deploy) to build, 
 ### Setup
 
 ```bash
-git clone https://github.com/your-username/SimPlex.git
+git clone https://github.com/pdxred/SimPlex.git
 cd SimPlex
 npm install
 ```
@@ -167,7 +160,7 @@ SimPlex is built on Roku's SceneGraph framework. Each UI component is a pair of 
 **Key architectural patterns:**
 
 - **Screen stack** — MainScene maintains an array of screen nodes. The Back button pops the stack, preserving focus position when returning to previous screens.
-- **Task-based HTTP** — All network requests run in background Task nodes (`PlexAuthTask`, `PlexApiTask`, `PlexSearchTask`, `PlexSessionTask`, `ImageCacheTask`) to avoid render-thread blocking.
+- **Task-based HTTP** — All network requests run in background Task nodes (`PlexAuthTask`, `PlexApiTask`, `PlexSearchTask`, `PlexSessionTask`) to avoid render-thread blocking.
 - **Observer pattern** — Task nodes communicate results to UI components via field observers, enabling asynchronous data flow.
 - **ContentNode trees** — All lists and grids are populated through Roku's ContentNode data model.
 - **Registry persistence** — User settings and authentication tokens are stored in `roRegistrySection("SimPlex")`.
@@ -176,7 +169,7 @@ For a detailed technical breakdown, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE
 
 ## License
 
-SimPlex is released under the [MIT License](LICENSE).
+UnPlex is released under the [MIT License](LICENSE).
 
 This project includes [Inter](https://rsms.me/inter/) Bold font by Rasmus Andersson, licensed under the [SIL Open Font License 1.1](https://openfontlicense.org/).
 

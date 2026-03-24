@@ -1,8 +1,8 @@
 {
-  "name": "simplex",
-  "version": "1.0.0",
+  "name": "unplex",
+  "version": "1.1.0",
   "private": true,
-  "description": "SimPlex - Custom Plex client for Roku",
+  "description": "UnPlex - Custom Plex client for Roku",
   "scripts": {
     "build": "bsc",
     "deploy": "bsc --deploy",

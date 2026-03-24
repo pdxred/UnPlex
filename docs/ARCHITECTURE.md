@@ -1,10 +1,10 @@
-# SimPlex Architecture
+# UnPlex Architecture
 
-This document describes the internal architecture of SimPlex — a Roku BrightScript application built on the SceneGraph framework. It covers the layer model, threading, navigation, data flow, and key design patterns that shape the codebase.
+This document describes the internal architecture of UnPlex — a Roku BrightScript application built on the SceneGraph framework. It covers the layer model, threading, navigation, data flow, and key design patterns that shape the codebase.
 
 ## System Overview
 
-SimPlex follows a layered component architecture. All UI is built with Roku SceneGraph XML components backed by BrightScript logic. All network I/O runs in background Task nodes to avoid blocking the render thread.
+UnPlex follows a layered component architecture. All UI is built with Roku SceneGraph XML components backed by BrightScript logic. All network I/O runs in background Task nodes to avoid blocking the render thread.
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -13,18 +13,17 @@ SimPlex follows a layered component architecture. All UI is built with Roku Scen
 │   │              MainScene (Root)                     │ │
 │   │   Screen stack · Auth routing · Global state      │ │
 │   ├───────────────────────────────────────────────────┤ │
-│   │               Screens (10)                        │ │
+│   │               Screens (9)                         │ │
 │   │   HomeScreen · DetailScreen · EpisodeScreen       │ │
 │   │   SearchScreen · PINScreen · SettingsScreen ...   │ │
 │   ├───────────────────────────────────────────────────┤ │
 │   │               Widgets (15+)                       │ │
 │   │   PosterGrid · Sidebar · VideoPlayer              │ │
-│   │   FilterBar · KeyboardDialog · TrackPanel ...     │ │
+│   │   FilterBar · AlphaNav · TrackPanel ...           │ │
 │   ├───────────────────────────────────────────────────┤ │
-│   │             Task Nodes (6)                        │ │
+│   │             Task Nodes (5)                        │ │
 │   │   PlexApiTask · PlexAuthTask · PlexSearchTask     │ │
 │   │   PlexSessionTask · ServerConnectionTask          │ │
-│   │   ImageCacheTask                                  │ │
 │   └───────────────────────────────────────────────────┘ │
 │                         │                               │
 │                    HTTP(S) / JSON                        │
@@ -100,7 +99,6 @@ A Task node is a SceneGraph component that extends `Task`. It runs its designate
 | **PlexSearchTask** | Search | Queries `/hubs/search` with term and limit |
 | **PlexSessionTask** | Playback tracking | Reports progress via `/:/timeline` every 10 seconds |
 | **ServerConnectionTask** | Connection validation | Tests server URI reachability before committing to it |
-| **ImageCacheTask** | Image prefetch | Prefetches poster images to local cache for grid performance |
 
 ### Error Handling in Tasks
 
@@ -134,8 +132,7 @@ Check Registry (authToken + serverUri)
               Token received → fetch server list
               GET /api/v2/resources?includeHttps=1&includeRelay=1
                     │
-                    ├── Single server → auto-connect → HomeScreen
-                    └── Multiple servers → ServerListScreen → user picks → HomeScreen
+                    └── Auto-connect to first server → HomeScreen
 ```
 
 Tokens are stored in `roRegistrySection("SimPlex")` and persist across app restarts. A separate admin token supports managed user switching.
@@ -183,7 +180,7 @@ When a user marks an item watched/unwatched on the DetailScreen, the change is p
 
 ### ContentNode Trees
 
-Roku's built-in grid and list components (`MarkupGrid`, `PosterGrid`, `RowList`, `LabelList`) expect data in the form of ContentNode hierarchies. Normalizer functions in `normalizers.brs` transform Plex API JSON arrays into ContentNode trees with standardized field names (`id`, `title`, `posterUrl`, `itemType`, `watched`, `viewOffset`, `ratingKey`).
+Roku's built-in grid and list components (`MarkupGrid`, `PosterGrid`, `RowList`, `LabelList`) expect data in the form of ContentNode hierarchies. API response handlers transform Plex API JSON arrays into ContentNode trees with standardized field names (`title`, `posterUrl`, `itemType`, `viewOffset`, `viewCount`, `ratingKey`).
 
 ```
 ContentNode (root)
@@ -242,7 +239,7 @@ The `m.global` node is accessible from every component and carries app-wide stat
 
 ### Poster Image Transcoding
 
-To avoid loading full-resolution artwork (which can be very large), SimPlex requests resized poster images from PMS:
+To avoid loading full-resolution artwork (which can be very large), UnPlex requests resized poster images from PMS:
 
 ```
 {serverUri}/photo/:/transcode?width=240&height=360&url={posterUrl}&X-Plex-Token={token}
@@ -256,19 +253,18 @@ Plex API responses can have missing or null fields depending on server version a
 
 ## Component Inventory
 
-### Screens (10)
+### Screens (9)
 
 | Screen | Purpose |
 |--------|---------|
 | **HomeScreen** | Main library browsing — sidebar, poster grid, hub rows, filter/sort |
 | **DetailScreen** | Item metadata display — poster, title, summary, play button, watch state |
 | **EpisodeScreen** | TV show season/episode list — season picker, episode grid |
-| **SearchScreen** | Search — text input with debounced results grid |
+| **SearchScreen** | Search — custom keyboard input with filter buttons and results grid |
 | **PlaylistScreen** | Playlist item browsing and playback |
-| **SettingsScreen** | User, server, and library management |
+| **SettingsScreen** | User and library management |
 | **PINScreen** | OAuth authentication — displays PIN code and polls for token |
 | **UserPickerScreen** | Managed user selection with optional PIN entry |
-| **ServerListScreen** | Server discovery — lists available PMS instances with connection testing |
 | **(MainScene)** | Root coordinator — screen stack, auth routing, global state management |
 
 ### Widgets (15+)
@@ -284,15 +280,13 @@ Plex API responses can have missing or null fields depending on server version a
 | **FilterBar** | Genre/year/sort filter controls above the grid |
 | **FilterBottomSheet** | Modal filter options panel |
 | **EpisodeItem** | Single episode row in the episode list |
-| **MediaRow** | Hub row of media items (Continue Watching, Recently Added) |
 | **PlaylistItem** | Single playlist entry |
 | **UserAvatarItem** | User avatar and name for the user picker |
 | **LibrarySettingItem** | Pinned library toggle in settings |
-| **KeyboardDialog** | On-screen keyboard for text input |
-| **LoadingSpinner** | Loading animation (currently disabled due to firmware crash) |
+| **LoadingSpinner** | Safe loading indicator (Label + Rectangle + Timer with 300ms delay) |
 | **AlphaNav** | A–Z alphabetic jump navigation |
 
-### Task Nodes (6)
+### Task Nodes (5)
 
 | Task | Purpose |
 |------|---------|
@@ -301,9 +295,8 @@ Plex API responses can have missing or null fields depending on server version a
 | **PlexSearchTask** | Search queries with configurable limits |
 | **PlexSessionTask** | Playback progress reporting (10-second intervals) |
 | **ServerConnectionTask** | Server URI validation and reachability testing |
-| **ImageCacheTask** | Background poster image prefetching |
 
-### Utility Modules (6)
+### Utility Modules (4)
 
 | Module | Purpose |
 |--------|---------|
@@ -311,5 +304,3 @@ Plex API responses can have missing or null fields depending on server version a
 | **utils.brs** | Registry access, URL builders, Plex header generation, safe field access |
 | **constants.brs** | Layout constants (FHD dimensions), colors, API metadata, pagination settings |
 | **logger.brs** | `LogEvent()` and `LogError()` for console-based tracing |
-| **normalizers.brs** | JSON response → ContentNode tree transformers |
-| **capabilities.brs** | Server capability detection (currently unused — reserved for future version checks) |
