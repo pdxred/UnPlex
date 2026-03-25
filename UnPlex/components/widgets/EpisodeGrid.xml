@@ -8,6 +8,8 @@
         <field id="jumpToItem" type="integer" value="0" onChange="onJumpToItem" />
     </interface>
 
+    <script type="text/brightscript" uri="pkg:/source/utils.brs" />
+    <script type="text/brightscript" uri="pkg:/source/logger.brs" />
     <script type="text/brightscript" uri="EpisodeGrid.brs" />
 
     <children>
