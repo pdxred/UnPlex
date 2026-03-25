@@ -1,21 +1,18 @@
 sub init()
     m.grid = m.top.findNode("grid")
-    m.focusRect = m.top.findNode("focusRect")
+    m.borderTop = m.top.findNode("focusBorderTop")
+    m.borderBottom = m.top.findNode("focusBorderBottom")
+    m.borderLeft = m.top.findNode("focusBorderLeft")
+    m.borderRight = m.top.findNode("focusBorderRight")
 
     m.NUM_COLUMNS = 5
     m.ITEM_W = 340
     m.ITEM_H = 240
     m.SPACING_H = 12
     m.SPACING_V = 16
+    m.BORDER = 4
     m.focusIndex = 0
     m.totalItems = 0
-
-    ' Size the focus highlight to match one item cell
-    m.focusRect.width = m.ITEM_W
-    m.focusRect.height = m.ITEM_H
-
-    ' Do NOT observe itemFocused — we manage focusIndex entirely ourselves
-    ' to avoid feedback loops with jumpToItem/animateToItem.
 end sub
 
 sub onContentChange(event as Object)
@@ -43,7 +40,7 @@ end sub
 
 sub updateFocusRect()
     if m.totalItems = 0
-        m.focusRect.visible = false
+        showBorders(false)
         return
     end if
 
@@ -52,14 +49,6 @@ sub updateFocusRect()
     totalRows = Int((m.totalItems - 1) / m.NUM_COLUMNS) + 1
     numVisibleRows = 2
 
-    ' Compute which row within the visible viewport this is.
-    ' The grid shows numVisibleRows rows. When we jumpToItem,
-    ' the grid scrolls so the target item is visible.
-    ' For a 2-row viewport:
-    '   - If totalRows <= 2, all rows are visible. visibleRow = row.
-    '   - If totalRows > 2, the grid scrolls. The focused item
-    '     appears at visibleRow 0 if it's row 0, else visibleRow 1
-    '     (the grid keeps the previous row above for context).
     if totalRows <= numVisibleRows
         visibleRow = row
     else
@@ -72,12 +61,38 @@ sub updateFocusRect()
 
     x = col * (m.ITEM_W + m.SPACING_H)
     y = visibleRow * (m.ITEM_H + m.SPACING_V)
+    b = m.BORDER
 
-    m.focusRect.translation = [x, y]
-    m.focusRect.visible = true
+    ' Top border
+    m.borderTop.translation = [x - b, y - b]
+    m.borderTop.width = m.ITEM_W + b * 2
+    m.borderTop.height = b
+
+    ' Bottom border
+    m.borderBottom.translation = [x - b, y + m.ITEM_H]
+    m.borderBottom.width = m.ITEM_W + b * 2
+    m.borderBottom.height = b
+
+    ' Left border
+    m.borderLeft.translation = [x - b, y]
+    m.borderLeft.width = b
+    m.borderLeft.height = m.ITEM_H
+
+    ' Right border
+    m.borderRight.translation = [x + m.ITEM_W, y]
+    m.borderRight.width = b
+    m.borderRight.height = m.ITEM_H
+
+    showBorders(true)
 end sub
 
-' EpisodeGrid Group holds focus. ALL keys come here.
+sub showBorders(vis as Boolean)
+    m.borderTop.visible = vis
+    m.borderBottom.visible = vis
+    m.borderLeft.visible = vis
+    m.borderRight.visible = vis
+end sub
+
 function onKeyEvent(key as String, press as Boolean) as Boolean
     if not press then return false
     if m.totalItems = 0 then return false
@@ -87,13 +102,10 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
     lastRow = Int((m.totalItems - 1) / m.NUM_COLUMNS)
 
     if key = "up"
-        LogEvent("EpisodeGrid UP: focusIndex=" + m.focusIndex.ToStr() + " row=" + currentRow.ToStr() + " lastRow=" + lastRow.ToStr() + " total=" + m.totalItems.ToStr())
         if currentRow = 0
-            ' Top row — escape to season list
             m.top.escapeUp = true
             return true
         end if
-        ' Move up one row
         m.focusIndex = m.focusIndex - m.NUM_COLUMNS
         m.grid.jumpToItem = m.focusIndex
         updateFocusRect()
@@ -101,7 +113,6 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
         return true
 
     else if key = "down"
-        LogEvent("EpisodeGrid DOWN: focusIndex=" + m.focusIndex.ToStr() + " row=" + currentRow.ToStr() + " lastRow=" + lastRow.ToStr() + " total=" + m.totalItems.ToStr())
         if currentRow >= lastRow
             ' Last row — wrap to top (same column)
             newCol = currentCol
@@ -112,10 +123,8 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
             m.top.itemFocused = m.focusIndex
             return true
         end if
-        ' Move down one row
         newIndex = m.focusIndex + m.NUM_COLUMNS
         if newIndex >= m.totalItems
-            ' Partial last row — clamp to last item in same column or last item
             newIndex = m.totalItems - 1
         end if
         m.focusIndex = newIndex

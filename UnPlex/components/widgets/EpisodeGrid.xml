@@ -13,12 +13,6 @@
     <script type="text/brightscript" uri="EpisodeGrid.brs" />
 
     <children>
-        <!-- Focus highlight rectangle drawn behind the focused item -->
-        <Rectangle
-            id="focusRect"
-            color="0xF3B12560"
-            visible="false"
-        />
         <MarkupGrid
             id="grid"
             itemComponentName="EpisodeGridItem"
@@ -28,5 +22,11 @@
             numRows="2"
             drawFocusFeedback="false"
         />
+        <!-- Focus highlight: bright border around the focused item -->
+        <!-- Use 4 thin rectangles to form a border (no fill overlay) -->
+        <Rectangle id="focusBorderTop" color="0xF3B125FF" visible="false" />
+        <Rectangle id="focusBorderBottom" color="0xF3B125FF" visible="false" />
+        <Rectangle id="focusBorderLeft" color="0xF3B125FF" visible="false" />
+        <Rectangle id="focusBorderRight" color="0xF3B125FF" visible="false" />
     </children>
 </component>
