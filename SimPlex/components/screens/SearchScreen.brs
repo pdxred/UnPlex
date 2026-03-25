@@ -271,7 +271,7 @@ sub onFocusChange(event as Object)
     if m.focusArea = "grid"
         ' We should be in grid mode but the Group itself got focus —
         ' re-delegate to the MarkupGrid.
-        delegateFocusToGrid()
+        focusGrid()
     end if
     ' Otherwise keyboard mode: Group keeps focus, onKeyEvent handles input.
 end sub
@@ -279,23 +279,40 @@ end sub
 sub setFocusToArea(area as String)
     m.focusArea = area
     if area = "keyboard"
-        ' Reclaim focus to SearchScreen Group. The key to preventing
-        ' dual-focus is setting focusArea BEFORE calling setFocus so that
-        ' any observer re-entry sees the correct state.
+        ' Explicitly defocus and hide the grid's focus ring before
+        ' reclaiming focus. In SceneGraph, setFocus(true) on a parent
+        ' does NOT reliably unfocus a deeply nested grandchild — the
+        ' MarkupGrid keeps its internal focus state and continues to
+        ' render drawFocusFeedback and process key events.
+        defocusGrid()
         updateKeyboardFocus()
         m.top.setFocus(true)
     else if area = "grid"
         clearKeyboardHighlight()
-        delegateFocusToGrid()
+        focusGrid()
     end if
 end sub
 
-sub delegateFocusToGrid()
+sub focusGrid()
+    ' Enable focus feedback and give focus to the inner MarkupGrid
     innerGrid = m.resultsGrid.findNode("grid")
     if innerGrid <> invalid
+        innerGrid.drawFocusFeedback = true
         innerGrid.setFocus(true)
     else
         m.resultsGrid.setFocus(true)
+    end if
+end sub
+
+sub defocusGrid()
+    ' Explicitly remove focus from the MarkupGrid AND disable its focus
+    ' ring rendering. Without this, the grid retains visual highlight
+    ' and continues processing key events even after the parent Group
+    ' calls setFocus(true).
+    innerGrid = m.resultsGrid.findNode("grid")
+    if innerGrid <> invalid
+        innerGrid.drawFocusFeedback = false
+        innerGrid.setFocus(false)
     end if
 end sub
 
