@@ -12,5 +12,10 @@
   "devDependencies": {
     "brighterscript": "^0.70.3",
     "roku-deploy": "^3.16.1"
+  },
+  "dependencies": {
+    "install": "^0.13.0",
+    "pnpm": "^10.33.0",
+    "yarn": "^1.22.22"
   }
 }

@@ -1,7 +1,10 @@
 # Build artifacts
+<<<<<<< Updated upstream
 *.zip
 !UnPlex-v*.zip
 *.zip.old
+=======
+>>>>>>> Stashed changes
 out/
 .roku-deploy/
 *.pkg
