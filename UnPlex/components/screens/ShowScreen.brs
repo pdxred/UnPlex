@@ -204,16 +204,22 @@ sub processSeasons()
             node.viewedLeafCount = season.viewedLeafCount
         end if
 
-        ' Auto-focus logic: find first season with unwatched episodes
+        ' Auto-focus logic: prefer focusSeasonRatingKey if set, else first unwatched
         if not foundUnwatched
-            leafCount = 0
-            viewedLeafCount = 0
-            if season.leafCount <> invalid then leafCount = season.leafCount
-            if season.viewedLeafCount <> invalid then viewedLeafCount = season.viewedLeafCount
-
-            if leafCount > 0 and viewedLeafCount < leafCount
+            ' Check if this season matches the requested focus target
+            if m.top.focusSeasonRatingKey <> "" and GetRatingKeyStr(season.ratingKey) = m.top.focusSeasonRatingKey
                 targetIndex = i
-                foundUnwatched = true
+                foundUnwatched = true  ' Stop searching
+            else
+                leafCount = 0
+                viewedLeafCount = 0
+                if season.leafCount <> invalid then leafCount = season.leafCount
+                if season.viewedLeafCount <> invalid then viewedLeafCount = season.viewedLeafCount
+
+                if leafCount > 0 and viewedLeafCount < leafCount
+                    targetIndex = i
+                    foundUnwatched = true
+                end if
             end if
         end if
     end for
@@ -237,6 +243,8 @@ sub processSeasons()
     season = m.seasons[targetIndex]
     loadEpisodes(GetRatingKeyStr(season.ratingKey))
 
+    m.seasonRow.drawFocusFeedback = true
+    m.episodeGrid.drawFocusFeedback = false
     m.seasonRow.setFocus(true)
 end sub
 
@@ -319,8 +327,12 @@ end sub
 
 sub onSeasonSelected(event as Object)
     ' When season is selected (OK pressed), move focus to episode grid
-    m.focusOnSeasons = false
-    m.episodeGrid.setFocus(true)
+    if m.episodeGrid.content <> invalid and m.episodeGrid.content.getChildCount() > 0
+        m.focusOnSeasons = false
+        m.seasonRow.drawFocusFeedback = false
+        m.episodeGrid.drawFocusFeedback = true
+        m.episodeGrid.setFocus(true)
+    end if
 end sub
 
 ' ========== Episode Selection ==========
@@ -330,59 +342,14 @@ sub onEpisodeSelected(event as Object)
     content = m.episodeGrid.content
     if content <> invalid and index >= 0 and index < content.getChildCount()
         episode = content.getChild(index)
-        c = m.global.constants
 
-        ' Check if partially watched (viewOffset > 0 and >= 5% progress)
-        if episode.viewOffset > 0 and episode.duration > 0
-            progress = episode.viewOffset / episode.duration
-            if progress >= c.PROGRESS_MIN_PERCENT
-                showResumeDialog(episode)
-                return
-            end if
-        end if
-
-        startPlayback(episode, episode.viewOffset)
-    end if
-end sub
-
-' ========== Resume Dialog ==========
-
-sub showResumeDialog(episode as Object)
-    m.pendingPlayItem = episode
-
-    resumeTime = FormatTime(episode.viewOffset)
-
-    dialog = CreateObject("roSGNode", "StandardMessageDialog")
-    dialog.title = episode.title
-    dialog.message = ["Resume from " + resumeTime + "?"]
-    dialog.buttons = ["Resume from " + resumeTime, "Start from Beginning", "Go to Details"]
-    dialog.observeField("buttonSelected", "onResumeDialogButton")
-    dialog.observeField("wasClosed", "onResumeDialogClosed")
-    m.top.getScene().dialog = dialog
-end sub
-
-sub onResumeDialogButton(event as Object)
-    index = event.getData()
-    m.top.getScene().dialog.close = true
-
-    if index = 0
-        ' Resume from last position
-        startPlayback(m.pendingPlayItem, m.pendingPlayItem.viewOffset)
-    else if index = 1
-        ' Start from beginning
-        startPlayback(m.pendingPlayItem, 0)
-    else if index = 2
-        ' Go to detail screen
+        ' Always navigate to episode detail screen
         m.top.itemSelected = {
             action: "detail"
-            ratingKey: m.pendingPlayItem.ratingKey
+            ratingKey: episode.ratingKey
             itemType: "episode"
         }
     end if
-end sub
-
-sub onResumeDialogClosed(event as Object)
-    m.episodeGrid.setFocus(true)
 end sub
 
 ' ========== Options Key Context Menu ==========
@@ -619,13 +586,26 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
         m.top.navigateBack = true
         return true
     else if key = "down" and m.focusOnSeasons
-        m.focusOnSeasons = false
-        m.episodeGrid.setFocus(true)
+        ' Only move to episode grid if it has content
+        if m.episodeGrid.content <> invalid and m.episodeGrid.content.getChildCount() > 0
+            m.focusOnSeasons = false
+            m.seasonRow.drawFocusFeedback = false
+            m.episodeGrid.drawFocusFeedback = true
+            m.episodeGrid.setFocus(true)
+        end if
         return true
     else if key = "up" and not m.focusOnSeasons
-        m.focusOnSeasons = true
-        m.seasonRow.setFocus(true)
-        return true
+        ' Move to season row when on top row of episode grid (items 0..numColumns-1)
+        focusedIndex = m.episodeGrid.itemFocused
+        if focusedIndex < 5
+            m.focusOnSeasons = true
+            m.episodeGrid.drawFocusFeedback = false
+            m.seasonRow.drawFocusFeedback = true
+            m.seasonRow.setFocus(true)
+            return true
+        end if
+        ' Not on top row — let MarkupGrid handle internal navigation
+        return false
     else if key = "options" and not m.focusOnSeasons
         ' Show context menu for focused episode
         focusedIndex = m.episodeGrid.itemFocused

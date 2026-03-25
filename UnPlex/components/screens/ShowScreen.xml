@@ -3,6 +3,7 @@
     <interface>
         <field id="ratingKey" type="string" onChange="onRatingKeyChange" />
         <field id="showTitle" type="string" />
+        <field id="focusSeasonRatingKey" type="string" value="" />
         <field id="itemSelected" type="assocarray" alwaysNotify="true" />
         <field id="navigateBack" type="boolean" alwaysNotify="true" />
     </interface>

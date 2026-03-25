@@ -257,6 +257,18 @@ sub buildButtons()
         end if
     end if
 
+    ' Episode-specific navigation: Go to Show, Go to Season
+    if item.type = "episode"
+        if item.grandparentRatingKey <> invalid
+            buttons.push("Go to Show")
+            m.buttonActions.push("goToShow")
+        end if
+        if item.parentRatingKey <> invalid and item.grandparentRatingKey <> invalid
+            buttons.push("Go to Season")
+            m.buttonActions.push("goToSeason")
+        end if
+    end if
+
     ' Watched/Unwatched toggle
     if item.viewCount <> invalid and item.viewCount > 0
         buttons.push("Mark as Unwatched")
@@ -286,6 +298,21 @@ sub onButtonSelected(event as Object)
             action: "episodes"
             ratingKey: GetRatingKeyStr(m.itemData.ratingKey)
             title: m.itemData.title
+        }
+    else if action = "goToShow"
+        ' Navigate to ShowScreen for the parent show
+        m.top.itemSelected = {
+            action: "episodes"
+            ratingKey: GetRatingKeyStr(m.itemData.grandparentRatingKey)
+            title: m.itemData.grandparentTitle
+        }
+    else if action = "goToSeason"
+        ' Navigate to ShowScreen with focus on the specific season
+        m.top.itemSelected = {
+            action: "episodes"
+            ratingKey: GetRatingKeyStr(m.itemData.grandparentRatingKey)
+            title: m.itemData.grandparentTitle
+            focusSeasonRatingKey: GetRatingKeyStr(m.itemData.parentRatingKey)
         }
     else if action = "markWatched"
         markAsWatched()

@@ -164,10 +164,13 @@ sub showDetailScreen(ratingKey as String, itemType as String)
     m.top.currentScreen = "detail"
 end sub
 
-sub showShowScreen(ratingKey as String, showTitle as String)
+sub showShowScreen(ratingKey as String, showTitle as String, focusSeasonRatingKey = "" as String)
     screen = CreateObject("roSGNode", "ShowScreen")
     screen.ratingKey = ratingKey
     screen.showTitle = showTitle
+    if focusSeasonRatingKey <> ""
+        screen.focusSeasonRatingKey = focusSeasonRatingKey
+    end if
     pushScreen(screen)
     m.top.currentScreen = "episodes"
 end sub
@@ -419,7 +422,9 @@ sub onItemSelected(event as Object)
         else if data.action = "detail"
             showDetailScreen(data.ratingKey, data.itemType)
         else if data.action = "episodes"
-            showShowScreen(data.ratingKey, data.title)
+            focusSeason = ""
+            if data.focusSeasonRatingKey <> invalid then focusSeason = data.focusSeasonRatingKey
+            showShowScreen(data.ratingKey, data.title, focusSeason)
         else if data.action = "search"
             showSearchScreen()
         else if data.action = "playlist"
