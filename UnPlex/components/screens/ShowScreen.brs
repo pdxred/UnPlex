@@ -2,6 +2,7 @@ sub init()
     m.showTitleLabel = m.top.findNode("showTitleLabel")
     m.seasonRow = m.top.findNode("seasonRow")
     m.episodeGrid = m.top.findNode("episodeGrid")
+    m.episodeGridInner = m.episodeGrid.findNode("grid")
     m.loadingSpinner = m.top.findNode("loadingSpinner")
     m.emptyState = m.top.findNode("emptyState")
     m.retryGroup = m.top.findNode("retryGroup")
@@ -30,9 +31,8 @@ sub init()
     ' Observe episode selection
     m.episodeGrid.observeField("itemSelected", "onEpisodeSelected")
 
-    ' Observe episode grid focus to detect wrap-around (up from top row)
-    m.episodeGrid.observeField("itemFocused", "onEpisodeGridFocused")
-    m.lastEpisodeFocusIndex = 0
+    ' Observe escape signal from EpisodeGrid (up pressed on top row)
+    m.episodeGrid.observeField("escapeUp", "onEpisodeGridEscapeUp")
 
     ' Delegate focus when screen receives focus
     m.top.observeField("focusedChild", "onFocusChange")
@@ -44,7 +44,7 @@ sub onFocusChange(event as Object)
         if m.focusOnSeasons
             m.seasonRow.setFocus(true)
         else
-            m.episodeGrid.setFocus(true)
+            m.episodeGridInner.setFocus(true)
         end if
     end if
 end sub
@@ -249,7 +249,7 @@ sub processSeasons()
     loadEpisodes(GetRatingKeyStr(season.ratingKey))
 
     if m.seasonRowGrid <> invalid then m.seasonRowGrid.drawFocusFeedback = true
-    m.episodeGrid.drawFocusFeedback = false
+    m.episodeGridInner.drawFocusFeedback = false
     m.seasonRow.setFocus(true)
 end sub
 
@@ -334,43 +334,20 @@ sub onSeasonSelected(event as Object)
     ' When season is selected (OK pressed), move focus to episode grid
     if m.episodeGrid.content <> invalid and m.episodeGrid.content.getChildCount() > 0
         m.focusOnSeasons = false
-        m.lastEpisodeFocusIndex = m.episodeGrid.itemFocused
         if m.seasonRowGrid <> invalid then m.seasonRowGrid.drawFocusFeedback = false
-        m.episodeGrid.drawFocusFeedback = true
-        m.episodeGrid.setFocus(true)
+        m.episodeGridInner.drawFocusFeedback = true
+        m.episodeGridInner.setFocus(true)
     end if
 end sub
 
 ' ========== Episode Grid Focus ==========
 
-sub onEpisodeGridFocused(event as Object)
-    newIndex = event.getData()
-    numColumns = 5
-
-    if not m.focusOnSeasons and m.lastEpisodeFocusIndex < numColumns and newIndex >= numColumns
-        totalItems = 0
-        if m.episodeGrid.content <> invalid then totalItems = m.episodeGrid.content.getChildCount()
-
-        ' Calculate number of rows
-        numRows = Int((totalItems + numColumns - 1) / numColumns)
-
-        ' Only detect wrap if there are 3+ rows — otherwise we can't distinguish
-        ' wrap from normal downward navigation (row 0 → row 1 looks the same)
-        if numRows >= 3
-            lastRowStart = (numRows - 1) * numColumns
-            ' Focus jumped from top row to last row = upward wrap
-            if newIndex >= lastRowStart
-                m.episodeGrid.jumpToItem = m.lastEpisodeFocusIndex
-                m.focusOnSeasons = true
-                m.episodeGrid.drawFocusFeedback = false
-                if m.seasonRowGrid <> invalid then m.seasonRowGrid.drawFocusFeedback = true
-                m.seasonRow.setFocus(true)
-                return
-            end if
-        end if
-    end if
-
-    m.lastEpisodeFocusIndex = newIndex
+sub onEpisodeGridEscapeUp(event as Object)
+    ' EpisodeGrid signals that up was pressed on the top row — move to season row
+    m.focusOnSeasons = true
+    if m.episodeGridInner <> invalid then m.episodeGridInner.drawFocusFeedback = false
+    if m.seasonRowGrid <> invalid then m.seasonRowGrid.drawFocusFeedback = true
+    m.seasonRow.setFocus(true)
 end sub
 
 ' ========== Episode Selection ==========
@@ -448,11 +425,11 @@ sub onEpisodeOptionsButton(event as Object)
         }
     end if
 
-    m.episodeGrid.setFocus(true)
+    m.episodeGridInner.setFocus(true)
 end sub
 
 sub onEpisodeOptionsClosed(event as Object)
-    m.episodeGrid.setFocus(true)
+    m.episodeGridInner.setFocus(true)
 end sub
 
 ' ========== Playback ==========
@@ -561,7 +538,7 @@ sub onErrorDialogClosed(event as Object)
     if m.focusOnSeasons
         m.seasonRow.setFocus(true)
     else
-        m.episodeGrid.setFocus(true)
+        m.episodeGridInner.setFocus(true)
     end if
 end sub
 
@@ -627,16 +604,11 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
         ' Only move to episode grid if it has content
         if m.episodeGrid.content <> invalid and m.episodeGrid.content.getChildCount() > 0
             m.focusOnSeasons = false
-            m.lastEpisodeFocusIndex = m.episodeGrid.itemFocused
             if m.seasonRowGrid <> invalid then m.seasonRowGrid.drawFocusFeedback = false
-            m.episodeGrid.drawFocusFeedback = true
-            m.episodeGrid.setFocus(true)
+            m.episodeGridInner.drawFocusFeedback = true
+            m.episodeGridInner.setFocus(true)
         end if
         return true
-    else if key = "up" and not m.focusOnSeasons
-        ' MarkupGrid handles up internally; wrap detection in onEpisodeGridFocused
-        ' handles the top-row escape. This branch is a fallback.
-        return false
     else if key = "options" and not m.focusOnSeasons
         ' Show context menu for focused episode
         focusedIndex = m.episodeGrid.itemFocused

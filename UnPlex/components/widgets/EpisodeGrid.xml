@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component name="EpisodeGrid" extends="Group">
+    <interface>
+        <field id="content" type="node" onChange="onContentChange" />
+        <field id="itemSelected" type="integer" alwaysNotify="true" />
+        <field id="itemFocused" type="integer" alwaysNotify="true" />
+        <field id="escapeUp" type="boolean" alwaysNotify="true" value="false" />
+        <field id="jumpToItem" type="integer" value="0" onChange="onJumpToItem" />
+    </interface>
+
+    <script type="text/brightscript" uri="EpisodeGrid.brs" />
+
+    <children>
+        <MarkupGrid
+            id="grid"
+            itemComponentName="EpisodeGridItem"
+            numColumns="5"
+            itemSize="[340, 240]"
+            itemSpacing="[12, 16]"
+            numRows="2"
+            wrap="false"
+            drawFocusFeedback="true"
+            focusBitmapBlendColor="0xF3B125FF"
+        />
+    </children>
+</component>

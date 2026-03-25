@@ -34,18 +34,10 @@
             numRows="1"
             gridWidth="1760"
         />
-        <!-- Episode grid: landscape thumbnail cards -->
-        <MarkupGrid
+        <!-- Episode grid: landscape thumbnail cards (custom wrapper for focus control) -->
+        <EpisodeGrid
             id="episodeGrid"
             translation="[80, 520]"
-            itemComponentName="EpisodeGridItem"
-            numColumns="5"
-            itemSize="[340, 240]"
-            itemSpacing="[12, 16]"
-            numRows="2"
-            wrap="true"
-            drawFocusFeedback="true"
-            focusBitmapBlendColor="0xF3B125FF"
         />
         <!-- Empty state -->
         <Group id="emptyState" translation="[960, 640]" visible="false">
