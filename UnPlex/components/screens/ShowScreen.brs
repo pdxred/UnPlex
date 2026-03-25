@@ -1,7 +1,7 @@
 sub init()
     m.showTitleLabel = m.top.findNode("showTitleLabel")
-    m.seasonList = m.top.findNode("seasonList")
-    m.episodeList = m.top.findNode("episodeList")
+    m.seasonRow = m.top.findNode("seasonRow")
+    m.episodeGrid = m.top.findNode("episodeGrid")
     m.loadingSpinner = m.top.findNode("loadingSpinner")
     m.emptyState = m.top.findNode("emptyState")
     m.retryGroup = m.top.findNode("retryGroup")
@@ -19,27 +19,27 @@ sub init()
     ' Observe server reconnected signal
     m.global.observeField("serverReconnected", "onServerReconnected")
 
-    ' Observe watch state updates from DetailScreen
+    ' Observe watch state updates
     m.global.observeField("watchStateUpdate", "onWatchStateUpdate")
 
-    ' Observe season selection
-    m.seasonList.observeField("itemFocused", "onSeasonFocused")
-    m.seasonList.observeField("itemSelected", "onSeasonSelected")
+    ' Observe season selection and focus (PosterGrid bubbles these up)
+    m.seasonRow.observeField("itemSelected", "onSeasonSelected")
+    m.seasonRow.observeField("itemFocused", "onSeasonFocused")
 
     ' Observe episode selection
-    m.episodeList.observeField("itemSelected", "onEpisodeSelected")
+    m.episodeGrid.observeField("itemSelected", "onEpisodeSelected")
 
     ' Delegate focus when screen receives focus
     m.top.observeField("focusedChild", "onFocusChange")
 end sub
 
 sub onFocusChange(event as Object)
-    ' When EpisodeScreen is in focus chain but no child has focus, delegate
+    ' When ShowScreen is in focus chain but no child has focus, delegate
     if m.top.isInFocusChain() and m.top.focusedChild = invalid
         if m.focusOnSeasons
-            m.seasonList.setFocus(true)
+            m.seasonRow.setFocus(true)
         else
-            m.episodeList.setFocus(true)
+            m.episodeGrid.setFocus(true)
         end if
     end if
 end sub
@@ -51,6 +51,8 @@ sub onRatingKeyChange(event as Object)
         loadSeasons(ratingKey)
     end if
 end sub
+
+' ========== Data Loading ==========
 
 sub loadSeasons(ratingKey as String)
     if m.loadingSpinner <> invalid then m.loadingSpinner.showSpinner = true
@@ -83,6 +85,8 @@ sub loadEpisodes(seasonKey as String)
     m.episodesTask = task
 end sub
 
+' ========== Task Callbacks ==========
+
 sub onSeasonsTaskStateChange(event as Object)
     state = event.getData()
     if state = "completed"
@@ -107,7 +111,7 @@ sub onSeasonsTaskStateChange(event as Object)
                 retryLastRequest()
             else
                 m.retryCount = 0
-                showErrorDialog("Error", "Couldn't load episodes. Please try again.")
+                showErrorDialog("Error", "Couldn't load seasons. Please try again.")
             end if
         end if
     end if
@@ -143,6 +147,8 @@ sub onEpisodesTaskStateChange(event as Object)
     end if
 end sub
 
+' ========== Data Processing ==========
+
 sub processSeasons()
     response = m.seasonsTask.response
     if response = invalid or response.MediaContainer = invalid
@@ -157,26 +163,81 @@ sub processSeasons()
 
     m.emptyState.visible = false
     m.seasons = metadata
-    seasonTitles = []
-    for each season in metadata
-        seasonTitles.push(season.title)
-    end for
 
     content = CreateObject("roSGNode", "ContentNode")
-    for each title in seasonTitles
-        item = content.createChild("ContentNode")
-        item.title = title
-    end for
-    m.seasonList.content = content
+    targetIndex = 0
+    foundUnwatched = false
 
-    ' Load first season's episodes
-    if m.seasons.count() > 0
-        m.currentSeasonIndex = 0
-        season = m.seasons[0]
-        loadEpisodes(GetRatingKeyStr(season.ratingKey))
+    for i = 0 to metadata.count() - 1
+        season = metadata[i]
+        node = content.createChild("ContentNode")
+
+        ' Set title
+        if season.title <> invalid
+            node.title = season.title
+        else
+            node.title = "Season " + (i + 1).ToStr()
+        end if
+
+        ' Set poster URL with fallback to show poster
+        thumbPath = ""
+        if season.thumb <> invalid and season.thumb <> ""
+            thumbPath = season.thumb
+        else if season.parentThumb <> invalid and season.parentThumb <> ""
+            thumbPath = season.parentThumb
+        end if
+        if thumbPath <> ""
+            node.HDPosterUrl = BuildPosterUrl(thumbPath, 240, 360)
+        end if
+
+        ' Set leaf counts for PosterGridItem badge support
+        node.addFields({
+            ratingKey: GetRatingKeyStr(season.ratingKey)
+            leafCount: 0
+            viewedLeafCount: 0
+            itemType: "season"
+        })
+        if season.leafCount <> invalid
+            node.leafCount = season.leafCount
+        end if
+        if season.viewedLeafCount <> invalid
+            node.viewedLeafCount = season.viewedLeafCount
+        end if
+
+        ' Auto-focus logic: find first season with unwatched episodes
+        if not foundUnwatched
+            leafCount = 0
+            viewedLeafCount = 0
+            if season.leafCount <> invalid then leafCount = season.leafCount
+            if season.viewedLeafCount <> invalid then viewedLeafCount = season.viewedLeafCount
+
+            if leafCount > 0 and viewedLeafCount < leafCount
+                targetIndex = i
+                foundUnwatched = true
+            end if
+        end if
+    end for
+
+    ' If all seasons fully watched, focus last season
+    if not foundUnwatched and metadata.count() > 0
+        targetIndex = metadata.count() - 1
     end if
 
-    m.seasonList.setFocus(true)
+    m.seasonRow.content = content
+    m.currentSeasonIndex = targetIndex
+
+    ' Jump to the target season
+    ' PosterGrid contains an inner MarkupGrid; we need to set jumpToItem on it
+    innerGrid = m.seasonRow.findNode("grid")
+    if innerGrid <> invalid
+        innerGrid.jumpToItem = targetIndex
+    end if
+
+    ' Load episodes for the auto-focused season
+    season = m.seasons[targetIndex]
+    loadEpisodes(GetRatingKeyStr(season.ratingKey))
+
+    m.seasonRow.setFocus(true)
 end sub
 
 sub processEpisodes()
@@ -192,12 +253,11 @@ sub processEpisodes()
 
     if metadata.count() = 0
         m.emptyState.visible = true
-        m.episodeList.content = invalid
+        m.episodeGrid.content = invalid
         return
     end if
 
     m.emptyState.visible = false
-    c = m.global.constants
     content = CreateObject("roSGNode", "ContentNode")
 
     for each episode in metadata
@@ -205,7 +265,6 @@ sub processEpisodes()
         ratingKeyStr = GetRatingKeyStr(episode.ratingKey)
 
         node.addFields({
-            title: episode.title
             ratingKey: ratingKeyStr
             episodeNumber: 0
             summary: ""
@@ -238,12 +297,16 @@ sub processEpisodes()
             end if
         end if
 
-        ' Format title with episode number
-        node.title = "E" + node.episodeNumber.ToStr() + " - " + episode.title
+        ' Format title with episode number: "E1 · Title"
+        epTitle = ""
+        if episode.title <> invalid then epTitle = episode.title
+        node.title = "E" + node.episodeNumber.ToStr() + " · " + epTitle
     end for
 
-    m.episodeList.content = content
+    m.episodeGrid.content = content
 end sub
+
+' ========== Season Navigation ==========
 
 sub onSeasonFocused(event as Object)
     index = event.getData()
@@ -255,14 +318,16 @@ sub onSeasonFocused(event as Object)
 end sub
 
 sub onSeasonSelected(event as Object)
-    ' When season is selected, move focus to episode list
+    ' When season is selected (OK pressed), move focus to episode grid
     m.focusOnSeasons = false
-    m.episodeList.setFocus(true)
+    m.episodeGrid.setFocus(true)
 end sub
+
+' ========== Episode Selection ==========
 
 sub onEpisodeSelected(event as Object)
     index = event.getData()
-    content = m.episodeList.content
+    content = m.episodeGrid.content
     if content <> invalid and index >= 0 and index < content.getChildCount()
         episode = content.getChild(index)
         c = m.global.constants
@@ -317,7 +382,7 @@ sub onResumeDialogButton(event as Object)
 end sub
 
 sub onResumeDialogClosed(event as Object)
-    m.episodeList.setFocus(true)
+    m.episodeGrid.setFocus(true)
 end sub
 
 ' ========== Options Key Context Menu ==========
@@ -367,8 +432,8 @@ sub onEpisodeOptionsButton(event as Object)
         }
         task.control = "run"
 
-        ' Force episode list re-render
-        m.episodeList.content = m.episodeList.content
+        ' Force episode grid re-render
+        m.episodeGrid.content = m.episodeGrid.content
     else if index = 1
         ' Navigate to show detail screen
         m.top.itemSelected = {
@@ -378,12 +443,14 @@ sub onEpisodeOptionsButton(event as Object)
         }
     end if
 
-    m.episodeList.setFocus(true)
+    m.episodeGrid.setFocus(true)
 end sub
 
 sub onEpisodeOptionsClosed(event as Object)
-    m.episodeList.setFocus(true)
+    m.episodeGrid.setFocus(true)
 end sub
+
+' ========== Playback ==========
 
 sub startPlayback(episode as Object, offset as Integer)
     m.player = CreateObject("roSGNode", "VideoPlayer")
@@ -443,6 +510,8 @@ sub onPlaybackResult(event as Object)
     }
 end sub
 
+' ========== Error / Retry ==========
+
 sub retryLastRequest()
     if m.retryContext = invalid then return
     if m.loadingSpinner <> invalid then m.loadingSpinner.showSpinner = true
@@ -485,15 +554,15 @@ end sub
 
 sub onErrorDialogClosed(event as Object)
     if m.focusOnSeasons
-        m.seasonList.setFocus(true)
+        m.seasonRow.setFocus(true)
     else
-        m.episodeList.setFocus(true)
+        m.episodeGrid.setFocus(true)
     end if
 end sub
 
 sub showInlineRetry()
-    m.seasonList.visible = false
-    m.episodeList.visible = false
+    m.seasonRow.visible = false
+    m.episodeGrid.visible = false
     m.emptyState.visible = false
     m.retryGroup.visible = true
     m.retryButton.setFocus(true)
@@ -501,10 +570,12 @@ end sub
 
 sub onRetryButtonSelected(event as Object)
     m.retryGroup.visible = false
-    m.seasonList.visible = true
-    m.episodeList.visible = true
+    m.seasonRow.visible = true
+    m.episodeGrid.visible = true
     retryLastRequest()
 end sub
+
+' ========== Server Reconnect ==========
 
 sub onServerReconnected(event as Object)
     if m.global.serverReconnected = true
@@ -515,13 +586,7 @@ sub onServerReconnected(event as Object)
     end if
 end sub
 
-sub showError(message as String)
-    dialog = CreateObject("roSGNode", "StandardMessageDialog")
-    dialog.title = "Error"
-    dialog.message = [message]
-    dialog.buttons = ["OK"]
-    m.top.getScene().dialog = dialog
-end sub
+' ========== Watch State Updates ==========
 
 sub onWatchStateUpdate(event as Object)
     update = event.getData()
@@ -530,10 +595,10 @@ sub onWatchStateUpdate(event as Object)
     ratingKey = update.ratingKey
     viewCount = update.viewCount
 
-    ' Update matching episode in episode list
-    if m.episodeList.content <> invalid
-        for i = 0 to m.episodeList.content.getChildCount() - 1
-            item = m.episodeList.content.getChild(i)
+    ' Update matching episode in episode grid
+    if m.episodeGrid.content <> invalid
+        for i = 0 to m.episodeGrid.content.getChildCount() - 1
+            item = m.episodeGrid.content.getChild(i)
             if item <> invalid and item.ratingKey = ratingKey
                 item.viewCount = viewCount
                 item.watched = (viewCount > 0)
@@ -545,6 +610,8 @@ sub onWatchStateUpdate(event as Object)
     end if
 end sub
 
+' ========== Focus / Key Event Management ==========
+
 function onKeyEvent(key as String, press as Boolean) as Boolean
     if not press then return false
 
@@ -553,16 +620,16 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
         return true
     else if key = "down" and m.focusOnSeasons
         m.focusOnSeasons = false
-        m.episodeList.setFocus(true)
+        m.episodeGrid.setFocus(true)
         return true
     else if key = "up" and not m.focusOnSeasons
         m.focusOnSeasons = true
-        m.seasonList.setFocus(true)
+        m.seasonRow.setFocus(true)
         return true
     else if key = "options" and not m.focusOnSeasons
         ' Show context menu for focused episode
-        focusedIndex = m.episodeList.itemFocused
-        content = m.episodeList.content
+        focusedIndex = m.episodeGrid.itemFocused
+        content = m.episodeGrid.content
         if content <> invalid and focusedIndex >= 0 and focusedIndex < content.getChildCount()
             episode = content.getChild(focusedIndex)
             showEpisodeOptionsMenu(episode)

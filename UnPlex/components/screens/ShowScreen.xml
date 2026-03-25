@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<component name="EpisodeScreen" extends="Group">
+<component name="ShowScreen" extends="Group">
     <interface>
         <field id="ratingKey" type="string" onChange="onRatingKeyChange" />
         <field id="showTitle" type="string" />
@@ -9,39 +9,44 @@
 
     <script type="text/brightscript" uri="pkg:/source/utils.brs" />
     <script type="text/brightscript" uri="pkg:/source/constants.brs" />
-    <script type="text/brightscript" uri="EpisodeScreen.brs" />
+    <script type="text/brightscript" uri="ShowScreen.brs" />
 
     <children>
+        <!-- Full-screen black background -->
         <Rectangle
             id="background"
             width="1920"
             height="1080"
             color="0x000000FF"
         />
+        <!-- Show title -->
         <Label
             id="showTitleLabel"
-            translation="[80, 40]"
+            translation="[80, 30]"
             font="font:LargeBoldSystemFont"
             color="0xFFFFFFFF"
         />
-        <LabelList
-            id="seasonList"
-            translation="[80, 120]"
-            itemSize="[200, 50]"
+        <!-- Season poster row: single horizontal row via PosterGrid numRows=1 -->
+        <PosterGrid
+            id="seasonRow"
+            translation="[80, 90]"
             numRows="1"
-            focusedColor="0xF3B125FF"
-            color="0xFFFFFFFF"
+            gridWidth="1760"
         />
-        <MarkupList
-            id="episodeList"
-            translation="[80, 200]"
-            itemSize="[1760, 120]"
-            itemSpacing="[0, 10]"
+        <!-- Episode grid: landscape thumbnail cards -->
+        <MarkupGrid
+            id="episodeGrid"
+            translation="[80, 520]"
+            itemComponentName="EpisodeGridItem"
+            numColumns="5"
+            itemSize="[340, 240]"
+            itemSpacing="[12, 16]"
+            numRows="2"
             drawFocusFeedback="true"
             focusBitmapBlendColor="0xF3B125FF"
-            itemComponentName="EpisodeItem"
         />
-        <Group id="emptyState" translation="[960, 440]" visible="false">
+        <!-- Empty state -->
+        <Group id="emptyState" translation="[960, 640]" visible="false">
             <Label
                 id="emptyTitle"
                 horizAlign="center"
@@ -62,7 +67,8 @@
                 translation="[-300, 60]"
             />
         </Group>
-        <Group id="retryGroup" translation="[960, 440]" visible="false">
+        <!-- Retry group -->
+        <Group id="retryGroup" translation="[960, 540]" visible="false">
             <Label
                 id="retryTitle"
                 horizAlign="center"
@@ -88,6 +94,7 @@
                 buttons="[&quot;Retry&quot;]"
             />
         </Group>
+        <!-- Loading spinner -->
         <LoadingSpinner id="loadingSpinner" />
     </children>
 </component>

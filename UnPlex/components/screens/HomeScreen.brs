@@ -468,7 +468,7 @@ sub onHubItemSelected(event as Object)
             viewOffset: itemContent.viewOffset
         }
     else if itemContent.itemType = "show"
-        ' TV shows: go directly to EpisodeScreen
+        ' TV shows: go directly to ShowScreen
         m.top.itemSelected = {
             action: "episodes"
             ratingKey: itemContent.ratingKey
@@ -1183,7 +1183,7 @@ sub onGridItemSelected(event as Object)
             end if
         end if
 
-        ' TV shows: go directly to EpisodeScreen
+        ' TV shows: go directly to ShowScreen
         if item.itemType = "show"
             m.top.itemSelected = {
                 action: "episodes"

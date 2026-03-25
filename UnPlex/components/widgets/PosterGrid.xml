@@ -3,6 +3,7 @@
     <interface>
         <field id="content" type="node" onChange="onContentChange" />
         <field id="itemSelected" type="integer" alwaysNotify="true" />
+        <field id="itemFocused" type="integer" alwaysNotify="true" />
         <field id="loadMore" type="boolean" alwaysNotify="true" />
         <field id="gridWidth" type="integer" value="1620" />
         <field id="numRows" type="integer" value="0" onChange="onNumRowsChange" />

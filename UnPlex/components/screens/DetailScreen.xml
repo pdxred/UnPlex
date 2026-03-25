@@ -25,7 +25,10 @@
             width="640"
             height="360"
         />
-        <Group id="metadataGroup" translation="[760, 80]">
+        <LayoutGroup id="metadataGroup" translation="[760, 80]"
+            layoutDirection="vert"
+            itemSpacings="[4, 8, 40, 40, 60, 16, 8, 8, 8, 8]"
+        >
             <Label
                 id="titleLabel"
                 font="font:LargeBoldSystemFont"
@@ -33,34 +36,74 @@
                 width="1080"
             />
             <Label
+                id="taglineLabel"
+                font="font:SmallSystemFont"
+                color="0xA0A0B0FF"
+                width="1080"
+                visible="false"
+            />
+            <Label
                 id="yearRuntimeLabel"
-                translation="[0, 60]"
                 font="font:MediumSystemFont"
                 color="0xA0A0B0FF"
             />
             <Label
                 id="ratingLabel"
-                translation="[0, 100]"
                 font="font:MediumSystemFont"
                 color="0xF3B125FF"
             />
             <Label
                 id="genreLabel"
-                translation="[0, 140]"
                 font="font:SmallSystemFont"
                 color="0xA0A0B0FF"
                 width="1080"
             />
             <Label
                 id="summaryLabel"
-                translation="[0, 200]"
                 font="font:SmallSystemFont"
                 color="0xFFFFFFFF"
                 width="1080"
                 wrap="true"
                 maxLines="5"
             />
-        </Group>
+            <Label
+                id="contextLabel"
+                font="font:MediumBoldSystemFont"
+                color="0xA0A0B0FF"
+                width="1080"
+                visible="false"
+            />
+            <Label
+                id="airdateLabel"
+                font="font:SmallSystemFont"
+                color="0xA0A0B0FF"
+                width="1080"
+                visible="false"
+            />
+            <Label
+                id="castLabel"
+                font="font:SmallSystemFont"
+                color="0xA0A0B0FF"
+                width="1080"
+                maxLines="2"
+                wrap="true"
+                visible="false"
+            />
+            <Label
+                id="crewLabel"
+                font="font:SmallSystemFont"
+                color="0xA0A0B0FF"
+                width="1080"
+                visible="false"
+            />
+            <Label
+                id="studioLabel"
+                font="font:SmallSystemFont"
+                color="0xA0A0B0FF"
+                width="1080"
+                visible="false"
+            />
+        </LayoutGroup>
         <Group id="progressGroup" translation="[80, 470]">
             <Rectangle
                 id="detailProgressTrack"

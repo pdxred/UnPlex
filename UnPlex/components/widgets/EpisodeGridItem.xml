@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component name="EpisodeGridItem" extends="Group">
+    <interface>
+        <field id="itemContent" type="node" onChange="onItemContentChange" />
+    </interface>
+
+    <script type="text/brightscript" uri="pkg:/source/utils.brs" />
+    <script type="text/brightscript" uri="pkg:/source/constants.brs" />
+    <script type="text/brightscript" uri="EpisodeGridItem.brs" />
+
+    <children>
+        <!-- 320x180 landscape episode thumbnail -->
+        <Poster
+            id="thumbnail"
+            width="320"
+            height="180"
+        />
+        <!-- Episode title: "E1 · Title" -->
+        <Label
+            id="titleLabel"
+            translation="[0, 186]"
+            width="320"
+            font="font:SmallBoldSystemFont"
+            color="0xFFFFFFFF"
+            maxLines="1"
+        />
+        <!-- Duration label -->
+        <Label
+            id="durationLabel"
+            translation="[0, 214]"
+            width="320"
+            font="font:SmallestSystemFont"
+            color="0xA0A0B0FF"
+        />
+        <!-- Progress bar track (full width of thumbnail) -->
+        <Rectangle
+            id="progressTrack"
+            translation="[0, 176]"
+            width="320"
+            height="4"
+            color="0xFFFFFF33"
+            visible="false"
+        />
+        <!-- Progress bar fill -->
+        <Rectangle
+            id="progressFill"
+            translation="[0, 176]"
+            width="0"
+            height="4"
+            color="0xF3B125FF"
+            visible="false"
+        />
+        <!-- Watched checkmark badge (top-right of thumbnail) -->
+        <Rectangle
+            id="watchedBadgeBg"
+            translation="[284, 0]"
+            width="36"
+            height="28"
+            color="0x00000088"
+            visible="false"
+        />
+        <Label
+            id="watchedBadge"
+            translation="[284, 2]"
+            text="&#x2713;"
+            font="font:SmallestSystemFont"
+            color="0xF3B125FF"
+            visible="false"
+            width="36"
+            horizAlign="center"
+        />
+        <!-- Unwatched dot badge (top-right of thumbnail) -->
+        <Poster
+            id="unwatchedBadge"
+            translation="[296, 0]"
+            width="24"
+            height="24"
+            uri="pkg:/images/badge-unwatched.png"
+            visible="false"
+        />
+    </children>
+</component>

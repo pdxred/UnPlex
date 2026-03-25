@@ -78,8 +78,8 @@ sub updateBadge(content as Object)
         return
     end if
 
-    ' TV shows with real episode counts: use leafCount/viewedLeafCount
-    if content.itemType <> invalid and content.itemType = "show"
+    ' TV shows and seasons with real episode counts: use leafCount/viewedLeafCount
+    if content.itemType <> invalid and (content.itemType = "show" or content.itemType = "season")
         hasLeafData = (content.leafCount <> invalid and content.leafCount > 0)
         if hasLeafData
             viewedLeaf = 0

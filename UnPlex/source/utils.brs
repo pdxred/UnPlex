@@ -149,7 +149,7 @@ end function
 function BuildPosterUrl(thumbPath as String, width as Integer, height as Integer) as String
     serverUri = GetServerUri()
     token = GetAuthToken()
-    encodedPath = thumbPath ' Note: URL-encode if needed
+    encodedPath = UrlEncode(thumbPath)
     return serverUri + "/photo/:/transcode?width=" + width.ToStr() + "&height=" + height.ToStr() + "&url=" + encodedPath + "&X-Plex-Token=" + token
 end function
 

@@ -164,8 +164,8 @@ sub showDetailScreen(ratingKey as String, itemType as String)
     m.top.currentScreen = "detail"
 end sub
 
-sub showEpisodeScreen(ratingKey as String, showTitle as String)
-    screen = CreateObject("roSGNode", "EpisodeScreen")
+sub showShowScreen(ratingKey as String, showTitle as String)
+    screen = CreateObject("roSGNode", "ShowScreen")
     screen.ratingKey = ratingKey
     screen.showTitle = showTitle
     pushScreen(screen)
@@ -359,7 +359,7 @@ sub popScreen()
         m.top.currentScreen = "home"
     else if previousScreen.subtype() = "DetailScreen"
         m.top.currentScreen = "detail"
-    else if previousScreen.subtype() = "EpisodeScreen"
+    else if previousScreen.subtype() = "ShowScreen"
         m.top.currentScreen = "episodes"
     else if previousScreen.subtype() = "SearchScreen"
         m.top.currentScreen = "search"
@@ -403,7 +403,6 @@ end sub
 
 sub onAuthComplete(event as Object)
     ' Auth completed successfully, refresh global state and show home
-    m.global.authToken = GetAuthToken()
     m.global.serverUri = GetServerUri()
 
     ' Remove settings screen and show home
@@ -420,7 +419,7 @@ sub onItemSelected(event as Object)
         else if data.action = "detail"
             showDetailScreen(data.ratingKey, data.itemType)
         else if data.action = "episodes"
-            showEpisodeScreen(data.ratingKey, data.title)
+            showShowScreen(data.ratingKey, data.title)
         else if data.action = "search"
             showSearchScreen()
         else if data.action = "playlist"

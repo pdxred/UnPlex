@@ -5,6 +5,12 @@ sub init()
     m.ratingLabel = m.top.findNode("ratingLabel")
     m.genreLabel = m.top.findNode("genreLabel")
     m.summaryLabel = m.top.findNode("summaryLabel")
+    m.taglineLabel = m.top.findNode("taglineLabel")
+    m.contextLabel = m.top.findNode("contextLabel")
+    m.airdateLabel = m.top.findNode("airdateLabel")
+    m.castLabel = m.top.findNode("castLabel")
+    m.crewLabel = m.top.findNode("crewLabel")
+    m.studioLabel = m.top.findNode("studioLabel")
     m.buttonGroup = m.top.findNode("buttonGroup")
     m.loadingSpinner = m.top.findNode("loadingSpinner")
 
@@ -180,6 +186,17 @@ sub processMetadata()
 
     ' Update progress bar and remaining time
     updateDetailProgress()
+
+    ' Populate type-specific metadata
+    hideTypeSpecificLabels()
+    if item.type = "movie"
+        populateMovieMetadata(item)
+    else if item.type = "episode"
+        populateEpisodeMetadata(item)
+    else if item.type = "show"
+        populateShowMetadata(item)
+    end if
+    ' clip/unknown: all type-specific labels stay hidden
 
     ' Build buttons based on item type
     buildButtons()
@@ -484,6 +501,168 @@ sub showError(message as String)
     dialog.buttons = ["OK"]
     m.top.getScene().dialog = dialog
 end sub
+
+sub hideTypeSpecificLabels()
+    m.taglineLabel.visible = false
+    m.contextLabel.visible = false
+    m.airdateLabel.visible = false
+    m.castLabel.visible = false
+    m.crewLabel.visible = false
+    m.studioLabel.visible = false
+end sub
+
+sub populateMovieMetadata(item as Object)
+    ' Tagline
+    if item.tagline <> invalid and item.tagline <> ""
+        m.taglineLabel.text = item.tagline
+        m.taglineLabel.visible = true
+    end if
+
+    ' Cast — up to 5 Role[] names
+    if item.Role <> invalid and item.Role.count() > 0
+        castNames = []
+        maxCast = item.Role.count()
+        if maxCast > 5 then maxCast = 5
+        for i = 0 to maxCast - 1
+            role = item.Role[i]
+            if role <> invalid and role.tag <> invalid and role.tag <> ""
+                castNames.push(role.tag)
+            end if
+        end for
+        if castNames.count() > 0
+            m.castLabel.text = "Cast: " + castNames.join(", ")
+            m.castLabel.visible = true
+        end if
+    end if
+
+    ' Director and Writer — build crew line
+    directorName = ""
+    writerName = ""
+
+    if item.Director <> invalid and item.Director.count() > 0
+        firstDirector = item.Director[0]
+        if firstDirector <> invalid and firstDirector.tag <> invalid
+            directorName = firstDirector.tag
+        end if
+    end if
+
+    if item.Writer <> invalid and item.Writer.count() > 0
+        firstWriter = item.Writer[0]
+        if firstWriter <> invalid and firstWriter.tag <> invalid
+            writerName = firstWriter.tag
+        end if
+    end if
+
+    crewText = ""
+    if directorName <> ""
+        crewText = "Directed by " + directorName
+    end if
+    if writerName <> ""
+        if crewText <> ""
+            crewText = crewText + " · Written by " + writerName
+        else
+            crewText = "Written by " + writerName
+        end if
+    end if
+
+    if crewText <> ""
+        m.crewLabel.text = crewText
+        m.crewLabel.visible = true
+    end if
+
+    ' Studio
+    if item.studio <> invalid and item.studio <> ""
+        m.studioLabel.text = item.studio
+        m.studioLabel.visible = true
+    end if
+end sub
+
+sub populateEpisodeMetadata(item as Object)
+    ' Context line: "S{parentIndex} · E{index} — {grandparentTitle}"
+    contextParts = []
+    if item.parentIndex <> invalid
+        contextParts.push("S" + item.parentIndex.ToStr())
+    end if
+    if item.index <> invalid
+        contextParts.push("E" + item.index.ToStr())
+    end if
+
+    contextText = contextParts.join(" · ")
+
+    if item.grandparentTitle <> invalid and item.grandparentTitle <> ""
+        if contextText <> ""
+            contextText = contextText + " — " + item.grandparentTitle
+        else
+            contextText = item.grandparentTitle
+        end if
+    end if
+
+    if contextText <> ""
+        m.contextLabel.text = contextText
+        m.contextLabel.visible = true
+    end if
+
+    ' Air date
+    if item.originallyAvailableAt <> invalid and item.originallyAvailableAt <> ""
+        formatted = FormatDate(item.originallyAvailableAt)
+        m.airdateLabel.text = "Aired: " + formatted
+        m.airdateLabel.visible = true
+    end if
+end sub
+
+sub populateShowMetadata(item as Object)
+    ' Context line: "{childCount} Seasons · {leafCount} Episodes"
+    showParts = []
+    if item.childCount <> invalid
+        showParts.push(item.childCount.ToStr() + " Seasons")
+    end if
+    if item.leafCount <> invalid
+        showParts.push(item.leafCount.ToStr() + " Episodes")
+    end if
+
+    if showParts.count() > 0
+        m.contextLabel.text = showParts.join(" · ")
+        m.contextLabel.visible = true
+    end if
+
+    ' Studio
+    if item.studio <> invalid and item.studio <> ""
+        m.studioLabel.text = item.studio
+        m.studioLabel.visible = true
+    end if
+end sub
+
+function FormatDate(dateStr as String) as String
+    if dateStr = invalid or dateStr = ""
+        return dateStr
+    end if
+
+    parts = dateStr.split("-")
+    if parts.count() <> 3
+        return dateStr
+    end if
+
+    months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+
+    yearStr = parts[0]
+    monthStr = parts[1]
+    dayStr = parts[2]
+
+    monthNum = monthStr.ToInt()
+    if monthNum < 1 or monthNum > 12
+        return dateStr
+    end if
+
+    monthName = months[monthNum - 1]
+
+    ' Strip leading zero from day
+    dayNum = dayStr.ToInt()
+    if dayNum < 1 or dayNum > 31
+        return dateStr
+    end if
+
+    return monthName + " " + dayNum.ToStr() + ", " + yearStr
+end function
 
 function onKeyEvent(key as String, press as Boolean) as Boolean
     if not press then return false

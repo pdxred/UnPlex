@@ -111,6 +111,8 @@ These rules are non-negotiable — violating them causes crashes or broken behav
 
 7. **Use ContentNode trees** to populate all grids and lists. SceneGraph components like `MarkupGrid`, `PosterGrid`, and `RowList` expect ContentNode hierarchies for data binding.
 
+8. **All HTTP in Task nodes must use `AsyncGetToString()` + `wait(timeout, port)`.** Never call blocking `GetToString()` in a Task node — it blocks the Task thread with no timeout control. Use `AsyncGetToString()` to initiate the request, then `wait(30000, port)` to wait with a timeout. This ensures tasks can time out gracefully instead of hanging indefinitely.
+
 ### Error Handling
 
 - Use `SafeGet(obj, field, default)` for defensive access to API response fields
@@ -141,12 +143,13 @@ UnPlex/
 │   ├── screens/                # Full-screen views
 │   │   ├── HomeScreen          # Library browsing with sidebar + poster grid + hubs
 │   │   ├── DetailScreen        # Item metadata, play button, watch state
-│   │   ├── EpisodeScreen       # Season/episode list for TV shows
+│   │   ├── ShowScreen           # TV show season poster row + episode grid
 │   │   ├── SearchScreen        # Custom keyboard search with filter + results grid
 │   │   ├── PlaylistScreen      # Playlist item browsing
 │   │   ├── SettingsScreen      # User and library management
 │   │   ├── PINScreen           # OAuth PIN code display and polling
-│   │   └── UserPickerScreen    # Managed user selection
+│   │   ├── UserPickerScreen    # Managed user selection
+│   │   └── PostPlayScreen      # Post-play next episode countdown and options
 │   ├── widgets/                # Reusable UI components
 │   │   ├── Sidebar             # Library nav list (MarkupList + SidebarNavItem)
 │   │   ├── PosterGrid          # Movie/show poster grid with badges
@@ -154,7 +157,7 @@ UnPlex/
 │   │   ├── FilterBar           # Genre/sort controls
 │   │   ├── AlphaNav            # A–Z alphabetic jump navigation
 │   │   ├── LoadingSpinner      # Safe loading indicator (Label+Rectangle+Timer)
-│   │   └── [10 more widgets]   # TrackSelectionPanel, EpisodeItem, PlaylistItem, etc.
+│   │   └── [8 more widgets]    # TrackSelectionPanel, EpisodeGridItem, PlaylistItem, etc.
 │   └── tasks/                  # Background HTTP Task nodes
 │       ├── PlexApiTask         # General library/metadata API calls
 │       ├── PlexAuthTask        # PIN polling + plex.tv auth + server discovery
@@ -165,7 +168,7 @@ UnPlex/
 └── images/                      # App icons (FHD + HD), splash screen
 ```
 
-**Codebase scale:** ~8,978 lines of BrightScript across 33 `.brs` files, ~1,348 lines of SceneGraph XML across 32 `.xml` files, plus the manifest, fonts, and image assets.
+**Codebase scale:** ~10,000 lines of BrightScript across 33 `.brs` files, ~1,971 lines of SceneGraph XML across 29 `.xml` files, plus the manifest, fonts, and image assets.
 
 ## Known Limitations
 

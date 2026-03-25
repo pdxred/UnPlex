@@ -134,6 +134,15 @@ sub run()
         return
     end if
 
+    ' Treat other HTTP errors (403, 404, 500, etc.) as errors
+    if responseCode >= 400
+        errorMsg = "HTTP error " + responseCode.ToStr() + " from " + endpoint
+        LogError("API error: " + errorMsg)
+        m.top.error = errorMsg
+        m.top.status = "error"
+        return
+    end if
+
     ' Some endpoints (scrobble, unscrobble, timeline) return empty 200 responses
     if response = "" and responseCode >= 200 and responseCode < 300
         LogEvent("API complete: " + endpoint + " (empty " + responseCode.ToStr() + ")")

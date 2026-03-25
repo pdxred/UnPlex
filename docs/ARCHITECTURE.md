@@ -14,10 +14,10 @@ UnPlex follows a layered component architecture. All UI is built with Roku Scene
 │   │   Screen stack · Auth routing · Global state      │ │
 │   ├───────────────────────────────────────────────────┤ │
 │   │               Screens (9)                         │ │
-│   │   HomeScreen · DetailScreen · EpisodeScreen       │ │
+│   │   HomeScreen · DetailScreen · ShowScreen           │ │
 │   │   SearchScreen · PINScreen · SettingsScreen ...   │ │
 │   ├───────────────────────────────────────────────────┤ │
-│   │               Widgets (15+)                       │ │
+│   │               Widgets (14)                        │ │
 │   │   PosterGrid · Sidebar · VideoPlayer              │ │
 │   │   FilterBar · AlphaNav · TrackPanel ...           │ │
 │   ├───────────────────────────────────────────────────┤ │
@@ -148,6 +148,8 @@ Tokens are stored in `roRegistrySection("UnPlex")` and persist across app restar
 6. As the user scrolls near the bottom, an `onLoadMore` event triggers the next page fetch
 7. Hub rows (Continue Watching, Recently Added) are fetched separately and refresh on a 2-minute timer
 
+For TV shows, selecting a show from HomeScreen or SearchScreen navigates to ShowScreen, which displays season posters in a horizontal row. Focusing a season loads its episodes as landscape thumbnail cards in a grid below. Selecting an episode navigates to DetailScreen.
+
 ### Playback
 
 ```
@@ -251,6 +253,25 @@ This reduces bandwidth and memory usage. The `BuildPosterUrl()` helper in `utils
 
 Plex API responses can have missing or null fields depending on server version and media type. The `SafeGet(obj, field, default)` function prevents crashes by checking for `invalid` objects and missing fields before access. `SafeGetMetadata(response)` safely extracts the `MediaContainer.Metadata` array that most endpoints return.
 
+### Type-Branching in DetailScreen
+
+DetailScreen displays type-specific metadata by branching on `item.type`. On each item load, `hideTypeSpecificLabels()` resets all 6 type-specific Label nodes to hidden, then a type-specific populate function runs:
+
+- **Movies:** `populateMovieMetadata()` — tagline, cast (up to 5 names from `Role[]`), director + writer crew line, studio
+- **Episodes:** `populateEpisodeMetadata()` — "S{parentIndex} · E{index} — {grandparentTitle}" context, formatted air date
+- **Shows:** `populateShowMetadata()` — "{childCount} Seasons · {leafCount} Episodes" context, studio
+- **Clips/Unknown:** All type-specific labels stay hidden — generic metadata (title, year, runtime, rating, summary) still renders
+
+The metadata group uses a `LayoutGroup` with `layoutDirection="vert"` instead of fixed Y-offsets, so variable-height summaries don't break the layout (D008).
+
+Nested Plex API arrays (e.g., `Role[]`, `Director[]`) require a 4-level null-guard pattern: check parent `<> invalid`, check `count() > 0`, check element `<> invalid`, check element field `<> invalid`.
+
+### ShowScreen Dual-Focus Areas
+
+ShowScreen manages two focus areas: a season poster row (PosterGrid, numRows=1) and an episode grid (MarkupGrid). When the user navigates down from the season row, focus transfers to the episode grid via explicit `setFocus(false)` on the season row followed by `setFocus(true)` on the episode grid. The `drawFocusFeedback` flag toggles on each area to provide visual feedback for which area is active.
+
+When a different season gains focus in the season row, PosterGrid's `itemFocused` interface field fires, triggering an episode reload for that season. The first season with unwatched episodes is auto-focused on initial load.
+
 ## Component Inventory
 
 ### Screens (9)
@@ -258,28 +279,29 @@ Plex API responses can have missing or null fields depending on server version a
 | Screen | Purpose |
 |--------|---------|
 | **HomeScreen** | Main library browsing — sidebar, poster grid, hub rows, filter/sort |
-| **DetailScreen** | Item metadata display — poster, title, summary, play button, watch state |
-| **EpisodeScreen** | TV show season/episode list — season picker, episode grid |
+| **DetailScreen** | Item metadata display — type-specific fields for movies (tagline, cast, director, crew, studio), episodes (season/show context, air date), shows (season/episode counts, studio). LayoutGroup auto-stacking for variable-height content |
+| **ShowScreen** | TV show browsing — season poster row (PosterGrid numRows=1) + episode landscape grid (MarkupGrid) with auto-focus on first unwatched season |
 | **SearchScreen** | Search — custom keyboard input with filter buttons and results grid |
 | **PlaylistScreen** | Playlist item browsing and playback |
 | **SettingsScreen** | User and library management |
 | **PINScreen** | OAuth authentication — displays PIN code and polls for token |
 | **UserPickerScreen** | Managed user selection with optional PIN entry |
+| **PostPlayScreen** | Post-play — next episode countdown with replay, back-to-show, and auto-play options |
 | **(MainScene)** | Root coordinator — screen stack, auth routing, global state management |
 
-### Widgets (15+)
+### Widgets (14)
 
 | Widget | Purpose |
 |--------|---------|
 | **Sidebar** | Library navigation list with pinned libraries and nav items |
 | **SidebarNavItem** | Custom MarkupList item renderer for the Sidebar |
-| **PosterGrid** | Scrollable poster grid with selection, badges, and dynamic column sizing |
+| **PosterGrid** | Scrollable poster grid with selection, badges, dynamic column sizing, and itemFocused notification |
 | **PosterGridItem** | Individual poster with progress bar and watched badge |
 | **VideoPlayer** | Full playback — seeking, track selection, skip intro/credits, auto-play next |
 | **TrackSelectionPanel** | Audio and subtitle track picker during playback |
 | **FilterBar** | Genre/year/sort filter controls above the grid |
 | **FilterBottomSheet** | Modal filter options panel |
-| **EpisodeItem** | Single episode row in the episode list |
+| **EpisodeGridItem** | Landscape episode card (320×180) with thumbnail, episode number + title, duration, progress bar, watched badge |
 | **PlaylistItem** | Single playlist entry |
 | **UserAvatarItem** | User avatar and name for the user picker |
 | **LibrarySettingItem** | Pinned library toggle in settings |

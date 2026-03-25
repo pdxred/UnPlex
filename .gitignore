@@ -2,6 +2,8 @@
 *.zip
 *.zip.old
 out/
+.roku-deploy/
+*.pkg
 
 # Dependencies
 node_modules/
@@ -24,7 +26,6 @@ Thumbs.db
 
 # ── GSD baseline (auto-generated) ──
 .idea/
-.vscode/
 *.code-workspace
 .env.*
 !.env.example
@@ -51,6 +52,7 @@ tmp/
 .planning/
 # GSD project management infrastructure
 .gsd/
+.gsd
 # Claude Code agent configuration
 .claude/
 # Background shell session state
@@ -63,6 +65,3 @@ scripts/
 .gsd.migrating/
 # Project planning briefs
 simplex-project-brief.md
-
-# ── GSD baseline (auto-generated) ──
-.gsd

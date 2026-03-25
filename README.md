@@ -94,7 +94,8 @@ This uses [roku-deploy](https://github.com/RokuCommunity/roku-deploy) to build, 
 
 - **Sidebar** — Press **Left** from any screen to access the sidebar with your pinned libraries, hub sections (Home, On Deck), and settings
 - **Library browsing** — Select a library to view its content in a poster grid. Use the filter/sort options to narrow results by genre, year, or watched status
-- **TV Shows** — Navigate from Show → Season list → Episode grid
+- **TV Shows** — Click a show to see season posters in a scrollable row, select a season to browse episodes as landscape thumbnail cards in a grid below
+- **Enriched detail screens** — movies show tagline, cast, director, studio; episodes show air date and season context; shows display season and episode counts
 - **Search** — Select the search option from the sidebar. Type to search across all libraries with debounced results
 
 ### Playback
@@ -139,7 +140,7 @@ UnPlex/
 │   └── constants.brs       # Colors, sizes, API constants
 ├── components/              # SceneGraph components
 │   ├── MainScene.xml/.brs  # Root scene and screen stack management
-│   ├── screens/            # Full-screen views (Home, Detail, Episodes, Search, Settings)
+│   ├── screens/            # Full-screen views (Home, Detail, Show, Search, Settings, PostPlay, Playlist, PIN, UserPicker)
 │   ├── widgets/            # Reusable UI (Sidebar, PosterGrid, VideoPlayer)
 │   └── tasks/              # Background Task nodes for HTTP requests
 ├── fonts/                   # Bundled fonts (Inter Bold)

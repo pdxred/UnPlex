@@ -29,11 +29,26 @@ sub run()
         url.AddHeader(key, headers[key])
     end for
 
-    ' Make GET request
-    response = url.GetToString()
+    ' Make async GET request with timeout
+    port = CreateObject("roMessagePort")
+    url.SetMessagePort(port)
+    if not url.AsyncGetToString()
+        m.top.error = "Failed to start search request"
+        m.top.status = "error"
+        return
+    end if
+
+    msg = wait(10000, port)
+    if msg = invalid
+        m.top.error = "Search request timed out"
+        m.top.status = "error"
+        return
+    end if
+
+    response = msg.GetString()
 
     if response = ""
-        m.top.error = "Search failed: " + url.GetFailureReason()
+        m.top.error = "Search failed: empty response"
         m.top.status = "error"
         return
     end if

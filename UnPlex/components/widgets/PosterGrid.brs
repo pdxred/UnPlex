@@ -96,6 +96,9 @@ sub onItemFocused(event as Object)
     index = event.getData()
     m.lastFocusedIndex = index
 
+    ' Bubble focus index up to interface for parent components (e.g. ShowScreen)
+    m.top.itemFocused = index
+
     ' Check if we need to load more (within 2 rows of the end)
     itemsPerRow = m.grid.numColumns
     threshold = m.totalItems - (itemsPerRow * 2)

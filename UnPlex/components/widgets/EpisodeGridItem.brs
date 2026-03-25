@@ -1,15 +1,15 @@
 sub init()
     m.thumbnail = m.top.findNode("thumbnail")
     m.titleLabel = m.top.findNode("titleLabel")
-    m.summaryLabel = m.top.findNode("summaryLabel")
     m.durationLabel = m.top.findNode("durationLabel")
     m.progressTrack = m.top.findNode("progressTrack")
     m.progressFill = m.top.findNode("progressFill")
+    m.watchedBadge = m.top.findNode("watchedBadge")
+    m.watchedBadgeBg = m.top.findNode("watchedBadgeBg")
     m.unwatchedBadge = m.top.findNode("unwatchedBadge")
 
-    ' Cache constants and set badge tint color
+    ' Cache constants
     m.constants = m.global.constants
-    m.unwatchedBadge.blendColor = m.constants.ACCENT
 end sub
 
 sub onItemContentChange(event as Object)
@@ -19,21 +19,22 @@ sub onItemContentChange(event as Object)
     ' Set thumbnail
     if content.thumb <> invalid and content.thumb <> ""
         m.thumbnail.uri = content.thumb
+    else
+        m.thumbnail.uri = ""
     end if
 
-    ' Set title
+    ' Set formatted title: "E1 · Title"
     if content.title <> invalid
         m.titleLabel.text = content.title
-    end if
-
-    ' Set summary
-    if content.summary <> invalid
-        m.summaryLabel.text = content.summary
+    else
+        m.titleLabel.text = ""
     end if
 
     ' Set duration
     if content.duration <> invalid and content.duration > 0
         m.durationLabel.text = FormatTime(content.duration)
+    else
+        m.durationLabel.text = ""
     end if
 
     ' Update watch state indicators (progress bar must be called first)
@@ -57,7 +58,7 @@ sub updateProgressBar(content as Object)
         if progress > 1.0 then progress = 1.0
         m.progressTrack.visible = true
         m.progressFill.visible = true
-        m.progressFill.width = Int(213 * progress)
+        m.progressFill.width = Int(320 * progress)
         m.progressFill.color = m.constants.ACCENT
     else
         m.progressTrack.visible = false
@@ -66,35 +67,32 @@ sub updateProgressBar(content as Object)
 end sub
 
 sub updateBadge(content as Object)
-    ' Coexistence rule: progress bar showing = hide badge
+    ' Coexistence rule: progress bar showing = hide all badges
     if m.progressTrack.visible = true
         m.unwatchedBadge.visible = false
+        m.watchedBadge.visible = false
+        m.watchedBadgeBg.visible = false
         return
     end if
 
     ' Check watched state via viewCount or watched flag
+    watched = false
     if content.viewCount <> invalid and content.viewCount > 0
-        m.unwatchedBadge.visible = false
-        return
+        watched = true
     end if
     if content.watched <> invalid and content.watched = true
+        watched = true
+    end if
+
+    if watched
+        ' Watched: show checkmark
         m.unwatchedBadge.visible = false
-        return
-    end if
-
-    ' Unwatched: show badge (no count label for individual episodes)
-    m.unwatchedBadge.visible = true
-end sub
-
-function FormatTime(ms as Integer) as String
-    totalSeconds = ms / 1000
-    hours = totalSeconds \ 3600
-    minutes = (totalSeconds mod 3600) \ 60
-    seconds = totalSeconds mod 60
-
-    if hours > 0
-        return hours.ToStr() + ":" + Right("0" + minutes.ToStr(), 2) + ":" + Right("0" + seconds.ToStr(), 2)
+        m.watchedBadge.visible = true
+        m.watchedBadgeBg.visible = true
     else
-        return minutes.ToStr() + ":" + Right("0" + seconds.ToStr(), 2)
+        ' Unwatched: show dot badge
+        m.unwatchedBadge.visible = true
+        m.watchedBadge.visible = false
+        m.watchedBadgeBg.visible = false
     end if
-end function
+end sub

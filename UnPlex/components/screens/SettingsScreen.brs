@@ -383,6 +383,7 @@ sub onAuthTaskStateChange(event as Object)
         ' Retry after delay
         m.pollTimer.duration = 5
         m.pollTimer.repeat = false
+        m.pollTimer.unobserveField("fire")
         m.pollTimer.observeField("fire", "requestPin")
         m.pollTimer.control = "start"
     end if

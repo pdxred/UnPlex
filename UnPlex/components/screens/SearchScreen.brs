@@ -530,11 +530,19 @@ sub onGridItemSelected(event as Object)
     content = m.resultsGrid.content
     if content <> invalid and index >= 0 and index < content.getChildCount()
         item = content.getChild(index)
-        m.top.itemSelected = {
-            action: "detail"
-            ratingKey: item.ratingKey
-            itemType: item.itemType
-        }
+        if item.itemType = "show"
+            m.top.itemSelected = {
+                action: "episodes"
+                ratingKey: item.ratingKey
+                title: item.title
+            }
+        else
+            m.top.itemSelected = {
+                action: "detail"
+                ratingKey: item.ratingKey
+                itemType: item.itemType
+            }
+        end if
     end if
 end sub
 
