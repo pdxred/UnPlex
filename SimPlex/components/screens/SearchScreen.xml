@@ -19,17 +19,14 @@
         <Label id="queryLabel" translation="[260, 30]"
             font="font:MediumSystemFont" color="0xA0A0B0FF" width="1500" />
 
-        <!-- Keyboard container (all keys built dynamically in BRS) -->
+        <!-- Keyboard + action keys + separator + filter buttons (all in one row) -->
         <Group id="keyboardGroup" translation="[80, 80]" />
 
-        <!-- Filter row (built dynamically in BRS to match keyboard styling) -->
-        <Group id="filterGroup" translation="[80, 248]" />
-
-        <!-- Divider below filter row -->
-        <Rectangle id="divider" translation="[80, 306]" width="1760" height="1" color="0xFFFFFF15" />
+        <!-- Divider below keyboard row -->
+        <Rectangle id="divider" translation="[80, 240]" width="1760" height="1" color="0xFFFFFF15" />
 
         <!-- Results grid (horizontal single-row, full width) -->
-        <PosterGrid id="resultsGrid" translation="[80, 326]" gridWidth="1760" />
+        <PosterGrid id="resultsGrid" translation="[80, 260]" gridWidth="1760" />
 
         <Group id="emptyState" translation="[960, 600]" visible="false">
             <Label id="emptyTitle" horizAlign="center" text="No results found"

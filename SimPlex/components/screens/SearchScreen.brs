@@ -1,23 +1,20 @@
-' ===== SearchScreen — 3-row keyboard, custom filters, horizontal results =====
+' ===== SearchScreen — 3-row keyboard + inline filters, horizontal results =====
 '
 ' Layout (FHD 1920×1080):
 '   y=25:   "Search" title + live query text
-'   y=80:   Keyboard (3 rows × 12 cols):
-'             Row 0: A B C D E F G H I J K L
-'             Row 1: M N O P Q R S T U V W X
-'             Row 2: Y Z 0 1 2 3 4 5 6 7 8 9
-'             Action keys: Space / Delete / Clear (right of grid, full 3-row height)
-'   y=248:  Filter row: All | Movies | TV Shows | Other (custom drawn, matches keyboard)
-'   y=306:  Divider
-'   y=326:  Results — single horizontal row of posters (scrolls left/right)
+'   y=80:   Single keyboard row containing all controls:
+'             Letters (12 cols × 3 rows) | Action keys (Space/Delete/Clear) |
+'             2px separator | Filter buttons (All/Movies/TV Shows/Other)
+'             All action and filter buttons span full 3-row height (152px)
+'   y=240:  Divider
+'   y=260:  Results — single horizontal row of posters (scrolls left/right)
 '
-' Focus areas: "keyboard" | "filters" | "grid"
-'   Left/Right within keyboard navigates across all sections seamlessly
-'   Down from keyboard → filters
-'   Down from filters → grid (if results exist)
-'   Up from grid → filters
-'   Up from filters → keyboard
-'   Back: grid→filters, filters→keyboard, keyboard→exit
+' Focus areas: "keyboard" | "grid"
+'   Keyboard includes letter grid, action keys, AND filter buttons in one
+'   continuous left/right navigation strip.
+'   Down from keyboard → grid (if results exist)
+'   Up from grid → keyboard
+'   Back: grid→keyboard, keyboard→exit
 
 sub init()
     ' ── Layout dimensions ──
@@ -28,11 +25,14 @@ sub init()
     m.KB_ROWS = 3
     m.ACTION_GAP = 30
     m.ACTION_W = 135
-    m.ACTION_H = (m.KEY_H * m.KB_ROWS) + (m.KEY_SP * (m.KB_ROWS - 1))  ' spans all 3 rows
+    m.ACTION_H = (m.KEY_H * m.KB_ROWS) + (m.KEY_SP * (m.KB_ROWS - 1))  ' 152px, spans all 3 rows
     m.ACTION_SP = 10
+    m.SEPARATOR_GAP = 15
+    m.SEPARATOR_W = 2
+    m.FILTER_W = 135   ' same width as action keys
+    m.FILTER_SP = 10   ' same spacing as action keys
 
     m.queryLabel = m.top.findNode("queryLabel")
-    m.filterGroup = m.top.findNode("filterGroup")
     m.resultsGrid = m.top.findNode("resultsGrid")
     m.emptyState = m.top.findNode("emptyState")
     m.loadingSpinner = m.top.findNode("loadingSpinner")
@@ -41,22 +41,18 @@ sub init()
     m.keyboardGroup = m.top.findNode("keyboardGroup")
 
     m.filterIndex = 0   ' 0=All, 1=Movies, 2=TV Shows, 3=Other
-    m.filterFocusIndex = 0  ' Tracks which filter button has visual focus
     m.searchQuery = ""
-    m.focusArea = "keyboard"  ' "keyboard" | "filters" | "grid"
+    m.focusArea = "keyboard"  ' "keyboard" | "grid"
     m.retryCount = 0
     m.retryContext = invalid
     m.lastSearchResponse = invalid
 
-    ' Keyboard state: row (0-2), col (0 to totalCols-1 across all sections)
+    ' Keyboard state: row (0-2 for letter grid), col (0 to totalCols-1)
     m.kbRow = 0
     m.kbCol = 0
 
-    ' Build the keyboard UI
+    ' Build the entire keyboard row: letters + actions + separator + filters
     buildKeyboard()
-
-    ' Build the custom filter row (matching keyboard style)
-    buildFilterButtons()
 
     ' Configure results grid for horizontal single-row layout
     m.resultsGrid.numRows = 1
@@ -85,11 +81,9 @@ end sub
 ' ========== Keyboard Construction ==========
 
 sub buildKeyboard()
-    ' 3 rows of 12 characters:
-    '   Row 0: A-L
-    '   Row 1: M-X
-    '   Row 2: Y-Z + 0-9
-    m.gridKeys = []  ' 2D array: m.gridKeys[row][col] = { label, bg, char }
+    ' ── Section 1: Letter/number grid (12 cols × 3 rows) ──
+    '   Row 0: A-L, Row 1: M-X, Row 2: Y-Z + 0-9
+    m.gridKeys = []
     rows = [
         ["A","B","C","D","E","F","G","H","I","J","K","L"],
         ["M","N","O","P","Q","R","S","T","U","V","W","X"],
@@ -108,7 +102,7 @@ sub buildKeyboard()
         m.gridKeys.push(rowArr)
     end for
 
-    ' Action keys: Space, Delete, Clear — tall buttons spanning all 3 rows
+    ' ── Section 2: Action keys (Space, Delete, Clear) — tall, spanning 3 rows ──
     m.actionKeys = []
     actionStartX = m.GRID_COLS * (m.KEY_W + m.KEY_SP) + m.ACTION_GAP
     actionLabels = ["Space", "Delete", "Clear"]
@@ -121,10 +115,39 @@ sub buildKeyboard()
         m.actionKeys.push(info)
     end for
 
-    ' Total columns for unified navigation:
-    '   cols 0..11  = grid keys (12)
-    '   cols 12..14 = actions (3)
-    m.totalCols = m.GRID_COLS + 3
+    ' ── Vertical separator ──
+    lastActionEndX = actionStartX + 2 * (m.ACTION_W + m.ACTION_SP) + m.ACTION_W
+    sepX = lastActionEndX + m.SEPARATOR_GAP
+    separator = CreateObject("roSGNode", "Rectangle")
+    separator.width = m.SEPARATOR_W
+    separator.height = m.ACTION_H
+    separator.color = "0xFFFFFF25"
+    separator.translation = [sepX, 0]
+    m.keyboardGroup.appendChild(separator)
+
+    ' ── Section 3: Filter buttons — same style as action keys ──
+    m.filterKeys = []
+    filterStartX = sepX + m.SEPARATOR_W + m.SEPARATOR_GAP
+    filterLabels = ["All", "Movies", "TV Shows", "Other"]
+    filterChars  = ["F_ALL", "F_MOV", "F_TV", "F_OTH"]
+
+    for i = 0 to 3
+        x = filterStartX + i * (m.FILTER_W + m.FILTER_SP)
+        info = createKeyCell(x, 0, m.FILTER_W, m.ACTION_H, filterLabels[i])
+        info.char = filterChars[i]
+        m.filterKeys.push(info)
+    end for
+
+    ' Apply initial active-filter visual (All)
+    updateFilterActiveVisual()
+
+    ' ── Column map for unified navigation ──
+    '   cols 0..11  = letter grid (12)
+    '   cols 12..14 = action keys (3)
+    '   cols 15..18 = filter buttons (4)
+    m.FIRST_ACTION_COL = m.GRID_COLS          ' 12
+    m.FIRST_FILTER_COL = m.GRID_COLS + 3      ' 15
+    m.totalCols = m.GRID_COLS + 3 + 4         ' 19
 end sub
 
 function createKeyCell(x as Integer, y as Integer, w as Integer, h as Integer, text as String) as Object
@@ -149,69 +172,17 @@ function createKeyCell(x as Integer, y as Integer, w as Integer, h as Integer, t
     return { bg: bg, label: label, char: text }
 end function
 
-' ========== Custom Filter Buttons ==========
+' ========== Filter Active Visual ==========
 
-sub buildFilterButtons()
-    ' Custom-drawn filter buttons that visually match the keyboard cells.
-    ' Each filter button: rounded-rect background + centered label, same
-    ' font/colors as keyboard keys. Highlighted filter = accent bg + dark text.
-    m.filterLabels = ["All", "Movies", "TV Shows", "Other"]
-    m.filterKeys = []  ' array of { bg, label }
-    m.FILTER_H = 42
-    m.FILTER_SP = 8
-    filterX = 0
-
-    for i = 0 to m.filterLabels.count() - 1
-        text = m.filterLabels[i]
-        ' Variable width: measure roughly by character count + padding
-        charW = text.Len() * 12 + 28  ' ~12px per char + 28px padding
-        if charW < 60 then charW = 60
-
-        bg = CreateObject("roSGNode", "Rectangle")
-        bg.width = charW
-        bg.height = m.FILTER_H
-        bg.color = "0xFFFFFF10"
-        bg.translation = [filterX, 0]
-        m.filterGroup.appendChild(bg)
-
-        label = CreateObject("roSGNode", "Label")
-        label.width = charW
-        label.height = m.FILTER_H
-        label.horizAlign = "center"
-        label.vertAlign = "center"
-        label.font = "font:SmallBoldSystemFont"
-        label.color = "0xCCCCCCFF"
-        label.text = text
-        label.translation = [filterX, 0]
-        m.filterGroup.appendChild(label)
-
-        m.filterKeys.push({ bg: bg, label: label, width: charW })
-        filterX = filterX + charW + m.FILTER_SP
-    end for
-
-    ' Set initial active filter visual (index 0 = "All")
-    updateFilterVisuals()
-end sub
-
-sub updateFilterVisuals()
-    ' Update filter button visuals: active filter gets accent underline bar,
-    ' focused filter (when focusArea=filters) gets accent bg.
+sub updateFilterActiveVisual()
+    ' Show which filter is currently active (semi-transparent accent when
+    ' that filter button is NOT focused, full accent handled by updateKeyboardFocus)
     for i = 0 to m.filterKeys.count() - 1
         fk = m.filterKeys[i]
-        if m.focusArea = "filters" and i = m.filterIndex
-            ' Focused + active
-            fk.bg.color = "0xF3B125FF"
-            fk.label.color = "0x000000FF"
-        else if i = m.filterIndex
-            ' Active but not focused
-            fk.bg.color = "0xF3B125AA"
-            fk.label.color = "0x000000FF"
-        else if m.focusArea = "filters" and i = m.filterFocusIndex
-            ' Focused but not active
-            fk.bg.color = "0xFFFFFF30"
+        if i = m.filterIndex
+            fk.bg.color = "0xF3B12560"
             fk.label.color = "0xFFFFFFFF"
         else
-            ' Default
             fk.bg.color = "0xFFFFFF10"
             fk.label.color = "0xCCCCCCFF"
         end if
@@ -221,7 +192,7 @@ end sub
 ' ========== Keyboard Focus Visual ==========
 
 sub updateKeyboardFocus()
-    ' Clear all key highlights
+    ' Reset all keys to default
     for row = 0 to m.KB_ROWS - 1
         for col = 0 to m.GRID_COLS - 1
             m.gridKeys[row][col].bg.color = "0xFFFFFF10"
@@ -233,7 +204,10 @@ sub updateKeyboardFocus()
         m.actionKeys[i].label.color = "0xCCCCCCFF"
     end for
 
-    ' Highlight the focused key
+    ' Reset filter buttons to their active/inactive base state
+    updateFilterActiveVisual()
+
+    ' Highlight the focused key (overrides filter base state if on a filter)
     info = getKeyAt(m.kbRow, m.kbCol)
     if info <> invalid
         info.bg.color = "0xF3B125FF"
@@ -241,18 +215,39 @@ sub updateKeyboardFocus()
     end if
 end sub
 
+sub clearKeyboardHighlight()
+    ' Remove focus highlight from all keys, preserving filter active state
+    for row = 0 to m.KB_ROWS - 1
+        for col = 0 to m.GRID_COLS - 1
+            m.gridKeys[row][col].bg.color = "0xFFFFFF10"
+            m.gridKeys[row][col].label.color = "0xCCCCCCFF"
+        end for
+    end for
+    for i = 0 to 2
+        m.actionKeys[i].bg.color = "0xFFFFFF10"
+        m.actionKeys[i].label.color = "0xCCCCCCFF"
+    end for
+    updateFilterActiveVisual()
+end sub
+
 ' Map unified (row, col) to a key info object
 function getKeyAt(row as Integer, col as Integer) as Object
     if col < m.GRID_COLS
-        ' Grid key section
+        ' Letter/number grid
         if row >= 0 and row < m.KB_ROWS and col < m.gridKeys[row].count()
             return m.gridKeys[row][col]
         end if
-    else
-        ' Action section (actions span all rows, so row is ignored for lookup)
-        actionIdx = col - m.GRID_COLS
+    else if col < m.FIRST_FILTER_COL
+        ' Action keys (span all rows — row is ignored)
+        actionIdx = col - m.FIRST_ACTION_COL
         if actionIdx >= 0 and actionIdx < 3
             return m.actionKeys[actionIdx]
+        end if
+    else
+        ' Filter buttons (span all rows — row is ignored)
+        filterIdx = col - m.FIRST_FILTER_COL
+        if filterIdx >= 0 and filterIdx < m.filterKeys.count()
+            return m.filterKeys[filterIdx]
         end if
     end if
     return invalid
@@ -268,15 +263,20 @@ end function
 ' ========== Focus Management ==========
 
 sub onFocusChange(event as Object)
-    if m.top.hasFocus() or (m.top.isInFocusChain() and m.top.focusedChild = invalid)
-        if m.focusArea = "keyboard"
-            ' Keep focus on the screen Group — keyboard is manually drawn
+    ' This fires when the SearchScreen Group itself gains or regains focus.
+    ' We must ensure exactly one focus owner at all times.
+    if m.top.hasFocus()
+        ' The Group itself has focus (not a child). This is correct for
+        ' keyboard mode. If we're supposed to be in grid mode, re-delegate.
+        if m.focusArea = "grid"
+            delegateFocusToGrid()
+        end if
+        ' Otherwise keyboard/filters: Group keeps focus, onKeyEvent handles input.
+    else if m.top.isInFocusChain() and m.top.focusedChild <> invalid
+        ' A child (the MarkupGrid) has focus. Verify this is intentional.
+        if m.focusArea <> "grid"
+            ' Focus escaped to grid unexpectedly — reclaim it.
             m.top.setFocus(true)
-        else if m.focusArea = "filters"
-            ' Filters are also manually drawn — keep focus on screen
-            m.top.setFocus(true)
-        else
-            setFocusToArea(m.focusArea)
         end if
     end if
 end sub
@@ -286,34 +286,19 @@ sub setFocusToArea(area as String)
     if area = "keyboard"
         m.top.setFocus(true)
         updateKeyboardFocus()
-        updateFilterVisuals()
-    else if area = "filters"
-        m.top.setFocus(true)
-        clearKeyboardHighlight()
-        updateFilterVisuals()
     else if area = "grid"
         clearKeyboardHighlight()
-        updateFilterVisuals()
-        innerGrid = m.resultsGrid.findNode("grid")
-        if innerGrid <> invalid
-            innerGrid.setFocus(true)
-        else
-            m.resultsGrid.setFocus(true)
-        end if
+        delegateFocusToGrid()
     end if
 end sub
 
-sub clearKeyboardHighlight()
-    for row = 0 to m.KB_ROWS - 1
-        for col = 0 to m.GRID_COLS - 1
-            m.gridKeys[row][col].bg.color = "0xFFFFFF10"
-            m.gridKeys[row][col].label.color = "0xCCCCCCFF"
-        end for
-    end for
-    for i = 0 to 2
-        m.actionKeys[i].bg.color = "0xFFFFFF10"
-        m.actionKeys[i].label.color = "0xCCCCCCFF"
-    end for
+sub delegateFocusToGrid()
+    innerGrid = m.resultsGrid.findNode("grid")
+    if innerGrid <> invalid
+        innerGrid.setFocus(true)
+    else
+        m.resultsGrid.setFocus(true)
+    end if
 end sub
 
 ' ========== Keyboard Input ==========
@@ -322,6 +307,22 @@ sub activateKey()
     key = getFocusedKeyChar()
     if key = "" then return
 
+    ' ── Filter button activation ──
+    if key = "F_ALL"
+        applyFilter(0)
+        return
+    else if key = "F_MOV"
+        applyFilter(1)
+        return
+    else if key = "F_TV"
+        applyFilter(2)
+        return
+    else if key = "F_OTH"
+        applyFilter(3)
+        return
+    end if
+
+    ' ── Text input keys ──
     if key = "DEL"
         if m.searchQuery.Len() > 0
             m.searchQuery = m.searchQuery.Left(m.searchQuery.Len() - 1)
@@ -335,6 +336,16 @@ sub activateKey()
     end if
     updateQueryDisplay()
     triggerSearch()
+end sub
+
+sub applyFilter(index as Integer)
+    if m.filterIndex <> index
+        m.filterIndex = index
+        updateKeyboardFocus()
+        if m.lastSearchResponse <> invalid
+            processSearchResults()
+        end if
+    end if
 end sub
 
 sub updateQueryDisplay()
@@ -421,7 +432,6 @@ sub processSearchResults()
 
         if hub.Metadata <> invalid
             for each item in hub.Metadata
-                ' Determine effective type: prefer item.type, fall back to hub.type
                 effectiveType = invalid
                 if item.type <> invalid and item.type <> ""
                     effectiveType = item.type
@@ -429,10 +439,6 @@ sub processSearchResults()
                     effectiveType = hubType
                 end if
 
-                ' Capture subtype for "Other Videos" detection.
-                ' Plex "Other Videos" libraries store items as type="movie"
-                ' with subtype="clip". We pass this through so the filter
-                ' can distinguish real movies from home videos / clips.
                 effectiveSubtype = ""
                 if item.subtype <> invalid and item.subtype <> ""
                     effectiveSubtype = item.subtype
@@ -479,10 +485,8 @@ function shouldIncludeItem(itemType as Dynamic, itemSubtype as String) as Boolea
     ' Filter logic:
     '   0 = All — show everything
     '   1 = Movies — type=movie AND subtype is NOT "clip"
-    '              (excludes "Other Videos" which are type=movie, subtype=clip)
     '   2 = TV Shows — type is show, episode, or season
-    '   3 = Other — everything else: clips (Other Videos/home videos), music,
-    '              photos, and items with subtype="clip" (even if type=movie)
+    '   3 = Other — clips, home videos, anything not movie or TV
     if m.filterIndex = 0 then return true
     if itemType = invalid or itemType = "" then return (m.filterIndex = 3)
 
@@ -490,16 +494,12 @@ function shouldIncludeItem(itemType as Dynamic, itemSubtype as String) as Boolea
     st = LCase(itemSubtype)
 
     if m.filterIndex = 1
-        ' Movies — real movies only (not clips from "Other Videos" libraries)
         return (t = "movie" and st <> "clip")
     end if
     if m.filterIndex = 2
-        ' TV Shows
         return (t = "show" or t = "episode" or t = "season")
     end if
     if m.filterIndex = 3
-        ' Other — clips, Other Videos (type=movie + subtype=clip), and anything
-        ' that isn't a normal movie or TV content
         isClip = (st = "clip" or t = "clip")
         isMovie = (t = "movie" and st <> "clip")
         isTv = (t = "show" or t = "episode" or t = "season")
@@ -507,18 +507,6 @@ function shouldIncludeItem(itemType as Dynamic, itemSubtype as String) as Boolea
     end if
     return true
 end function
-
-' ========== Filter Selection ==========
-
-sub activateFilter()
-    if m.filterIndex <> m.filterFocusIndex
-        m.filterIndex = m.filterFocusIndex
-        updateFilterVisuals()
-        if m.lastSearchResponse <> invalid
-            processSearchResults()
-        end if
-    end if
-end sub
 
 ' ========== Grid Item Selection ==========
 
@@ -598,7 +586,7 @@ end sub
 function onKeyEvent(key as String, press as Boolean) as Boolean
     if not press then return false
 
-    ' ── Keyboard focus area ──
+    ' ── Keyboard focus area (letters + actions + filters) ──
     if m.focusArea = "keyboard"
         if key = "OK"
             activateKey()
@@ -617,59 +605,28 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
             return true
         else if key = "up"
             if m.kbRow > 0 and m.kbCol < m.GRID_COLS
-                ' Only grid keys have multiple rows; actions are single tall buttons
+                ' Only letter/number grid has multiple rows
                 m.kbRow = m.kbRow - 1
                 updateKeyboardFocus()
                 return true
             end if
-            ' Already at top row — don't consume, let back handle exit
+            ' Top row — don't consume
             return false
         else if key = "down"
             if m.kbCol < m.GRID_COLS and m.kbRow < m.KB_ROWS - 1
-                ' Move to next row within grid keys
+                ' Move to next row within letter/number grid
                 m.kbRow = m.kbRow + 1
                 updateKeyboardFocus()
                 return true
             end if
-            ' At bottom of keyboard (row 2, or action key) → move to filters
-            m.filterFocusIndex = m.filterIndex
-            setFocusToArea("filters")
-            return true
-        else if key = "back"
-            m.top.navigateBack = true
-            return true
-        end if
-        return false
-    end if
-
-    ' ── Filters focus area ──
-    if m.focusArea = "filters"
-        if key = "OK"
-            activateFilter()
-            return true
-        else if key = "left"
-            if m.filterFocusIndex > 0
-                m.filterFocusIndex = m.filterFocusIndex - 1
-                updateFilterVisuals()
-            end if
-            return true
-        else if key = "right"
-            if m.filterFocusIndex < m.filterKeys.count() - 1
-                m.filterFocusIndex = m.filterFocusIndex + 1
-                updateFilterVisuals()
-            end if
-            return true
-        else if key = "up"
-            setFocusToArea("keyboard")
-            return true
-        else if key = "down"
+            ' Bottom of grid, or on tall key → move to results if available
             if m.resultsGrid.content <> invalid and m.resultsGrid.content.getChildCount() > 0
                 setFocusToArea("grid")
                 return true
             end if
-            return true  ' consume even if no results to prevent focus escape
+            return true  ' consume to prevent focus escape
         else if key = "back"
-            setFocusToArea("keyboard")
+            m.top.navigateBack = true
             return true
         end if
         return false
@@ -678,15 +635,14 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
     ' ── Grid focus area ──
     if m.focusArea = "grid"
         if key = "up"
-            ' Single-row horizontal grid — up always escapes to filters
-            m.filterFocusIndex = m.filterIndex
-            setFocusToArea("filters")
+            ' Single-row horizontal grid — up always escapes to keyboard
+            setFocusToArea("keyboard")
             return true
         else if key = "back"
             setFocusToArea("keyboard")
             return true
         end if
-        ' Left/right within the horizontal grid handled by MarkupGrid natively
+        ' Left/right: let MarkupGrid handle natively
         return false
     end if
 
