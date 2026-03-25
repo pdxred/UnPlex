@@ -347,18 +347,30 @@ sub onEpisodeGridFocused(event as Object)
     newIndex = event.getData()
     numColumns = 5
 
-    ' Detect upward wrap: focus was on top row (0..4) and jumped to a higher row
-    ' This means the grid wrapped from top to bottom — intercept and go to season row
     if not m.focusOnSeasons and m.lastEpisodeFocusIndex < numColumns and newIndex >= numColumns
-        ' Wrap detected — reverse it by jumping back to item 0 and switching to seasons
-        m.episodeGrid.jumpToItem = m.lastEpisodeFocusIndex
-        m.focusOnSeasons = true
-        m.episodeGrid.drawFocusFeedback = false
-        if m.seasonRowGrid <> invalid then m.seasonRowGrid.drawFocusFeedback = true
-        m.seasonRow.setFocus(true)
-    else
-        m.lastEpisodeFocusIndex = newIndex
+        totalItems = 0
+        if m.episodeGrid.content <> invalid then totalItems = m.episodeGrid.content.getChildCount()
+
+        ' Calculate number of rows
+        numRows = Int((totalItems + numColumns - 1) / numColumns)
+
+        ' Only detect wrap if there are 3+ rows — otherwise we can't distinguish
+        ' wrap from normal downward navigation (row 0 → row 1 looks the same)
+        if numRows >= 3
+            lastRowStart = (numRows - 1) * numColumns
+            ' Focus jumped from top row to last row = upward wrap
+            if newIndex >= lastRowStart
+                m.episodeGrid.jumpToItem = m.lastEpisodeFocusIndex
+                m.focusOnSeasons = true
+                m.episodeGrid.drawFocusFeedback = false
+                if m.seasonRowGrid <> invalid then m.seasonRowGrid.drawFocusFeedback = true
+                m.seasonRow.setFocus(true)
+                return
+            end if
+        end if
     end if
+
+    m.lastEpisodeFocusIndex = newIndex
 end sub
 
 ' ========== Episode Selection ==========
