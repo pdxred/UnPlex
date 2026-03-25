@@ -1,3 +1,4 @@
+' Copyright 2026 UnPlex contributors. MIT License.
 sub init()
     m.indexLabel = m.top.findNode("indexLabel")
     m.titleLabel = m.top.findNode("titleLabel")

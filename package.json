@@ -6,7 +6,8 @@
   "scripts": {
     "build": "bsc",
     "deploy": "bsc --deploy",
-    "lint": "bsc --noEmit"
+    "lint": "bsc --noEmit",
+    "package": "bsc --out-file ./UnPlex-v1.3.0.zip"
   },
   "devDependencies": {
     "brighterscript": "^0.70.3",

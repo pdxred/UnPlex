@@ -36,6 +36,64 @@ Edit `bsconfig.json` to point at your Roku device:
 
 Replace the IP and password with the values from your Roku's developer settings. **Do not commit `bsconfig.json` with real credentials.**
 
+## Contributing Workflow
+
+### Fork, Branch, and Pull Request
+
+1. **Fork** the repository on GitHub and clone your fork:
+
+   ```bash
+   git clone https://github.com/<your-username>/UnPlex.git
+   cd UnPlex
+   npm install
+   ```
+
+2. **Create a feature branch** from `main`:
+
+   ```bash
+   git checkout -b feat/your-feature-name
+   ```
+
+   Use a descriptive branch name with a conventional prefix:
+   - `feat/` — new features or enhancements
+   - `fix/` — bug fixes
+   - `docs/` — documentation changes
+   - `refactor/` — code restructuring without behavior changes
+
+3. **Make your changes.** Follow the [Code Conventions](#code-conventions) and [Critical Rules](#critical-rules) sections below. Test on a real Roku device — there is no desktop simulator.
+
+4. **Run lint** before committing to catch type errors early:
+
+   ```bash
+   npm run lint
+   ```
+
+   Fix any errors before proceeding. The lint check runs the BrighterScript compiler in type-check mode.
+
+5. **Commit with a conventional commit message:**
+
+   ```bash
+   git commit -m "feat: add genre filter to HomeScreen"
+   ```
+
+   Follow the [Conventional Commits](https://www.conventionalcommits.org/) format: `type: description`. Common types: `feat`, `fix`, `docs`, `refactor`, `chore`.
+
+6. **Push your branch** to your fork:
+
+   ```bash
+   git push origin feat/your-feature-name
+   ```
+
+7. **Open a pull request** against the `main` branch of the upstream repository. Fill out the PR template (`.github/PULL_REQUEST_TEMPLATE.md`) — it will guide you through describing your changes, testing steps, and any related issues.
+
+### PR Review Guidelines
+
+- Keep PRs focused — one feature or fix per PR
+- Include a clear description of what changed and why
+- Mention any Roku models you tested on
+- Link related issues with `Fixes #123` or `Relates to #456`
+- Respond to review feedback promptly
+
 ## Build & Deploy
 
 UnPlex uses the [BrighterScript](https://github.com/RokuCommunity/brighterscript) compiler (`bsc`) for compilation and [roku-deploy](https://github.com/RokuCommunity/roku-deploy) for side-loading.

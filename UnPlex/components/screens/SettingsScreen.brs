@@ -1,3 +1,4 @@
+' Copyright 2026 UnPlex contributors. MIT License.
 sub init()
     m.authGroup = m.top.findNode("authGroup")
     m.settingsGroup = m.top.findNode("settingsGroup")
@@ -71,7 +72,7 @@ sub showSettingsMenu()
 
     ' Show current user name and menu options
     userName = GetActiveUserName()
-    items = ["Signed in as: " + userName, "Hub Libraries", "Sidebar Libraries", "Switch User", "Sign Out"]
+    items = ["Signed in as: " + userName, "Hub Libraries", "Sidebar Libraries", "Switch User", "Sign Out", "Export Logs", "UnPlex v" + GetAppVersion()]
     for each item in items
         node = content.createChild("ContentNode")
         node.title = item
@@ -113,7 +114,37 @@ sub onSettingsItemSelected(event as Object)
     else if index = 4
         ' Sign out
         signOut()
+    else if index = 5
+        ' Export Logs
+        exportLogsWithConfirmation()
+    else if index = 6
+        ' About row - non-interactive
+        return
     end if
+end sub
+
+' ========== Export Logs ==========
+
+sub exportLogsWithConfirmation()
+    success = ExportLogs()
+    dialog = CreateObject("roSGNode", "StandardMessageDialog")
+    if success
+        LogEvent("Debug logs exported to tmp:/unplex_debug.log")
+        dialog.title = "Logs Exported"
+        dialog.message = ["Debug logs saved to tmp:/unplex_debug.log", "", "Download via your Roku's dev web server at:", "http://<roku-ip>/tmpfs/unplex_debug.log"]
+        dialog.buttons = ["OK"]
+    else
+        LogError("Failed to export debug logs")
+        dialog.title = "Export Failed"
+        dialog.message = ["No log data available to export.", "Try again after using the app for a while."]
+        dialog.buttons = ["OK"]
+    end if
+    dialog.observeField("buttonSelected", "onExportDialogButton")
+    m.top.getScene().dialog = dialog
+end sub
+
+sub onExportDialogButton(event as Object)
+    m.top.getScene().dialog.close = true
 end sub
 
 ' ========== Hub Library Manager ==========

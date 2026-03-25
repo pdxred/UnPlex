@@ -1,3 +1,4 @@
+' Copyright 2026 UnPlex contributors. MIT License.
 sub init()
     LogEvent("HomeScreen init: finding nodes")
     m.sidebar = m.top.findNode("sidebar")

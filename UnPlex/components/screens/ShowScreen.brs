@@ -1,3 +1,4 @@
+' Copyright 2026 UnPlex contributors. MIT License.
 sub init()
     m.showTitleLabel = m.top.findNode("showTitleLabel")
     m.seasonRow = m.top.findNode("seasonRow")

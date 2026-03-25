@@ -1,3 +1,4 @@
+' Copyright 2026 UnPlex contributors. MIT License.
 sub init()
     m.titleLabel = m.top.findNode("titleLabel")
     m.userGrid = m.top.findNode("userGrid")

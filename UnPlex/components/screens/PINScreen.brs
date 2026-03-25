@@ -1,3 +1,4 @@
+' Copyright 2026 UnPlex contributors. MIT License.
 sub init()
     ' Store UI element references
     m.pinCodeLabel = m.top.findNode("pinCodeLabel")

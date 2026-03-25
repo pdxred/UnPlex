@@ -13,11 +13,11 @@ UnPlex follows a layered component architecture. All UI is built with Roku Scene
 │   │              MainScene (Root)                     │ │
 │   │   Screen stack · Auth routing · Global state      │ │
 │   ├───────────────────────────────────────────────────┤ │
-│   │               Screens (9)                         │ │
+│   │               Screens (10)                        │ │
 │   │   HomeScreen · DetailScreen · ShowScreen           │ │
 │   │   SearchScreen · PINScreen · SettingsScreen ...   │ │
 │   ├───────────────────────────────────────────────────┤ │
-│   │               Widgets (14)                        │ │
+│   │               Widgets (15)                        │ │
 │   │   PosterGrid · Sidebar · VideoPlayer              │ │
 │   │   FilterBar · AlphaNav · TrackPanel ...           │ │
 │   ├───────────────────────────────────────────────────┤ │
@@ -94,7 +94,7 @@ A Task node is a SceneGraph component that extends `Task`. It runs its designate
 
 | Task | Purpose | Key Behavior |
 |------|---------|-------------|
-| **PlexApiTask** | General PMS API calls | Paginated library browsing, metadata fetches, scrobble/unscrobble |
+| **PlexApiTask** | General PMS API calls | Paginated library browsing, metadata fetches, scrobble/unscrobble, DELETE via X-HTTP-Method-Override |
 | **PlexAuthTask** | Authentication | PIN request → polling → token acquisition → server discovery |
 | **PlexSearchTask** | Search | Queries `/hubs/search` with term and limit |
 | **PlexSessionTask** | Playback tracking | Reports progress via `/:/timeline` every 10 seconds |
@@ -268,28 +268,29 @@ Nested Plex API arrays (e.g., `Role[]`, `Director[]`) require a 4-level null-gua
 
 ### ShowScreen Dual-Focus Areas
 
-ShowScreen manages two focus areas: a season poster row (PosterGrid, numRows=1) and an episode grid (MarkupGrid). When the user navigates down from the season row, focus transfers to the episode grid via explicit `setFocus(false)` on the season row followed by `setFocus(true)` on the episode grid. The `drawFocusFeedback` flag toggles on each area to provide visual feedback for which area is active.
+ShowScreen manages two focus areas: a season poster row (PosterGrid, numRows=1) and an episode grid (EpisodeGrid, a custom widget replacing the built-in MarkupGrid). When the user navigates down from the season row, focus transfers to the episode grid via explicit `setFocus(false)` on the season row followed by `setFocus(true)` on the episode grid. The `drawFocusFeedback` flag toggles on each area to provide visual feedback for which area is active.
 
 When a different season gains focus in the season row, PosterGrid's `itemFocused` interface field fires, triggering an episode reload for that season. The first season with unwatched episodes is auto-focused on initial load.
 
 ## Component Inventory
 
-### Screens (9)
+### Screens (10)
 
 | Screen | Purpose |
 |--------|---------|
 | **HomeScreen** | Main library browsing — sidebar, poster grid, hub rows, filter/sort |
-| **DetailScreen** | Item metadata display — type-specific fields for movies (tagline, cast, director, crew, studio), episodes (season/show context, air date), shows (season/episode counts, studio). LayoutGroup auto-stacking for variable-height content |
-| **ShowScreen** | TV show browsing — season poster row (PosterGrid numRows=1) + episode landscape grid (MarkupGrid) with auto-focus on first unwatched season |
+| **DetailScreen** | Item metadata display — type-specific fields for movies (tagline, cast, director, crew, studio), episodes (season/show context, air date), shows (season/episode counts, studio). LayoutGroup auto-stacking for variable-height content (D008). Delete button with confirmation dialog and 403 handling. Get Info button navigates to MediaInfoScreen for technical metadata. Type-branching for movies/episodes/shows/clips |
+| **ShowScreen** | TV show browsing — season poster row (PosterGrid numRows=1) + episode landscape grid (EpisodeGrid custom widget replacing MarkupGrid) with auto-focus on first unwatched season |
 | **SearchScreen** | Search — custom keyboard input with filter buttons and results grid |
 | **PlaylistScreen** | Playlist item browsing and playback |
-| **SettingsScreen** | User and library management |
+| **SettingsScreen** | User and library management. About row displays app version via GetAppVersion() |
 | **PINScreen** | OAuth authentication — displays PIN code and polls for token |
 | **UserPickerScreen** | Managed user selection with optional PIN entry |
+| **MediaInfoScreen** | Technical metadata display — full-screen view showing file path, container format, video/audio codecs, resolution, bitrate, audio channels, subtitle streams, and file size. Data sourced from nested Media[].Part[].Stream[] arrays in the Plex API response |
 | **PostPlayScreen** | Post-play — next episode countdown with replay, back-to-show, and auto-play options |
 | **(MainScene)** | Root coordinator — screen stack, auth routing, global state management |
 
-### Widgets (14)
+### Widgets (15)
 
 | Widget | Purpose |
 |--------|---------|
@@ -301,6 +302,7 @@ When a different season gains focus in the season row, PosterGrid's `itemFocused
 | **TrackSelectionPanel** | Audio and subtitle track picker during playback |
 | **FilterBar** | Genre/year/sort filter controls above the grid |
 | **FilterBottomSheet** | Modal filter options panel |
+| **EpisodeGrid** | Custom episode grid widget with manual item layout, keyboard focus management, and landscape card rendering via EpisodeGridItem components |
 | **EpisodeGridItem** | Landscape episode card (320×180) with thumbnail, episode number + title, duration, progress bar, watched badge |
 | **PlaylistItem** | Single playlist entry |
 | **UserAvatarItem** | User avatar and name for the user picker |
@@ -312,7 +314,7 @@ When a different season gains focus in the season row, PosterGrid's `itemFocused
 
 | Task | Purpose |
 |------|---------|
-| **PlexApiTask** | General PMS REST API calls (library, metadata, scrobble) |
+| **PlexApiTask** | General PMS REST API calls (library, metadata, scrobble). Supports DELETE method via X-HTTP-Method-Override header for media deletion |
 | **PlexAuthTask** | PIN-based OAuth flow and server discovery via plex.tv |
 | **PlexSearchTask** | Search queries with configurable limits |
 | **PlexSessionTask** | Playback progress reporting (10-second intervals) |
@@ -323,6 +325,6 @@ When a different season gains focus in the season row, PosterGrid's `itemFocused
 | Module | Purpose |
 |--------|---------|
 | **main.brs** | App entry point — creates `roSGScreen`, instantiates MainScene, runs event loop |
-| **utils.brs** | Registry access, URL builders, Plex header generation, safe field access |
+| **utils.brs** | Registry access, URL builders, Plex header generation, safe field access, FormatFileSize() byte formatting, GetAppVersion() manifest reader |
 | **constants.brs** | Layout constants (FHD dimensions), colors, API metadata, pagination settings |
 | **logger.brs** | `LogEvent()` and `LogError()` for console-based tracing |

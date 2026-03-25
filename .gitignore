@@ -1,5 +1,6 @@
 # Build artifacts
 *.zip
+!UnPlex-v*.zip
 *.zip.old
 out/
 .roku-deploy/

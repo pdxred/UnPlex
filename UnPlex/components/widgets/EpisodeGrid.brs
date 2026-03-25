@@ -1,3 +1,4 @@
+' Copyright 2026 UnPlex contributors. MIT License.
 sub init()
     m.itemContainer = m.top.findNode("itemContainer")
     m.borderTop = m.top.findNode("focusBorderTop")

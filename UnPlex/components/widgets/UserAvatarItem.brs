@@ -1,3 +1,4 @@
+' Copyright 2026 UnPlex contributors. MIT License.
 sub init()
     m.avatarBg = m.top.findNode("avatarBg")
     m.avatarImage = m.top.findNode("avatarImage")

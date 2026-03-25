@@ -1,3 +1,4 @@
+' Copyright 2026 UnPlex contributors. MIT License.
 sub init()
     ' Cache constants in m.global for all components to access
     m.global.addFields({ constants: GetConstants() })
@@ -16,6 +17,9 @@ sub init()
 
     ' Watch state updates propagated from DetailScreen to grid screens
     m.global.addFields({ watchStateUpdate: {} })
+
+    ' Initialize debug log ring buffer (populated by Log() in logger.brs)
+    m.global.addFields({ logBuffer: [] })
 
     ' Signal to refresh hub rows and sidebar (set by SettingsScreen after pin changes)
     m.global.addFields({ hubsNeedRefresh: false })
@@ -234,6 +238,13 @@ sub showPostPlayScreen(data as Object)
     m.top.currentScreen = "postPlay"
 end sub
 
+sub showMediaInfoScreen(itemData as Object)
+    screen = CreateObject("roSGNode", "MediaInfoScreen")
+    screen.itemData = itemData
+    pushScreen(screen)
+    m.top.currentScreen = "mediaInfo"
+end sub
+
 sub onPostPlayAction(event as Object)
     action = event.getData()
     if action = invalid or action = "" then return
@@ -376,6 +387,8 @@ sub popScreen()
         m.top.currentScreen = "pin"
     else if previousScreen.subtype() = "PostPlayScreen"
         m.top.currentScreen = "postPlay"
+    else if previousScreen.subtype() = "MediaInfoScreen"
+        m.top.currentScreen = "mediaInfo"
     end if
 end sub
 
@@ -435,6 +448,8 @@ sub onItemSelected(event as Object)
             showSettingsScreen()
         else if data.action = "postPlay"
             showPostPlayScreen(data)
+        else if data.action = "mediaInfo"
+            showMediaInfoScreen(data.itemData)
         end if
     end if
 end sub

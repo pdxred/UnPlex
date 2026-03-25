@@ -1,0 +1,99 @@
+name: Bug Report
+description: Report a bug or unexpected behavior in UnPlex
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill out the fields below so we can investigate and fix the issue.
+
+  - type: input
+    id: roku_model
+    attributes:
+      label: Roku Model
+      description: Your Roku device model (e.g. Roku Ultra 4800, Roku Streaming Stick+ 3810, TCL 6-Series)
+      placeholder: "e.g. Roku Ultra 4800"
+    validations:
+      required: true
+
+  - type: input
+    id: roku_os_version
+    attributes:
+      label: Roku OS Version
+      description: "Found in Settings → System → About on your Roku (e.g. 12.5.0)"
+      placeholder: "e.g. 12.5.0"
+    validations:
+      required: true
+
+  - type: input
+    id: unplex_version
+    attributes:
+      label: UnPlex Version
+      description: "Shown in the Settings screen at the bottom of the menu list"
+      placeholder: "e.g. 0.1.0"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is.
+      placeholder: "Describe the bug..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro_steps
+    attributes:
+      label: Steps to Reproduce
+      description: Step-by-step instructions to reproduce the behavior.
+      placeholder: |
+        1. Go to '...'
+        2. Select '...'
+        3. Press '...'
+        4. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected_behavior
+    attributes:
+      label: Expected Behavior
+      description: What you expected to happen.
+      placeholder: "Describe what you expected..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual_behavior
+    attributes:
+      label: Actual Behavior
+      description: What actually happened instead.
+      placeholder: "Describe what actually happened..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: debug_logs
+    attributes:
+      label: Debug Logs
+      description: |
+        Attach debug logs if possible. You can collect them two ways:
+        1. **In-app:** Settings → Export Logs → download `unplex_debug.log` from `http://<roku-ip>/tmpfs/unplex_debug.log`
+        2. **Telnet:** Connect to your Roku on port 8085 (`telnet <roku-ip> 8085`) and copy the console output
+
+        See [docs/DEBUG-LOGS.md](../docs/DEBUG-LOGS.md) for detailed instructions.
+      placeholder: "Paste log output here or attach the unplex_debug.log file..."
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional Context
+      description: Any other context about the problem — screenshots, Plex server version, network setup, etc.
+      placeholder: "Any additional information..."
+    validations:
+      required: false

@@ -1,3 +1,4 @@
+' Copyright 2026 UnPlex contributors. MIT License.
 function GetConstants() as Object
     return {
         ' Colors (0xRRGGBBAA)

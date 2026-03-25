@@ -1,3 +1,4 @@
+' Copyright 2026 UnPlex contributors. MIT License.
 sub init()
     c = m.global.constants
     m.grid = m.top.findNode("grid")

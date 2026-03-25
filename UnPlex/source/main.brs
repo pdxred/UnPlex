@@ -1,3 +1,4 @@
+' Copyright 2026 UnPlex contributors. MIT License.
 sub Main(args as Dynamic)
     screen = CreateObject("roSGScreen")
     m.port = CreateObject("roMessagePort")

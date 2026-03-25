@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2026 UnPlex contributors. MIT License. -->
 <component name="Sidebar" extends="Rectangle" color="0x121314FF">
     <interface>
         <field id="selectedLibrary" type="assocarray" alwaysNotify="true" />

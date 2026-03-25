@@ -1,3 +1,4 @@
+' Copyright 2026 UnPlex contributors. MIT License.
 sub init()
     m.poster = m.top.findNode("poster")
     m.titleLabel = m.top.findNode("titleLabel")
@@ -274,15 +275,11 @@ sub buildButtons()
         end if
     end if
 
-    ' Episode-specific navigation: Go to Show, Go to Season
+    ' Episode-specific navigation: Go to Show
     if item.type = "episode"
         if item.grandparentRatingKey <> invalid
             buttons.push("Go to Show")
             m.buttonActions.push("goToShow")
-        end if
-        if item.parentRatingKey <> invalid and item.grandparentRatingKey <> invalid
-            buttons.push("Go to Season")
-            m.buttonActions.push("goToSeason")
         end if
     end if
 
@@ -293,6 +290,18 @@ sub buildButtons()
     else
         buttons.push("Mark as Watched")
         m.buttonActions.push("markWatched")
+    end if
+
+    ' Get Info — available for movies and episodes
+    if item.type = "movie" or item.type = "episode"
+        buttons.push("Get Info")
+        m.buttonActions.push("getInfo")
+    end if
+
+    ' Delete — last to reduce accidental selection
+    if item.type = "movie" or item.type = "episode"
+        buttons.push("Delete")
+        m.buttonActions.push("delete")
     end if
 
     m.buttonGroup.buttons = buttons
@@ -323,18 +332,17 @@ sub onButtonSelected(event as Object)
             ratingKey: GetRatingKeyStr(m.itemData.grandparentRatingKey)
             title: m.itemData.grandparentTitle
         }
-    else if action = "goToSeason"
-        ' Navigate to ShowScreen with focus on the specific season
-        m.top.itemSelected = {
-            action: "episodes"
-            ratingKey: GetRatingKeyStr(m.itemData.grandparentRatingKey)
-            title: m.itemData.grandparentTitle
-            focusSeasonRatingKey: GetRatingKeyStr(m.itemData.parentRatingKey)
-        }
     else if action = "markWatched"
         markAsWatched()
     else if action = "markUnwatched"
         markAsUnwatched()
+    else if action = "getInfo"
+        m.top.itemSelected = {
+            action: "mediaInfo"
+            itemData: m.itemData
+        }
+    else if action = "delete"
+        showDeleteConfirmation()
     end if
 end sub
 
@@ -470,6 +478,57 @@ sub onWatchedStateChange(event as Object)
         showError("Failed to update watch state. Changes may not be saved.")
     end if
     ' On success, do nothing - optimistic update already applied
+end sub
+
+sub showDeleteConfirmation()
+    if m.top.getScene().dialog <> invalid then return
+
+    dialog = CreateObject("roSGNode", "StandardMessageDialog")
+    dialog.title = "Delete Media"
+    dialog.message = ["This will permanently delete this media from your Plex library. This action cannot be undone."]
+    dialog.buttons = ["Delete", "Cancel"]
+    dialog.observeField("buttonSelected", "onDeleteDialogButton")
+    dialog.observeField("wasClosed", "onDeleteDialogClosed")
+    m.top.getScene().dialog = dialog
+end sub
+
+sub onDeleteDialogButton(event as Object)
+    index = event.getData()
+    m.top.getScene().dialog.close = true
+
+    if index = 0
+        ' User confirmed delete — fire DELETE request
+        ratingKeyStr = GetRatingKeyStr(m.itemData.ratingKey)
+        LogEvent("Deleting media: /library/metadata/" + ratingKeyStr)
+
+        task = CreateObject("roSGNode", "PlexApiTask")
+        task.endpoint = "/library/metadata/" + ratingKeyStr
+        task.method = "DELETE"
+        task.observeField("status", "onDeleteTaskComplete")
+        task.control = "run"
+        m.deleteTask = task
+    end if
+    ' index = 1 (Cancel) — dialog already closed, nothing else to do
+end sub
+
+sub onDeleteDialogClosed(event as Object)
+    m.buttonGroup.setFocus(true)
+end sub
+
+sub onDeleteTaskComplete(event as Object)
+    status = event.getData()
+    if status = "completed"
+        LogEvent("Delete successful, navigating back")
+        m.top.navigateBack = true
+    else if status = "error"
+        if m.deleteTask.responseCode = 403
+            LogError("Delete failed: 403 - media deletion not enabled")
+            showError("Media deletion is not enabled on this server. Enable it in Plex Media Server settings.")
+        else
+            LogError("Delete failed: " + m.deleteTask.error)
+            showErrorDialog("Delete Failed", "Could not delete this media. Please try again.")
+        end if
+    end if
 end sub
 
 sub retryLastRequest()

@@ -1,3 +1,4 @@
+' Copyright 2026 UnPlex contributors. MIT License.
 sub init()
     m.panelContainer = m.top.findNode("panelContainer")
     m.audioList = m.top.findNode("audioList")

@@ -1,3 +1,4 @@
+' Copyright 2026 UnPlex contributors. MIT License.
 ' Generate or retrieve persistent device UUID
 function GetDeviceId() as String
     sec = CreateObject("roRegistrySection", "UnPlex")
@@ -224,4 +225,55 @@ function GetRatingKeyStr(ratingKey as Dynamic) as String
         return ratingKey
     end if
     return ratingKey.ToStr()
+end function
+
+' Format file size in bytes to human-readable string (e.g. "1.54 GB", "850.00 MB")
+' Plex returns Part[0].size as LongInteger for multi-GB files
+function FormatFileSize(bytes as Dynamic) as String
+    if bytes = invalid or bytes = 0 then return "Unknown"
+
+    ' Convert to float for division
+    bytesFloat = 0.0
+    byteType = type(bytes)
+    if byteType = "roFloat" or byteType = "Float" or byteType = "roDouble" or byteType = "Double"
+        bytesFloat = bytes
+    else if byteType = "roInt" or byteType = "Integer" or byteType = "roLongInteger" or byteType = "LongInteger"
+        bytesFloat = bytes
+    else if byteType = "roString" or byteType = "String"
+        bytesFloat = bytes.ToFloat()
+        if bytesFloat = 0 then return "Unknown"
+    else
+        return "Unknown"
+    end if
+
+    if bytesFloat >= 1073741824.0
+        gb = bytesFloat / 1073741824.0
+        ' Format to 2 decimal places
+        whole = Int(gb)
+        frac = Int((gb - whole) * 100 + 0.5)
+        if frac >= 100
+            whole = whole + 1
+            frac = 0
+        end if
+        fracStr = frac.ToStr()
+        if frac < 10 then fracStr = "0" + fracStr
+        return whole.ToStr() + "." + fracStr + " GB"
+    else
+        mb = bytesFloat / 1048576.0
+        whole = Int(mb)
+        frac = Int((mb - whole) * 100 + 0.5)
+        if frac >= 100
+            whole = whole + 1
+            frac = 0
+        end if
+        fracStr = frac.ToStr()
+        if frac < 10 then fracStr = "0" + fracStr
+        return whole.ToStr() + "." + fracStr + " MB"
+    end if
+end function
+
+' Get app version from manifest (returns "major.minor.build" e.g. "1.0.2")
+function GetAppVersion() as String
+    appInfo = CreateObject("roAppInfo")
+    return appInfo.GetVersion()
 end function

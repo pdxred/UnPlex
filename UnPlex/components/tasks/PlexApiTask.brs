@@ -1,3 +1,4 @@
+' Copyright 2026 UnPlex contributors. MIT License.
 sub init()
     m.top.functionName = "run"
 end sub
@@ -81,6 +82,15 @@ sub run()
 
         if not url.AsyncPostFromString("")
             m.top.error = "Failed to start PUT request"
+            m.top.status = "error"
+            return
+        end if
+    else if method = "DELETE"
+        ' DELETE via method override (Roku doesn't support DELETE directly)
+        url.AddHeader("X-HTTP-Method-Override", "DELETE")
+
+        if not url.AsyncPostFromString("")
+            m.top.error = "Failed to start DELETE request"
             m.top.status = "error"
             return
         end if

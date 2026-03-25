@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2026 UnPlex contributors. MIT License. -->
+<component name="MediaInfoScreen" extends="Group">
+    <interface>
+        <field id="itemData" type="assocarray" onChange="onItemDataChange" />
+        <field id="navigateBack" type="boolean" alwaysNotify="true" />
+    </interface>
+
+    <script type="text/brightscript" uri="pkg:/source/utils.brs" />
+    <script type="text/brightscript" uri="pkg:/source/constants.brs" />
+    <script type="text/brightscript" uri="pkg:/source/logger.brs" />
+    <script type="text/brightscript" uri="MediaInfoScreen.brs" />
+
+    <children>
+        <Rectangle
+            id="background"
+            width="1920"
+            height="1080"
+            color="0x000000FF"
+        />
+        <Label
+            id="titleLabel"
+            translation="[80, 40]"
+            text="Media Info"
+            font="font:LargeBoldSystemFont"
+            color="0xFFFFFFFF"
+        />
+        <LabelList
+            id="infoList"
+            translation="[80, 120]"
+            itemSize="[1760, 48]"
+            color="0xFFFFFFFF"
+            focusedColor="0xF3B125FF"
+        />
+    </children>
+</component>

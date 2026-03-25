@@ -1,3 +1,4 @@
+' Copyright 2026 UnPlex contributors. MIT License.
 sub init()
     m.focusBg = m.top.findNode("focusBg")
     m.focusAccent = m.top.findNode("focusAccent")

@@ -1,8 +1,8 @@
 title=UnPlex
 subtitle=Custom Plex Client
 major_version=1
-minor_version=0
-build_version=2
+minor_version=3
+build_version=0
 
 mm_icon_focus_fhd=pkg:/images/icon_focus_fhd.png
 mm_icon_side_fhd=pkg:/images/icon_side_fhd.png

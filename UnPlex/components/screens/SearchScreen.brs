@@ -1,3 +1,4 @@
+' Copyright 2026 UnPlex contributors. MIT License.
 ' ===== SearchScreen — 3-row keyboard + inline filters, horizontal results =====
 '
 ' Layout (FHD 1920×1080):

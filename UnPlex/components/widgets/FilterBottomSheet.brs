@@ -1,3 +1,4 @@
+' Copyright 2026 UnPlex contributors. MIT License.
 sub init()
     m.sheetGroup = m.top.findNode("sheetGroup")
     m.sortList = m.top.findNode("sortList")

@@ -1,3 +1,4 @@
+' Copyright 2026 UnPlex contributors. MIT License.
 sub init()
     m.summaryLabel = m.top.findNode("summaryLabel")
     m.countLabel = m.top.findNode("countLabel")
