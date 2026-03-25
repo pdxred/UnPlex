@@ -11,6 +11,7 @@
 
     <script type="text/brightscript" uri="pkg:/source/utils.brs" />
     <script type="text/brightscript" uri="pkg:/source/constants.brs" />
+    <script type="text/brightscript" uri="pkg:/source/logger.brs" />
     <script type="text/brightscript" uri="DetailScreen.brs" />
 
     <children>

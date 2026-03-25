@@ -118,17 +118,17 @@ sub onItemDataChange(event as Object)
                 lines.push("Bitrate: " + bitrate.ToStr() + " kbps")
             end if
 
-            profile = SafeGet(stream, "profile", "")
+            profile = SafeStr(SafeGet(stream, "profile", invalid))
             if profile <> ""
                 lines.push("Profile: " + profile)
             end if
 
-            frameRate = SafeGet(stream, "frameRate", "")
+            frameRate = SafeStr(SafeGet(stream, "frameRate", invalid))
             if frameRate <> ""
                 lines.push("Frame Rate: " + frameRate)
             end if
 
-            colorSpace = SafeGet(stream, "colorSpace", "")
+            colorSpace = SafeStr(SafeGet(stream, "colorSpace", invalid))
             if colorSpace <> ""
                 lines.push("Color Space: " + colorSpace)
             end if

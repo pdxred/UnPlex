@@ -207,6 +207,24 @@ function SafeGet(obj as Dynamic, field as String, default as Dynamic) as Dynamic
     return obj[field]
 end function
 
+' Coerce a Dynamic value to String. Handles String, Integer, Float, LongInteger,
+' Double, Boolean, and invalid. Plex API returns some nominally-string fields
+' (e.g. frameRate) as numeric types depending on server version.
+function SafeStr(value as Dynamic) as String
+    if value = invalid then return ""
+    valueType = type(value)
+    if valueType = "String" or valueType = "roString" then return value
+    if valueType = "roInt" or valueType = "roInteger" or valueType = "Integer" then return value.ToStr()
+    if valueType = "roFloat" or valueType = "Float" then return Str(value).Trim()
+    if valueType = "roDouble" or valueType = "Double" then return Str(value).Trim()
+    if valueType = "LongInteger" or valueType = "roLongInteger" then return value.ToStr()
+    if valueType = "roBoolean" or valueType = "Boolean"
+        if value then return "true"
+        return "false"
+    end if
+    return ""
+end function
+
 ' Safe nested access for Plex MediaContainer pattern
 ' Usage: items = SafeGetMetadata(response) ' returns [] if path invalid
 function SafeGetMetadata(response as Dynamic) as Object

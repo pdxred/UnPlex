@@ -44,7 +44,7 @@ sub updateProgressBar(content as Object)
 
     if viewOffset > 0 and duration > 0
         progress = viewOffset / duration
-        if progress < m.constants.PROGRESS_MIN_PERCENT
+        if m.constants = invalid or progress < m.constants.PROGRESS_MIN_PERCENT
             m.progressTrack.visible = false
             m.progressFill.visible = false
             return
