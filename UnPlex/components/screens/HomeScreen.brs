@@ -1174,15 +1174,6 @@ sub onGridItemSelected(event as Object)
             return
         end if
 
-        ' Check if partially watched (viewOffset > 0 and >= 5% progress)
-        if item.viewOffset > 0 and item.duration > 0
-            progress = item.viewOffset / item.duration
-            if progress >= c.PROGRESS_MIN_PERCENT
-                showResumeDialog(item)
-                return
-            end if
-        end if
-
         ' TV shows: go directly to ShowScreen
         if item.itemType = "show"
             m.top.itemSelected = {
@@ -1197,77 +1188,6 @@ sub onGridItemSelected(event as Object)
                 itemType: item.itemType
             }
         end if
-    end if
-end sub
-
-' ========== Resume Dialog ==========
-
-sub showResumeDialog(item as Object)
-    m.pendingPlayItem = item
-    m.pendingFocusTarget = "grid"
-
-    resumeTime = FormatTime(item.viewOffset)
-
-    dialog = CreateObject("roSGNode", "StandardMessageDialog")
-    dialog.title = item.title
-    dialog.message = ["Resume from " + resumeTime + "?"]
-    dialog.buttons = ["Resume from " + resumeTime, "Start from Beginning", "Go to Details"]
-    dialog.observeField("buttonSelected", "onResumeDialogButton")
-    dialog.observeField("wasClosed", "onResumeDialogClosed")
-    m.top.getScene().dialog = dialog
-end sub
-
-sub onResumeDialogButton(event as Object)
-    index = event.getData()
-    m.top.getScene().dialog.close = true
-
-    if index = 0
-        ' Resume from last position
-        startPlaybackFromGrid(m.pendingPlayItem, m.pendingPlayItem.viewOffset)
-    else if index = 1
-        ' Start from beginning
-        startPlaybackFromGrid(m.pendingPlayItem, 0)
-    else if index = 2
-        ' Go to detail screen
-        m.top.itemSelected = {
-            action: "detail"
-            ratingKey: m.pendingPlayItem.ratingKey
-            itemType: m.pendingPlayItem.itemType
-        }
-    end if
-end sub
-
-sub onResumeDialogClosed(event as Object)
-    restoreFocusAfterDialog()
-end sub
-
-sub startPlaybackFromGrid(item as Object, offset as Integer)
-    m.player = CreateObject("roSGNode", "VideoPlayer")
-    m.player.ratingKey = item.ratingKey
-    m.player.mediaKey = "/library/metadata/" + item.ratingKey
-    m.player.startOffset = offset
-    m.player.itemTitle = item.title
-    m.player.observeField("playbackComplete", "onGridPlaybackComplete")
-
-    m.top.getScene().appendChild(m.player)
-    m.player.setFocus(true)
-    m.player.control = "play"
-end sub
-
-sub onGridPlaybackComplete(event as Object)
-    if m.player <> invalid
-        m.top.getScene().removeChild(m.player)
-        m.player = invalid
-    end if
-
-    ' Restore focus to grid
-    focusGrid()
-
-    ' Refresh hub data and library to update watch states
-    loadHubs()
-    if m.currentSectionId <> "" and m.viewMode = "libraryOnly"
-        m.currentOffset = 0
-        loadLibrary()
     end if
 end sub
 
@@ -1353,7 +1273,16 @@ sub fireScrobbleApi(ratingKey as String, watched as Boolean)
         "identifier": "com.plexapp.plugins.library"
         "key": ratingKey
     }
+    task.observeField("status", "onScrobbleComplete")
     task.control = "run"
+    m.scrobbleTask = task
+end sub
+
+sub onScrobbleComplete(event as Object)
+    ' Refresh hubs after scrobble so Continue Watching / On Deck update
+    if event.getData() = "completed" or event.getData() = "error"
+        loadHubs()
+    end if
 end sub
 
 sub restoreFocusAfterDialog()

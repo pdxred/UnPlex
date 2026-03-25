@@ -405,6 +405,7 @@ function buildTranscodeUrl() as String
     url = url + "&maxVideoBitrate=20000"
     url = url + "&videoResolution=1920x1080"
     url = url + "&subtitles=auto"
+    url = url + "&X-Plex-Client-Identifier=" + GetDeviceId()
     url = url + "&X-Plex-Token=" + token
 
     return url
@@ -428,6 +429,7 @@ function buildTranscodeUrlWithSubtitles(subtitleStreamID as Integer, offsetMs as
     url = url + "&subtitleStreamID=" + subtitleStreamID.ToStr()
     url = url + "&subtitles=burn"
     url = url + "&offset=" + Int(offsetMs / 1000).ToStr()
+    url = url + "&X-Plex-Client-Identifier=" + GetDeviceId()
     url = url + "&X-Plex-Token=" + token
 
     return url
@@ -608,7 +610,12 @@ sub showError(message as String)
     dialog.title = "Playback Error"
     dialog.message = [message]
     dialog.buttons = ["OK"]
+    dialog.observeField("buttonSelected", "onErrorDialogButton")
     m.top.getScene().dialog = dialog
+end sub
+
+sub onErrorDialogButton(event as Object)
+    m.top.getScene().dialog.close = true
 end sub
 
 ' ========== Track Selection Panel Integration ==========

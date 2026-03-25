@@ -121,8 +121,8 @@ sub updateBadge(content as Object)
         m.watchedBadge.visible = true
         m.watchedBadgeBg.visible = true
     else
-        ' Unwatched — show badge background (gold dot indicator)
-        m.unwatchedBadgeBg.visible = true
+        ' Unwatched — no badge
+        m.unwatchedBadgeBg.visible = false
         m.unwatchedCount.visible = false
         m.watchedBadge.visible = false
         m.watchedBadgeBg.visible = false

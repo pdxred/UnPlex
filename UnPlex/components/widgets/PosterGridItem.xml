@@ -65,13 +65,14 @@
         />
         <Label
             id="watchedBadge"
-            translation="[200, 2]"
-            text="&#x2713;"
-            font="font:SmallestSystemFont"
+            translation="[200, 3]"
+            text="&#x2714;"
             color="0xF3B125FF"
             visible="false"
             width="40"
             horizAlign="center"
-        />
+        >
+            <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="22" />
+        </Label>
     </children>
 </component>
