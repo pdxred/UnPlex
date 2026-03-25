@@ -76,9 +76,8 @@ sub run()
             return
         end if
     else if method = "PUT"
-        ' PUT via method override (Roku doesn't support PUT directly)
-        ' Same pattern as PlexSessionTask
-        url.AddHeader("X-HTTP-Method-Override", "PUT")
+        ' SetRequest changes the actual HTTP verb sent on the wire
+        url.SetRequest("PUT")
 
         if not url.AsyncPostFromString("")
             m.top.error = "Failed to start PUT request"
@@ -86,8 +85,8 @@ sub run()
             return
         end if
     else if method = "DELETE"
-        ' DELETE via method override (Roku doesn't support DELETE directly)
-        url.AddHeader("X-HTTP-Method-Override", "DELETE")
+        ' SetRequest("DELETE") sends a real HTTP DELETE — Plex requires it
+        url.SetRequest("DELETE")
 
         if not url.AsyncPostFromString("")
             m.top.error = "Failed to start DELETE request"

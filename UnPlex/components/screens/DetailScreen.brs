@@ -498,17 +498,21 @@ sub onDeleteDialogButton(event as Object)
 
     if index = 0
         ' User confirmed delete — fire DELETE request
-        ratingKeyStr = GetRatingKeyStr(m.itemData.ratingKey)
-        LogEvent("Deleting media: /library/metadata/" + ratingKeyStr)
-
-        task = CreateObject("roSGNode", "PlexApiTask")
-        task.endpoint = "/library/metadata/" + ratingKeyStr
-        task.method = "DELETE"
-        task.observeField("status", "onDeleteTaskComplete")
-        task.control = "run"
-        m.deleteTask = task
+        executeDelete()
     end if
     ' index = 1 (Cancel) — dialog already closed, nothing else to do
+end sub
+
+sub executeDelete()
+    ratingKeyStr = GetRatingKeyStr(m.itemData.ratingKey)
+    LogEvent("Deleting media: /library/metadata/" + ratingKeyStr)
+
+    task = CreateObject("roSGNode", "PlexApiTask")
+    task.endpoint = "/library/metadata/" + ratingKeyStr
+    task.method = "DELETE"
+    task.observeField("status", "onDeleteTaskComplete")
+    task.control = "run"
+    m.deleteTask = task
 end sub
 
 sub onDeleteDialogClosed(event as Object)
@@ -526,9 +530,34 @@ sub onDeleteTaskComplete(event as Object)
             showError("Media deletion is not enabled on this server. Enable it in Plex Media Server settings.")
         else
             LogError("Delete failed: " + m.deleteTask.error)
-            showErrorDialog("Delete Failed", "Could not delete this media. Please try again.")
+            showDeleteRetryDialog()
         end if
     end if
+end sub
+
+sub showDeleteRetryDialog()
+    if m.top.getScene().dialog <> invalid then return
+
+    dialog = CreateObject("roSGNode", "StandardMessageDialog")
+    dialog.title = "Delete Failed"
+    dialog.message = ["Could not delete this media. Please try again."]
+    dialog.buttons = ["Retry", "Dismiss"]
+    dialog.observeField("buttonSelected", "onDeleteRetryButton")
+    dialog.observeField("wasClosed", "onDeleteRetryDialogClosed")
+    m.top.getScene().dialog = dialog
+end sub
+
+sub onDeleteRetryButton(event as Object)
+    index = event.getData()
+    m.top.getScene().dialog.close = true
+
+    if index = 0
+        executeDelete()
+    end if
+end sub
+
+sub onDeleteRetryDialogClosed(event as Object)
+    m.buttonGroup.setFocus(true)
 end sub
 
 sub retryLastRequest()
