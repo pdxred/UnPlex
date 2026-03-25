@@ -16,6 +16,14 @@ sub init()
     m.totalItems = 0
     m.scrollRow = 0  ' Which row is at the top of the visible area
     m.items = []
+
+    m.top.observeField("focusedChild", "onFocusChange")
+end sub
+
+sub onFocusChange(event as Object)
+    if m.top.hasFocus() and m.totalItems > 0
+        showBorders(true)
+    end if
 end sub
 
 sub onContentChange(event as Object)
@@ -130,6 +138,7 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
 
     if key = "up"
         if currentRow = 0
+            showBorders(false)
             m.top.escapeUp = true
             return true
         end if
