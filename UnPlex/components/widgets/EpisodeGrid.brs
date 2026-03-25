@@ -1,20 +1,18 @@
 sub init()
     m.grid = m.top.findNode("grid")
+    m.focusRect = m.top.findNode("focusRect")
 
-    m.numColumns = 5
+    m.NUM_COLUMNS = 5
+    m.ITEM_W = 340
+    m.ITEM_H = 240
+    m.SPACING_H = 12
+    m.SPACING_V = 16
     m.focusIndex = 0
     m.totalItems = 0
 
-    ' We hold focus on the Group (not the inner grid).
-    ' The grid renders focus feedback via drawFocusFeedback even when
-    ' it doesn't have focus, as long as we keep updating jumpToItem.
-    ' But we DO need to give the grid focus for it to render the
-    ' focus rectangle. So we use the grid for focus + rendering,
-    ' but reclaim focus to the Group immediately after each key press
-    ' using a focusedChild observer.
-    m.grid.observeField("itemSelected", "onGridItemSelected")
-    m.grid.observeField("itemFocused", "onGridItemFocused")
-    m.top.observeField("focusedChild", "onFocusedChildChange")
+    ' Size the focus highlight to match one item cell
+    m.focusRect.width = m.ITEM_W
+    m.focusRect.height = m.ITEM_H
 end sub
 
 sub onContentChange(event as Object)
@@ -26,52 +24,130 @@ sub onContentChange(event as Object)
         m.totalItems = 0
     end if
     m.focusIndex = 0
+    updateFocusRect()
 end sub
 
 sub onJumpToItem(event as Object)
     idx = event.getData()
-    m.grid.jumpToItem = idx
-    m.focusIndex = idx
-end sub
-
-sub onGridItemSelected(event as Object)
-    m.top.itemSelected = event.getData()
-end sub
-
-sub onGridItemFocused(event as Object)
-    m.top.itemFocused = event.getData()
-    m.focusIndex = event.getData()
-end sub
-
-sub onFocusedChildChange(event as Object)
-    ' When we get focus (e.g. from ShowScreen), delegate to the inner grid
-    ' so it renders the focus rectangle. But we keep our onKeyEvent active
-    ' because it fires for the Group even when a child has focus.
-    if m.top.isInFocusChain() and not m.grid.hasFocus()
-        m.grid.setFocus(true)
+    if idx >= 0 and idx < m.totalItems
+        m.focusIndex = idx
+        m.grid.jumpToItem = idx
+        updateFocusRect()
     end if
 end sub
 
-' This fires when a key bubbles up from the inner MarkupGrid unhandled.
-' With wrap=false, boundary keys (up on top row, down on last row) bubble.
+sub updateFocusRect()
+    if m.totalItems = 0
+        m.focusRect.visible = false
+        return
+    end if
+
+    col = m.focusIndex MOD m.NUM_COLUMNS
+    row = Int(m.focusIndex / m.NUM_COLUMNS)
+
+    ' MarkupGrid scrolls internally — the visible row offset depends on
+    ' which rows are currently rendered. For numRows=2, the grid shows
+    ' at most 2 rows at a time. The focus rect needs to track the
+    ' visual position within the grid viewport, not the absolute row.
+    '
+    ' MarkupGrid's currFocusRow field (if available) tracks this,
+    ' but we can compute it: the grid scrolls so the focused row
+    ' is always visible. With numRows=2, the visible start row is
+    ' max(0, row - 1) when focusing the last visible row.
+    ' Simpler: the focus rect Y within the viewport is row offset 0 or 1.
+    totalRows = Int((m.totalItems - 1) / m.NUM_COLUMNS) + 1
+    numVisibleRows = 2
+    if totalRows <= numVisibleRows
+        visibleRow = row
+    else
+        ' Grid keeps focused item visible. For 2 visible rows,
+        ' the focused item is on visible row 0 or 1.
+        ' Use animateToItem behavior: grid scrolls to show the focused row.
+        ' The simplest model: focused row is at the bottom visible row
+        ' unless we're at the top.
+        if row = 0
+            visibleRow = 0
+        else
+            visibleRow = 1
+        end if
+    end if
+
+    x = col * (m.ITEM_W + m.SPACING_H)
+    y = visibleRow * (m.ITEM_H + m.SPACING_V)
+
+    m.focusRect.translation = [x, y]
+    m.focusRect.visible = true
+end sub
+
+' EpisodeGrid Group holds focus. ALL keys come here.
+' We manually navigate the inner grid via jumpToItem.
 function onKeyEvent(key as String, press as Boolean) as Boolean
     if not press then return false
+    if m.totalItems = 0 then return false
 
-    LogEvent("EpisodeGrid onKeyEvent: " + key + " focusIndex=" + m.focusIndex.ToStr())
+    currentRow = Int(m.focusIndex / m.NUM_COLUMNS)
+    currentCol = m.focusIndex MOD m.NUM_COLUMNS
+    lastRow = Int((m.totalItems - 1) / m.NUM_COLUMNS)
 
     if key = "up"
-        ' Only reaches here if the grid didn't handle it (top row, wrap=false)
-        LogEvent("EpisodeGrid: escapeUp triggered")
-        m.top.escapeUp = true
+        if currentRow = 0
+            ' Top row — escape to season list
+            m.top.escapeUp = true
+            return true
+        end if
+        ' Move up one row
+        newIndex = m.focusIndex - m.NUM_COLUMNS
+        if newIndex >= 0
+            m.focusIndex = newIndex
+            m.grid.animateToItem = m.focusIndex
+            updateFocusRect()
+            m.top.itemFocused = m.focusIndex
+        end if
         return true
+
     else if key = "down"
-        ' Only reaches here if the grid didn't handle it (last row, wrap=false)
-        ' Manually wrap to the same column on the top row
-        col = m.focusIndex MOD m.numColumns
-        if col >= m.totalItems then col = m.totalItems - 1
-        LogEvent("EpisodeGrid: downward wrap to item " + col.ToStr())
-        m.grid.jumpToItem = col
-        m.focusIndex = col
+        if currentRow >= lastRow
+            ' Last row — wrap to top (same column)
+            newIndex = currentCol
+            if newIndex >= m.totalItems then newIndex = m.totalItems - 1
+            m.focusIndex = newIndex
+            m.grid.jumpToItem = m.focusIndex
+            updateFocusRect()
+            m.top.itemFocused = m.focusIndex
+            return true
+        end if
+        ' Move down one row
+        newIndex = m.focusIndex + m.NUM_COLUMNS
+        if newIndex >= m.totalItems
+            ' Partial last row — clamp to last item
+            newIndex = m.totalItems - 1
+        end if
+        m.focusIndex = newIndex
+        m.grid.animateToItem = m.focusIndex
+        updateFocusRect()
+        m.top.itemFocused = m.focusIndex
+        return true
+
+    else if key = "left"
+        if currentCol > 0
+            m.focusIndex = m.focusIndex - 1
+            m.grid.animateToItem = m.focusIndex
+            updateFocusRect()
+            m.top.itemFocused = m.focusIndex
+        end if
+        return true
+
+    else if key = "right"
+        if currentCol < m.NUM_COLUMNS - 1 and m.focusIndex + 1 < m.totalItems
+            m.focusIndex = m.focusIndex + 1
+            m.grid.animateToItem = m.focusIndex
+            updateFocusRect()
+            m.top.itemFocused = m.focusIndex
+        end if
+        return true
+
+    else if key = "OK"
+        m.top.itemSelected = m.focusIndex
         return true
     end if
 

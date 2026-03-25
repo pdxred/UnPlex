@@ -2,7 +2,6 @@ sub init()
     m.showTitleLabel = m.top.findNode("showTitleLabel")
     m.seasonRow = m.top.findNode("seasonRow")
     m.episodeGrid = m.top.findNode("episodeGrid")
-    m.episodeGridInner = m.episodeGrid.findNode("grid")
     m.loadingSpinner = m.top.findNode("loadingSpinner")
     m.emptyState = m.top.findNode("emptyState")
     m.retryGroup = m.top.findNode("retryGroup")
@@ -44,7 +43,7 @@ sub onFocusChange(event as Object)
         if m.focusOnSeasons
             m.seasonRow.setFocus(true)
         else
-            m.episodeGridInner.setFocus(true)
+            m.episodeGrid.setFocus(true)
         end if
     end if
 end sub
@@ -249,7 +248,6 @@ sub processSeasons()
     loadEpisodes(GetRatingKeyStr(season.ratingKey))
 
     if m.seasonRowGrid <> invalid then m.seasonRowGrid.drawFocusFeedback = true
-    m.episodeGridInner.drawFocusFeedback = false
     m.seasonRow.setFocus(true)
 end sub
 
@@ -335,8 +333,7 @@ sub onSeasonSelected(event as Object)
     if m.episodeGrid.content <> invalid and m.episodeGrid.content.getChildCount() > 0
         m.focusOnSeasons = false
         if m.seasonRowGrid <> invalid then m.seasonRowGrid.drawFocusFeedback = false
-        m.episodeGridInner.drawFocusFeedback = true
-        m.episodeGridInner.setFocus(true)
+        m.episodeGrid.setFocus(true)
     end if
 end sub
 
@@ -345,7 +342,6 @@ end sub
 sub onEpisodeGridEscapeUp(event as Object)
     ' EpisodeGrid signals that up was pressed on the top row — move to season row
     m.focusOnSeasons = true
-    if m.episodeGridInner <> invalid then m.episodeGridInner.drawFocusFeedback = false
     if m.seasonRowGrid <> invalid then m.seasonRowGrid.drawFocusFeedback = true
     m.seasonRow.setFocus(true)
 end sub
@@ -425,11 +421,11 @@ sub onEpisodeOptionsButton(event as Object)
         }
     end if
 
-    m.episodeGridInner.setFocus(true)
+    m.episodeGrid.setFocus(true)
 end sub
 
 sub onEpisodeOptionsClosed(event as Object)
-    m.episodeGridInner.setFocus(true)
+    m.episodeGrid.setFocus(true)
 end sub
 
 ' ========== Playback ==========
@@ -538,7 +534,7 @@ sub onErrorDialogClosed(event as Object)
     if m.focusOnSeasons
         m.seasonRow.setFocus(true)
     else
-        m.episodeGridInner.setFocus(true)
+        m.episodeGrid.setFocus(true)
     end if
 end sub
 
@@ -605,8 +601,7 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
         if m.episodeGrid.content <> invalid and m.episodeGrid.content.getChildCount() > 0
             m.focusOnSeasons = false
             if m.seasonRowGrid <> invalid then m.seasonRowGrid.drawFocusFeedback = false
-            m.episodeGridInner.drawFocusFeedback = true
-            m.episodeGridInner.setFocus(true)
+            m.episodeGrid.setFocus(true)
         end if
         return true
     else if key = "options" and not m.focusOnSeasons
