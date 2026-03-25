@@ -22,7 +22,7 @@ end sub
 
 sub onFocusChange(event as Object)
     if m.top.hasFocus() and m.totalItems > 0
-        showBorders(true)
+        updateFocusBorder()
     end if
 end sub
 
@@ -57,7 +57,7 @@ sub onContentChange(event as Object)
     end for
 
     updateScroll()
-    updateFocusBorder()
+    showBorders(false)
 end sub
 
 sub onJumpToItem(event as Object)
