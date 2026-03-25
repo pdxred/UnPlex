@@ -13,6 +13,9 @@ sub init()
     ' Size the focus highlight to match one item cell
     m.focusRect.width = m.ITEM_W
     m.focusRect.height = m.ITEM_H
+
+    ' Do NOT observe itemFocused — we manage focusIndex entirely ourselves
+    ' to avoid feedback loops with jumpToItem/animateToItem.
 end sub
 
 sub onContentChange(event as Object)
@@ -24,6 +27,7 @@ sub onContentChange(event as Object)
         m.totalItems = 0
     end if
     m.focusIndex = 0
+    m.grid.jumpToItem = 0
     updateFocusRect()
 end sub
 
@@ -44,27 +48,20 @@ sub updateFocusRect()
 
     col = m.focusIndex MOD m.NUM_COLUMNS
     row = Int(m.focusIndex / m.NUM_COLUMNS)
-
-    ' MarkupGrid scrolls internally — the visible row offset depends on
-    ' which rows are currently rendered. For numRows=2, the grid shows
-    ' at most 2 rows at a time. The focus rect needs to track the
-    ' visual position within the grid viewport, not the absolute row.
-    '
-    ' MarkupGrid's currFocusRow field (if available) tracks this,
-    ' but we can compute it: the grid scrolls so the focused row
-    ' is always visible. With numRows=2, the visible start row is
-    ' max(0, row - 1) when focusing the last visible row.
-    ' Simpler: the focus rect Y within the viewport is row offset 0 or 1.
     totalRows = Int((m.totalItems - 1) / m.NUM_COLUMNS) + 1
     numVisibleRows = 2
+
+    ' Compute which row within the visible viewport this is.
+    ' The grid shows numVisibleRows rows. When we jumpToItem,
+    ' the grid scrolls so the target item is visible.
+    ' For a 2-row viewport:
+    '   - If totalRows <= 2, all rows are visible. visibleRow = row.
+    '   - If totalRows > 2, the grid scrolls. The focused item
+    '     appears at visibleRow 0 if it's row 0, else visibleRow 1
+    '     (the grid keeps the previous row above for context).
     if totalRows <= numVisibleRows
         visibleRow = row
     else
-        ' Grid keeps focused item visible. For 2 visible rows,
-        ' the focused item is on visible row 0 or 1.
-        ' Use animateToItem behavior: grid scrolls to show the focused row.
-        ' The simplest model: focused row is at the bottom visible row
-        ' unless we're at the top.
         if row = 0
             visibleRow = 0
         else
@@ -80,7 +77,6 @@ sub updateFocusRect()
 end sub
 
 ' EpisodeGrid Group holds focus. ALL keys come here.
-' We manually navigate the inner grid via jumpToItem.
 function onKeyEvent(key as String, press as Boolean) as Boolean
     if not press then return false
     if m.totalItems = 0 then return false
@@ -96,21 +92,18 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
             return true
         end if
         ' Move up one row
-        newIndex = m.focusIndex - m.NUM_COLUMNS
-        if newIndex >= 0
-            m.focusIndex = newIndex
-            m.grid.animateToItem = m.focusIndex
-            updateFocusRect()
-            m.top.itemFocused = m.focusIndex
-        end if
+        m.focusIndex = m.focusIndex - m.NUM_COLUMNS
+        m.grid.jumpToItem = m.focusIndex
+        updateFocusRect()
+        m.top.itemFocused = m.focusIndex
         return true
 
     else if key = "down"
         if currentRow >= lastRow
             ' Last row — wrap to top (same column)
-            newIndex = currentCol
-            if newIndex >= m.totalItems then newIndex = m.totalItems - 1
-            m.focusIndex = newIndex
+            newCol = currentCol
+            if newCol >= m.totalItems then newCol = m.totalItems - 1
+            m.focusIndex = newCol
             m.grid.jumpToItem = m.focusIndex
             updateFocusRect()
             m.top.itemFocused = m.focusIndex
@@ -119,11 +112,11 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
         ' Move down one row
         newIndex = m.focusIndex + m.NUM_COLUMNS
         if newIndex >= m.totalItems
-            ' Partial last row — clamp to last item
+            ' Partial last row — clamp to last item in same column or last item
             newIndex = m.totalItems - 1
         end if
         m.focusIndex = newIndex
-        m.grid.animateToItem = m.focusIndex
+        m.grid.jumpToItem = m.focusIndex
         updateFocusRect()
         m.top.itemFocused = m.focusIndex
         return true
@@ -131,7 +124,7 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
     else if key = "left"
         if currentCol > 0
             m.focusIndex = m.focusIndex - 1
-            m.grid.animateToItem = m.focusIndex
+            m.grid.jumpToItem = m.focusIndex
             updateFocusRect()
             m.top.itemFocused = m.focusIndex
         end if
@@ -140,7 +133,7 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
     else if key = "right"
         if currentCol < m.NUM_COLUMNS - 1 and m.focusIndex + 1 < m.totalItems
             m.focusIndex = m.focusIndex + 1
-            m.grid.animateToItem = m.focusIndex
+            m.grid.jumpToItem = m.focusIndex
             updateFocusRect()
             m.top.itemFocused = m.focusIndex
         end if
