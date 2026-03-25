@@ -1,5 +1,5 @@
 sub init()
-    m.grid = m.top.findNode("grid")
+    m.itemContainer = m.top.findNode("itemContainer")
     m.borderTop = m.top.findNode("focusBorderTop")
     m.borderBottom = m.top.findNode("focusBorderBottom")
     m.borderLeft = m.top.findNode("focusBorderLeft")
@@ -11,34 +11,74 @@ sub init()
     m.SPACING_H = 12
     m.SPACING_V = 16
     m.BORDER = 4
+    m.VISIBLE_ROWS = 2
     m.focusIndex = 0
     m.totalItems = 0
+    m.scrollRow = 0  ' Which row is at the top of the visible area
+    m.items = []
 end sub
 
 sub onContentChange(event as Object)
     content = event.getData()
-    m.grid.content = content
-    if content <> invalid
-        m.totalItems = content.getChildCount()
-    else
+
+    ' Remove old items
+    m.itemContainer.removeChildrenIndex(m.itemContainer.getChildCount(), 0)
+    m.items = []
+
+    if content = invalid
         m.totalItems = 0
+        m.focusIndex = 0
+        showBorders(false)
+        return
     end if
+
+    m.totalItems = content.getChildCount()
     m.focusIndex = 0
-    m.grid.jumpToItem = 0
-    LogEvent("EpisodeGrid: content loaded, totalItems=" + m.totalItems.ToStr())
-    updateFocusRect()
+    m.scrollRow = 0
+
+    ' Create EpisodeGridItem nodes positioned in a grid
+    for i = 0 to m.totalItems - 1
+        col = i MOD m.NUM_COLUMNS
+        row = Int(i / m.NUM_COLUMNS)
+
+        item = CreateObject("roSGNode", "EpisodeGridItem")
+        item.translation = [col * (m.ITEM_W + m.SPACING_H), row * (m.ITEM_H + m.SPACING_V)]
+        item.itemContent = content.getChild(i)
+        m.itemContainer.appendChild(item)
+        m.items.push(item)
+    end for
+
+    updateScroll()
+    updateFocusBorder()
 end sub
 
 sub onJumpToItem(event as Object)
     idx = event.getData()
     if idx >= 0 and idx < m.totalItems
         m.focusIndex = idx
-        m.grid.jumpToItem = idx
-        updateFocusRect()
+        ' Ensure the target row is visible
+        targetRow = Int(idx / m.NUM_COLUMNS)
+        ensureRowVisible(targetRow)
+        updateFocusBorder()
     end if
 end sub
 
-sub updateFocusRect()
+sub ensureRowVisible(targetRow as Integer)
+    if targetRow < m.scrollRow
+        m.scrollRow = targetRow
+    else if targetRow >= m.scrollRow + m.VISIBLE_ROWS
+        m.scrollRow = targetRow - m.VISIBLE_ROWS + 1
+    end if
+    updateScroll()
+end sub
+
+sub updateScroll()
+    ' Shift the item container up so scrollRow is at the top
+    y = -(m.scrollRow * (m.ITEM_H + m.SPACING_V))
+    m.itemContainer.translation = [0, y]
+end sub
+
+sub updateFocusBorder()
     if m.totalItems = 0
         showBorders(false)
         return
@@ -46,39 +86,26 @@ sub updateFocusRect()
 
     col = m.focusIndex MOD m.NUM_COLUMNS
     row = Int(m.focusIndex / m.NUM_COLUMNS)
-    totalRows = Int((m.totalItems - 1) / m.NUM_COLUMNS) + 1
-    numVisibleRows = 2
 
-    if totalRows <= numVisibleRows
-        visibleRow = row
-    else
-        if row = 0
-            visibleRow = 0
-        else
-            visibleRow = 1
-        end if
-    end if
+    ' Position within the visible viewport
+    visibleRow = row - m.scrollRow
 
     x = col * (m.ITEM_W + m.SPACING_H)
     y = visibleRow * (m.ITEM_H + m.SPACING_V)
     b = m.BORDER
 
-    ' Top border
     m.borderTop.translation = [x - b, y - b]
     m.borderTop.width = m.ITEM_W + b * 2
     m.borderTop.height = b
 
-    ' Bottom border
     m.borderBottom.translation = [x - b, y + m.ITEM_H]
     m.borderBottom.width = m.ITEM_W + b * 2
     m.borderBottom.height = b
 
-    ' Left border
     m.borderLeft.translation = [x - b, y]
     m.borderLeft.width = b
     m.borderLeft.height = m.ITEM_H
 
-    ' Right border
     m.borderRight.translation = [x + m.ITEM_W, y]
     m.borderRight.width = b
     m.borderRight.height = m.ITEM_H
@@ -107,19 +134,20 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
             return true
         end if
         m.focusIndex = m.focusIndex - m.NUM_COLUMNS
-        m.grid.jumpToItem = m.focusIndex
-        updateFocusRect()
+        ensureRowVisible(currentRow - 1)
+        updateFocusBorder()
         m.top.itemFocused = m.focusIndex
         return true
 
     else if key = "down"
         if currentRow >= lastRow
-            ' Last row — wrap to top (same column)
+            ' Wrap to top
             newCol = currentCol
             if newCol >= m.totalItems then newCol = m.totalItems - 1
             m.focusIndex = newCol
-            m.grid.jumpToItem = m.focusIndex
-            updateFocusRect()
+            m.scrollRow = 0
+            updateScroll()
+            updateFocusBorder()
             m.top.itemFocused = m.focusIndex
             return true
         end if
@@ -128,16 +156,15 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
             newIndex = m.totalItems - 1
         end if
         m.focusIndex = newIndex
-        m.grid.jumpToItem = m.focusIndex
-        updateFocusRect()
+        ensureRowVisible(Int(m.focusIndex / m.NUM_COLUMNS))
+        updateFocusBorder()
         m.top.itemFocused = m.focusIndex
         return true
 
     else if key = "left"
         if currentCol > 0
             m.focusIndex = m.focusIndex - 1
-            m.grid.jumpToItem = m.focusIndex
-            updateFocusRect()
+            updateFocusBorder()
             m.top.itemFocused = m.focusIndex
         end if
         return true
@@ -145,8 +172,7 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
     else if key = "right"
         if currentCol < m.NUM_COLUMNS - 1 and m.focusIndex + 1 < m.totalItems
             m.focusIndex = m.focusIndex + 1
-            m.grid.jumpToItem = m.focusIndex
-            updateFocusRect()
+            updateFocusBorder()
             m.top.itemFocused = m.focusIndex
         end if
         return true
