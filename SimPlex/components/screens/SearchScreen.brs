@@ -263,29 +263,27 @@ end function
 ' ========== Focus Management ==========
 
 sub onFocusChange(event as Object)
-    ' This fires when the SearchScreen Group itself gains or regains focus.
-    ' We must ensure exactly one focus owner at all times.
-    if m.top.hasFocus()
-        ' The Group itself has focus (not a child). This is correct for
-        ' keyboard mode. If we're supposed to be in grid mode, re-delegate.
-        if m.focusArea = "grid"
-            delegateFocusToGrid()
-        end if
-        ' Otherwise keyboard/filters: Group keeps focus, onKeyEvent handles input.
-    else if m.top.isInFocusChain() and m.top.focusedChild <> invalid
-        ' A child (the MarkupGrid) has focus. Verify this is intentional.
-        if m.focusArea <> "grid"
-            ' Focus escaped to grid unexpectedly — reclaim it.
-            m.top.setFocus(true)
-        end if
+    ' Guard: only act when SearchScreen itself gains focus (hasFocus = true,
+    ' meaning no child has focus). This avoids reacting to intermediate
+    ' focus-chain transitions that cause dual-focus.
+    if not m.top.hasFocus() then return
+
+    if m.focusArea = "grid"
+        ' We should be in grid mode but the Group itself got focus —
+        ' re-delegate to the MarkupGrid.
+        delegateFocusToGrid()
     end if
+    ' Otherwise keyboard mode: Group keeps focus, onKeyEvent handles input.
 end sub
 
 sub setFocusToArea(area as String)
     m.focusArea = area
     if area = "keyboard"
-        m.top.setFocus(true)
+        ' Reclaim focus to SearchScreen Group. The key to preventing
+        ' dual-focus is setting focusArea BEFORE calling setFocus so that
+        ' any observer re-entry sees the correct state.
         updateKeyboardFocus()
+        m.top.setFocus(true)
     else if area = "grid"
         clearKeyboardHighlight()
         delegateFocusToGrid()
@@ -641,9 +639,13 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
         else if key = "back"
             setFocusToArea("keyboard")
             return true
+        else if key = "left" or key = "right" or key = "OK" or key = "down"
+            ' Let MarkupGrid handle these natively.
+            ' Return false so the event reaches the grid.
+            return false
         end if
-        ' Left/right: let MarkupGrid handle natively
-        return false
+        ' Consume any other key to prevent it leaking to keyboard logic
+        return true
     end if
 
     return false

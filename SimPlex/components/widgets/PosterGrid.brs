@@ -39,16 +39,18 @@ sub init()
 end sub
 
 sub onFocusChange(event as Object)
-    ' When PosterGrid is in focus chain but no child has focus, delegate to grid
-    if m.top.isInFocusChain() and m.top.focusedChild = invalid
+    ' When PosterGrid Group itself has focus (not a child), delegate to grid.
+    ' Only act on hasFocus — not merely isInFocusChain — to avoid stealing
+    ' focus back from a parent that intentionally reclaimed it.
+    if m.top.hasFocus()
         m.grid.setFocus(true)
     end if
 end sub
 
 sub onFocusChainChange(event as Object)
-    ' Fires when this component enters the focus chain (e.g. setFocus(true)
-    ' called on this Group). If the Group itself has focus (not a child),
-    ' delegate to the inner MarkupGrid immediately.
+    ' Fires when this component enters or leaves the focus chain.
+    ' Only delegate to the inner grid when this Group *itself* has focus,
+    ' not when a parent or sibling is simply in the chain.
     if m.top.hasFocus()
         m.grid.setFocus(true)
     end if
