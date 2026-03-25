@@ -153,10 +153,25 @@ function BuildPosterUrl(thumbPath as String, width as Integer, height as Integer
     return serverUri + "/photo/:/transcode?width=" + width.ToStr() + "&height=" + height.ToStr() + "&url=" + encodedPath + "&X-Plex-Token=" + token
 end function
 
-' URL encode a string
+' URL encode a string (render-thread safe — no roUrlTransfer)
+' Percent-encodes all characters except unreserved set (A-Z a-z 0-9 - _ . ~)
 function UrlEncode(str as String) as String
-    obj = CreateObject("roUrlTransfer")
-    return obj.Escape(str)
+    encoded = ""
+    hexChars = "0123456789ABCDEF"
+    for i = 0 to Len(str) - 1
+        ch = Mid(str, i + 1, 1)
+        code = Asc(ch)
+        if (code >= 65 and code <= 90) or (code >= 97 and code <= 122) or (code >= 48 and code <= 57) or code = 45 or code = 95 or code = 46 or code = 126
+            ' Unreserved character: A-Z a-z 0-9 - _ . ~
+            encoded = encoded + ch
+        else
+            ' Percent-encode: %XX
+            hi = (code >> 4) and &hF
+            lo = code and &hF
+            encoded = encoded + "%" + Mid(hexChars, hi + 1, 1) + Mid(hexChars, lo + 1, 1)
+        end if
+    end for
+    return encoded
 end function
 
 ' Format milliseconds to HH:MM:SS or MM:SS
