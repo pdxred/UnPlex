@@ -43,6 +43,7 @@
             itemSize="[340, 240]"
             itemSpacing="[12, 16]"
             numRows="2"
+            wrap="false"
             drawFocusFeedback="true"
             focusBitmapBlendColor="0xF3B125FF"
         />

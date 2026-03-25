@@ -12,6 +12,7 @@ sub init()
     m.focusOnSeasons = true
     m.retryCount = 0
     m.retryContext = invalid
+    m.seasonRowGrid = invalid  ' Cached reference to inner MarkupGrid of season PosterGrid
 
     ' Observe inline retry button
     m.retryButton.observeField("buttonSelected", "onRetryButtonSelected")
@@ -234,16 +235,16 @@ sub processSeasons()
 
     ' Jump to the target season
     ' PosterGrid contains an inner MarkupGrid; we need to set jumpToItem on it
-    innerGrid = m.seasonRow.findNode("grid")
-    if innerGrid <> invalid
-        innerGrid.jumpToItem = targetIndex
+    m.seasonRowGrid = m.seasonRow.findNode("grid")
+    if m.seasonRowGrid <> invalid
+        m.seasonRowGrid.jumpToItem = targetIndex
     end if
 
     ' Load episodes for the auto-focused season
     season = m.seasons[targetIndex]
     loadEpisodes(GetRatingKeyStr(season.ratingKey))
 
-    m.seasonRow.drawFocusFeedback = true
+    if m.seasonRowGrid <> invalid then m.seasonRowGrid.drawFocusFeedback = true
     m.episodeGrid.drawFocusFeedback = false
     m.seasonRow.setFocus(true)
 end sub
@@ -329,7 +330,7 @@ sub onSeasonSelected(event as Object)
     ' When season is selected (OK pressed), move focus to episode grid
     if m.episodeGrid.content <> invalid and m.episodeGrid.content.getChildCount() > 0
         m.focusOnSeasons = false
-        m.seasonRow.drawFocusFeedback = false
+        if m.seasonRowGrid <> invalid then m.seasonRowGrid.drawFocusFeedback = false
         m.episodeGrid.drawFocusFeedback = true
         m.episodeGrid.setFocus(true)
     end if
@@ -589,7 +590,7 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
         ' Only move to episode grid if it has content
         if m.episodeGrid.content <> invalid and m.episodeGrid.content.getChildCount() > 0
             m.focusOnSeasons = false
-            m.seasonRow.drawFocusFeedback = false
+            if m.seasonRowGrid <> invalid then m.seasonRowGrid.drawFocusFeedback = false
             m.episodeGrid.drawFocusFeedback = true
             m.episodeGrid.setFocus(true)
         end if
@@ -600,7 +601,7 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
         if focusedIndex < 5
             m.focusOnSeasons = true
             m.episodeGrid.drawFocusFeedback = false
-            m.seasonRow.drawFocusFeedback = true
+            if m.seasonRowGrid <> invalid then m.seasonRowGrid.drawFocusFeedback = true
             m.seasonRow.setFocus(true)
             return true
         end if

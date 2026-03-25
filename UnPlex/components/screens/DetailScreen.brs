@@ -172,9 +172,23 @@ sub processMetadata()
         m.summaryLabel.text = ""
     end if
 
-    ' Set thumbnail (16:9 for episodes/movies)
+    ' Set poster image — portrait for movies/shows, landscape for episodes
     if item.thumb <> invalid and item.thumb <> ""
-        m.poster.uri = BuildPosterUrl(item.thumb, 640, 360)
+        if item.type = "movie" or item.type = "show"
+            ' Portrait poster
+            m.poster.width = 400
+            m.poster.height = 600
+            m.poster.uri = BuildPosterUrl(item.thumb, 400, 600)
+            m.top.findNode("metadataGroup").translation = [520, 80]
+        else
+            ' Landscape thumbnail (episodes, clips)
+            m.poster.width = 640
+            m.poster.height = 360
+            m.poster.uri = BuildPosterUrl(item.thumb, 640, 360)
+            m.top.findNode("metadataGroup").translation = [760, 80]
+        end if
+        ' Position progress group just below the poster
+        m.top.findNode("progressGroup").translation = [80, 80 + m.poster.height + 10]
     end if
 
     ' Store view offset
@@ -217,9 +231,10 @@ sub updateDetailProgress()
     if progress < m.constants.PROGRESS_MIN_PERCENT then return
 
     ' Show progress bar
+    m.detailProgressTrack.width = m.poster.width
     m.detailProgressTrack.visible = true
     m.detailProgressFill.visible = true
-    m.detailProgressFill.width = Int(640 * progress)
+    m.detailProgressFill.width = Int(m.poster.width * progress)
     m.detailProgressFill.color = m.constants.ACCENT
 
     ' Calculate remaining time

@@ -393,6 +393,7 @@ function buildTranscodeUrl() as String
     serverUri = GetServerUri()
     token = GetAuthToken()
     c = m.global.constants
+    di = CreateObject("roDeviceInfo")
 
     url = serverUri + "/video/:/transcode/universal/start.m3u8"
     url = url + "?path=" + UrlEncode(m.top.mediaKey)
@@ -406,6 +407,10 @@ function buildTranscodeUrl() as String
     url = url + "&videoResolution=1920x1080"
     url = url + "&subtitles=auto"
     url = url + "&X-Plex-Client-Identifier=" + GetDeviceId()
+    url = url + "&X-Plex-Product=" + UrlEncode(c.PLEX_PRODUCT)
+    url = url + "&X-Plex-Platform=" + c.PLEX_PLATFORM
+    url = url + "&X-Plex-Platform-Version=" + di.GetOSVersion().major + "." + di.GetOSVersion().minor
+    url = url + "&X-Plex-Device=" + UrlEncode(di.GetModelDisplayName())
     url = url + "&X-Plex-Token=" + token
 
     return url
@@ -415,6 +420,8 @@ end function
 function buildTranscodeUrlWithSubtitles(subtitleStreamID as Integer, offsetMs as Integer) as String
     serverUri = GetServerUri()
     token = GetAuthToken()
+    c = m.global.constants
+    di = CreateObject("roDeviceInfo")
 
     url = serverUri + "/video/:/transcode/universal/start.m3u8"
     url = url + "?path=" + UrlEncode(m.top.mediaKey)
@@ -430,6 +437,10 @@ function buildTranscodeUrlWithSubtitles(subtitleStreamID as Integer, offsetMs as
     url = url + "&subtitles=burn"
     url = url + "&offset=" + Int(offsetMs / 1000).ToStr()
     url = url + "&X-Plex-Client-Identifier=" + GetDeviceId()
+    url = url + "&X-Plex-Product=" + UrlEncode(c.PLEX_PRODUCT)
+    url = url + "&X-Plex-Platform=" + c.PLEX_PLATFORM
+    url = url + "&X-Plex-Platform-Version=" + di.GetOSVersion().major + "." + di.GetOSVersion().minor
+    url = url + "&X-Plex-Device=" + UrlEncode(di.GetModelDisplayName())
     url = url + "&X-Plex-Token=" + token
 
     return url
@@ -580,6 +591,19 @@ sub stopPlayback()
 end sub
 
 sub signalPlaybackComplete(reason as String)
+    ' Send final timeline update to Plex server so Continue Watching updates immediately
+    if m.currentPosition <> invalid and m.currentPosition > 0
+        finalState = "stopped"
+        if reason = "finished" then finalState = "stopped"
+        finalTask = CreateObject("roSGNode", "PlexSessionTask")
+        finalTask.ratingKey = m.top.ratingKey
+        finalTask.mediaKey = m.top.mediaKey
+        finalTask.playbackState = finalState
+        finalTask.time = m.currentPosition
+        finalTask.duration = m.duration
+        finalTask.control = "run"
+    end if
+
     ' Emit final watch state for stopped/cancelled (finished is handled by scrobble())
     if reason = "stopped" or reason = "cancelled"
         m.global.watchStateUpdate = {
