@@ -28,6 +28,7 @@ sub onContentChange(event as Object)
     end if
     m.focusIndex = 0
     m.grid.jumpToItem = 0
+    LogEvent("EpisodeGrid: content loaded, totalItems=" + m.totalItems.ToStr())
     updateFocusRect()
 end sub
 
@@ -86,6 +87,7 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
     lastRow = Int((m.totalItems - 1) / m.NUM_COLUMNS)
 
     if key = "up"
+        LogEvent("EpisodeGrid UP: focusIndex=" + m.focusIndex.ToStr() + " row=" + currentRow.ToStr() + " lastRow=" + lastRow.ToStr() + " total=" + m.totalItems.ToStr())
         if currentRow = 0
             ' Top row — escape to season list
             m.top.escapeUp = true
@@ -99,6 +101,7 @@ function onKeyEvent(key as String, press as Boolean) as Boolean
         return true
 
     else if key = "down"
+        LogEvent("EpisodeGrid DOWN: focusIndex=" + m.focusIndex.ToStr() + " row=" + currentRow.ToStr() + " lastRow=" + lastRow.ToStr() + " total=" + m.totalItems.ToStr())
         if currentRow >= lastRow
             ' Last row — wrap to top (same column)
             newCol = currentCol
