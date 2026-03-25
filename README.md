@@ -35,7 +35,7 @@ Built with BrightScript and Roku SceneGraph for FHD (1920×1080) displays.
 
 ## Installation
 
-SimPlex is installed by side-loading it onto a Roku device in developer mode. No channel store submission is required.
+UnPlex is installed by side-loading it onto a Roku device in developer mode. No channel store submission is required.
 
 ### 1. Enable Developer Mode on Your Roku
 
@@ -49,8 +49,8 @@ SimPlex is installed by side-loading it onto a Roku device in developer mode. No
 Make sure you have [Node.js](https://nodejs.org/) installed, then:
 
 ```bash
-git clone https://github.com/pdxred/SimPlex.git
-cd SimPlex
+git clone https://github.com/pdxred/UnPlex.git
+cd UnPlex
 npm install
 npm run build
 ```
@@ -68,7 +68,7 @@ This uses [roku-deploy](https://github.com/RokuCommunity/roku-deploy) to build, 
 **Option B — Manual upload:**
 
 1. Open a web browser and navigate to `http://<your-roku-ip>:8060`
-2. Upload the `SimPlex.zip` file through the installer page
+2. Upload the `UnPlex.zip` file through the installer page
 3. The channel will install and launch automatically
 
 ### 4. Authenticate with Plex
@@ -115,8 +115,8 @@ This uses [roku-deploy](https://github.com/RokuCommunity/roku-deploy) to build, 
 ### Setup
 
 ```bash
-git clone https://github.com/pdxred/SimPlex.git
-cd SimPlex
+git clone https://github.com/pdxred/UnPlex.git
+cd UnPlex
 npm install
 ```
 
@@ -131,7 +131,7 @@ npm install
 ### Project Structure
 
 ```
-SimPlex/
+UnPlex/
 ├── manifest                 # Roku app manifest (version, icons, settings)
 ├── source/                  # Main BrightScript source files
 │   ├── main.brs            # Entry point — screen creation and message loop
@@ -149,13 +149,13 @@ SimPlex/
 ### Build Configuration
 
 The BrighterScript compiler is configured via `bsconfig.json`:
-- **Input:** `SimPlex/manifest`, `SimPlex/source/**/*.brs`, `SimPlex/components/**/*`
+- **Input:** `UnPlex/manifest`, `UnPlex/source/**/*.brs`, `UnPlex/components/**/*`
 - **Output:** `out/staging` (generated at build time, not committed)
 - Source maps are enabled for debugging
 
 ## Architecture
 
-SimPlex is built on Roku's SceneGraph framework. Each UI component is a pair of files: an `.xml` file defining layout and interface fields, and a `.brs` file containing the component's logic.
+UnPlex is built on Roku's SceneGraph framework. Each UI component is a pair of files: an `.xml` file defining layout and interface fields, and a `.brs` file containing the component's logic.
 
 **Key architectural patterns:**
 
@@ -163,7 +163,7 @@ SimPlex is built on Roku's SceneGraph framework. Each UI component is a pair of 
 - **Task-based HTTP** — All network requests run in background Task nodes (`PlexAuthTask`, `PlexApiTask`, `PlexSearchTask`, `PlexSessionTask`) to avoid render-thread blocking.
 - **Observer pattern** — Task nodes communicate results to UI components via field observers, enabling asynchronous data flow.
 - **ContentNode trees** — All lists and grids are populated through Roku's ContentNode data model.
-- **Registry persistence** — User settings and authentication tokens are stored in `roRegistrySection("SimPlex")`.
+- **Registry persistence** — User settings and authentication tokens are stored in `roRegistrySection("UnPlex")`.
 
 For a detailed technical breakdown, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 

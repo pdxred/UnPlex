@@ -1,6 +1,6 @@
 ' Generate or retrieve persistent device UUID
 function GetDeviceId() as String
-    sec = CreateObject("roRegistrySection", "SimPlex")
+    sec = CreateObject("roRegistrySection", "UnPlex")
     deviceId = sec.Read("deviceId")
     if deviceId = ""
         deviceId = CreateObject("roDeviceInfo").GetRandomUUID()
@@ -12,46 +12,46 @@ end function
 
 ' Get stored auth token
 function GetAuthToken() as String
-    sec = CreateObject("roRegistrySection", "SimPlex")
+    sec = CreateObject("roRegistrySection", "UnPlex")
     return sec.Read("authToken")
 end function
 
 ' Store auth token
 sub SetAuthToken(token as String)
-    sec = CreateObject("roRegistrySection", "SimPlex")
+    sec = CreateObject("roRegistrySection", "UnPlex")
     sec.Write("authToken", token)
     sec.Flush()
 end sub
 
 ' Get stored server URI
 function GetServerUri() as String
-    sec = CreateObject("roRegistrySection", "SimPlex")
+    sec = CreateObject("roRegistrySection", "UnPlex")
     return sec.Read("serverUri")
 end function
 
 ' Store server URI
 sub SetServerUri(uri as String)
-    sec = CreateObject("roRegistrySection", "SimPlex")
+    sec = CreateObject("roRegistrySection", "UnPlex")
     sec.Write("serverUri", uri)
     sec.Flush()
 end sub
 
 ' Get stored admin (owner) token
 function GetAdminToken() as String
-    sec = CreateObject("roRegistrySection", "SimPlex")
+    sec = CreateObject("roRegistrySection", "UnPlex")
     return sec.Read("adminToken")
 end function
 
 ' Store admin (owner) token separately from active user token
 sub SetAdminToken(token as String)
-    sec = CreateObject("roRegistrySection", "SimPlex")
+    sec = CreateObject("roRegistrySection", "UnPlex")
     sec.Write("adminToken", token)
     sec.Flush()
 end sub
 
 ' Get active user display name
 function GetActiveUserName() as String
-    sec = CreateObject("roRegistrySection", "SimPlex")
+    sec = CreateObject("roRegistrySection", "UnPlex")
     name = sec.Read("activeUserName")
     if name = "" then return "Admin"
     return name
@@ -59,14 +59,14 @@ end function
 
 ' Set active user display name
 sub SetActiveUserName(name as String)
-    sec = CreateObject("roRegistrySection", "SimPlex")
+    sec = CreateObject("roRegistrySection", "UnPlex")
     sec.Write("activeUserName", name)
     sec.Flush()
 end sub
 
 ' Clear all stored authentication data (sign out)
 sub ClearAuthData()
-    sec = CreateObject("roRegistrySection", "SimPlex")
+    sec = CreateObject("roRegistrySection", "UnPlex")
     sec.Delete("authToken")
     sec.Delete("adminToken")
     sec.Delete("serverUri")
@@ -79,7 +79,7 @@ end sub
 ' Get pinned hub libraries from registry
 ' Returns array of { key: "sectionId", title: "Library Name" }
 function GetPinnedLibraries() as Object
-    sec = CreateObject("roRegistrySection", "SimPlex")
+    sec = CreateObject("roRegistrySection", "UnPlex")
     json = sec.Read("pinnedLibraries")
     if json = ""
         return []
@@ -91,14 +91,14 @@ end function
 
 ' Save pinned hub libraries to registry
 sub SetPinnedLibraries(libs as Object)
-    sec = CreateObject("roRegistrySection", "SimPlex")
+    sec = CreateObject("roRegistrySection", "UnPlex")
     sec.Write("pinnedLibraries", FormatJson(libs))
     sec.Flush()
 end sub
 
 ' Get sidebar pinned libraries from registry
 function GetSidebarLibraries() as Object
-    sec = CreateObject("roRegistrySection", "SimPlex")
+    sec = CreateObject("roRegistrySection", "UnPlex")
     json = sec.Read("sidebarLibraries")
     if json = ""
         return []
@@ -110,7 +110,7 @@ end function
 
 ' Save sidebar pinned libraries to registry
 sub SetSidebarLibraries(libs as Object)
-    sec = CreateObject("roRegistrySection", "SimPlex")
+    sec = CreateObject("roRegistrySection", "UnPlex")
     sec.Write("sidebarLibraries", FormatJson(libs))
     sec.Flush()
 end sub

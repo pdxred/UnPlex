@@ -135,7 +135,7 @@ Check Registry (authToken + serverUri)
                     └── Auto-connect to first server → HomeScreen
 ```
 
-Tokens are stored in `roRegistrySection("SimPlex")` and persist across app restarts. A separate admin token supports managed user switching.
+Tokens are stored in `roRegistrySection("UnPlex")` and persist across app restarts. A separate admin token supports managed user switching.
 
 ### Library Browsing
 
@@ -191,7 +191,7 @@ ContentNode (root)
 
 ### Registry Persistence
 
-All persistent state (auth tokens, server URI, user name, pinned libraries) is stored in `roRegistrySection("SimPlex")` via wrapper functions in `utils.brs`:
+All persistent state (auth tokens, server URI, user name, pinned libraries) is stored in `roRegistrySection("UnPlex")` via wrapper functions in `utils.brs`:
 
 - `GetAuthToken()` / `SetAuthToken(token)` — current user's Plex token
 - `GetServerUri()` / `SetServerUri(uri)` — active PMS connection

@@ -1,6 +1,6 @@
 {
   "$schema": "https://raw.githubusercontent.com/rokucommunity/brighterscript/master/bsconfig.schema.json",
-  "rootDir": "SimPlex",
+  "rootDir": "UnPlex",
   "stagingDir": "out/staging",
   "retainStagingDir": false,
   "sourceMap": true,

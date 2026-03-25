@@ -18,8 +18,8 @@ Thank you for your interest in contributing to UnPlex! This guide covers everyth
 ### Clone and Install
 
 ```bash
-git clone https://github.com/pdxred/SimPlex.git
-cd SimPlex
+git clone https://github.com/pdxred/UnPlex.git
+cd UnPlex
 npm install
 ```
 
@@ -38,7 +38,7 @@ Replace the IP and password with the values from your Roku's developer settings.
 
 ## Build & Deploy
 
-SimPlex uses the [BrighterScript](https://github.com/RokuCommunity/brighterscript) compiler (`bsc`) for compilation and [roku-deploy](https://github.com/RokuCommunity/roku-deploy) for side-loading.
+UnPlex uses the [BrighterScript](https://github.com/RokuCommunity/brighterscript) compiler (`bsc`) for compilation and [roku-deploy](https://github.com/RokuCommunity/roku-deploy) for side-loading.
 
 | Command | Description |
 |---------|-------------|
@@ -47,7 +47,7 @@ SimPlex uses the [BrighterScript](https://github.com/RokuCommunity/brighterscrip
 | `npm run lint` | Type-check without emitting (catches type errors and missing references) |
 
 **Build configuration** is in `bsconfig.json`:
-- `rootDir: "SimPlex"` — source app directory
+- `rootDir: "UnPlex"` — source app directory
 - `stagingDir: "out/staging"` — compiled output (not committed)
 - Source maps are enabled for debugging
 - Diagnostic filters suppress certain BrightScript-specific warnings (1105, 1045, 1140)
@@ -100,7 +100,7 @@ These rules are non-negotiable — violating them causes crashes or broken behav
 
 4. **Call `.Flush()` after every registry write.** The `roRegistrySection` write buffer is not flushed automatically:
    ```brightscript
-   sec = CreateObject("roRegistrySection", "SimPlex")
+   sec = CreateObject("roRegistrySection", "UnPlex")
    sec.Write("key", "value")
    sec.Flush()  ' Required!
    ```
@@ -129,7 +129,7 @@ Keep logging focused on errors and key events. Avoid verbose debug logging in co
 ## Project Structure
 
 ```
-SimPlex/
+UnPlex/
 ├── manifest                     # Roku app metadata (title, version, icons, splash)
 ├── source/                      # BrightScript entry point and shared utilities
 │   ├── main.brs                # App entry — creates roSGScreen, runs event loop

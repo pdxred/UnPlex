@@ -96,7 +96,7 @@ sub autoConnectToServer(server as Object, authToken as String)
     m.connectionTask.control = "run"
 
     ' Save server clientId while testing
-    sec = CreateObject("roRegistrySection", "SimPlex")
+    sec = CreateObject("roRegistrySection", "UnPlex")
     sec.Write("serverClientId", server.clientId)
     sec.Flush()
 end sub
