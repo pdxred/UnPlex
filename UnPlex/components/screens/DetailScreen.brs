@@ -187,8 +187,10 @@ sub processMetadata()
             m.poster.uri = BuildPosterUrl(item.thumb, 640, 360)
             m.top.findNode("metadataGroup").translation = [760, 80]
         end if
-        ' Position progress group just below the poster
-        m.top.findNode("progressGroup").translation = [80, 80 + m.poster.height + 10]
+        ' Position progress group and buttons below the poster
+        posterBottom = 80 + m.poster.height
+        m.top.findNode("progressGroup").translation = [80, posterBottom + 10]
+        m.top.findNode("buttonGroup").translation = [80, posterBottom + 50]
     end if
 
     ' Store view offset
