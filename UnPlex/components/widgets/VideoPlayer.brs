@@ -1146,6 +1146,16 @@ end sub
 
 ' ========== Auto-play Next Episode ==========
 
+' Called when we determine there is no next episode AND the video may have
+' already finished. If the video is in "finished" state, nobody else will
+' trigger signalPlaybackComplete, so we must do it here.
+sub handleNoNextEpisode()
+    m.noNextEpisode = true
+    if m.video.state = "finished"
+        signalPlaybackComplete("finished")
+    end if
+end sub
+
 ' Fetch next episode in current season via Plex API
 sub fetchNextEpisode()
     if m.top.parentRatingKey = "" or m.top.parentRatingKey = invalid then return
@@ -1162,14 +1172,20 @@ end sub
 sub onNextEpisodeLoaded(event as Object)
     state = event.getData()
     m.fetchingNextEpisode = false
-    if state <> "completed" then return
+    if state <> "completed"
+        handleNoNextEpisode()
+        return
+    end if
 
     response = m.nextEpisodeTask.response
-    if response = invalid or response.MediaContainer = invalid then return
+    if response = invalid or response.MediaContainer = invalid
+        handleNoNextEpisode()
+        return
+    end if
 
     episodes = SafeGet(response.MediaContainer, "Metadata", [])
     if episodes = invalid or episodes.count() = 0
-        m.noNextEpisode = true
+        handleNoNextEpisode()
         return
     end if
 
@@ -1230,7 +1246,7 @@ sub onNextEpisodeLoaded(event as Object)
         if m.top.grandparentRatingKey <> "" and m.top.grandparentRatingKey <> invalid
             fetchNextSeason()
         else
-            m.noNextEpisode = true
+            handleNoNextEpisode()
         end if
     end if
 end sub
@@ -1250,17 +1266,20 @@ end sub
 sub onSeasonsForNextLoaded(event as Object)
     state = event.getData()
     m.fetchingNextEpisode = false
-    if state <> "completed" then return
+    if state <> "completed"
+        handleNoNextEpisode()
+        return
+    end if
 
     response = m.nextSeasonTask.response
     if response = invalid or response.MediaContainer = invalid
-        m.noNextEpisode = true
+        handleNoNextEpisode()
         return
     end if
 
     seasons = SafeGet(response.MediaContainer, "Metadata", [])
     if seasons = invalid or seasons.count() = 0
-        m.noNextEpisode = true
+        handleNoNextEpisode()
         return
     end if
 
@@ -1284,7 +1303,7 @@ sub onSeasonsForNextLoaded(event as Object)
 
     if currentSeasonIndex = -1 or currentSeasonIndex >= seasons.count() - 1
         ' No next season found
-        m.noNextEpisode = true
+        handleNoNextEpisode()
         return
     end if
 
@@ -1313,17 +1332,20 @@ end sub
 sub onNextSeasonEpisodesLoaded(event as Object)
     state = event.getData()
     m.fetchingNextEpisode = false
-    if state <> "completed" then return
+    if state <> "completed"
+        handleNoNextEpisode()
+        return
+    end if
 
     response = m.nextSeasonEpisodesTask.response
     if response = invalid or response.MediaContainer = invalid
-        m.noNextEpisode = true
+        handleNoNextEpisode()
         return
     end if
 
     episodes = SafeGet(response.MediaContainer, "Metadata", [])
     if episodes = invalid or episodes.count() = 0
-        m.noNextEpisode = true
+        handleNoNextEpisode()
         return
     end if
 
