@@ -98,7 +98,7 @@ UnPlex is installed by side-loading it onto a Roku device in developer mode. No 
 3. Enable the installer and set a developer password
 4. Note your Roku's IP address (Settings → Network → About)
 
-### 2. Build the Channel Package
+### 2. Build the Channel Package (Or just download the desired UnPlex[version].zip from the repo root and skip to manual upload)
 
 Make sure you have [Node.js](https://nodejs.org/) installed, then:
 
