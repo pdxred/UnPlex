@@ -241,7 +241,7 @@ end sub
 sub showSwitchError(message as String)
     if m.top.getScene().dialog <> invalid then return
 
-    dialog = CreateObject("roSGNode", "StandardMessageDialog")
+    dialog = CreateThemedDialog()
     dialog.title = "Switch Failed"
     dialog.message = [message]
     dialog.buttons = ["OK"]

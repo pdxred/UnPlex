@@ -492,7 +492,7 @@ end sub
 sub showDeleteConfirmation()
     if m.top.getScene().dialog <> invalid then return
 
-    dialog = CreateObject("roSGNode", "StandardMessageDialog")
+    dialog = CreateThemedDialog()
     dialog.title = "Delete Media"
     dialog.message = ["This will permanently delete this media from your Plex library. This action cannot be undone."]
     dialog.buttons = ["Delete", "Cancel"]
@@ -532,8 +532,8 @@ sub onDeleteTaskComplete(event as Object)
     status = event.getData()
     if status = "completed"
         LogEvent("Delete successful, navigating back")
-        ' Trigger hub refresh so deleted item disappears from HomeScreen
-        m.global.hubsNeedRefresh = true
+        ' Broadcast deleted ratingKey so parent screens remove the item immediately
+        m.global.itemDeleted = GetRatingKeyStr(m.itemData.ratingKey)
         m.top.navigateBack = true
     else if status = "error"
         if m.deleteTask.responseCode = 403
@@ -549,7 +549,7 @@ end sub
 sub showDeleteRetryDialog()
     if m.top.getScene().dialog <> invalid then return
 
-    dialog = CreateObject("roSGNode", "StandardMessageDialog")
+    dialog = CreateThemedDialog()
     dialog.title = "Delete Failed"
     dialog.message = ["Could not delete this media. Please try again."]
     dialog.buttons = ["Retry", "Dismiss"]
@@ -586,7 +586,7 @@ end sub
 sub showErrorDialog(title as String, message as String)
     if m.top.getScene().dialog <> invalid then return
 
-    dialog = CreateObject("roSGNode", "StandardMessageDialog")
+    dialog = CreateThemedDialog()
     dialog.title = title
     dialog.message = [message]
     dialog.buttons = ["Retry", "Dismiss"]
@@ -638,7 +638,7 @@ sub onServerReconnected(event as Object)
 end sub
 
 sub showError(message as String)
-    dialog = CreateObject("roSGNode", "StandardMessageDialog")
+    dialog = CreateThemedDialog()
     dialog.title = "Error"
     dialog.message = [message]
     dialog.buttons = ["OK"]

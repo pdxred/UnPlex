@@ -560,7 +560,7 @@ end sub
 
 sub showErrorDialog(title as String, message as String)
     if m.top.getScene().dialog <> invalid then return
-    dialog = CreateObject("roSGNode", "StandardMessageDialog")
+    dialog = CreateThemedDialog()
     dialog.title = title
     dialog.message = [message]
     dialog.buttons = ["Retry", "Dismiss"]

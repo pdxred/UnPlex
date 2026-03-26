@@ -631,7 +631,7 @@ sub signalPlaybackComplete(reason as String)
 end sub
 
 sub showError(message as String)
-    dialog = CreateObject("roSGNode", "StandardMessageDialog")
+    dialog = CreateThemedDialog()
     dialog.title = "Playback Error"
     dialog.message = [message]
     dialog.buttons = ["OK"]
@@ -791,7 +791,7 @@ end sub
 ' Revert to previous playback state after PGS transcode failure
 sub revertFromTranscodePivot()
     ' Show error toast
-    dialog = CreateObject("roSGNode", "StandardMessageDialog")
+    dialog = CreateThemedDialog()
     dialog.title = "Subtitle Unavailable"
     dialog.message = ["Could not load this subtitle track. Reverting to previous settings."]
     dialog.buttons = ["OK"]

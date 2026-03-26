@@ -24,6 +24,7 @@ sub init()
     ' Signal to refresh hub rows and sidebar (set by SettingsScreen after pin changes)
     m.global.addFields({ hubsNeedRefresh: false })
     m.global.addFields({ sidebarNeedRefresh: false })
+    m.global.addFields({ itemDeleted: "" })
     m.global.observeField("serverUnreachable", "onServerUnreachable")
 
     ' Observe showSignOut field
@@ -400,7 +401,7 @@ function getCurrentScreen() as Object
 end function
 
 sub showExitDialog()
-    dialog = CreateObject("roSGNode", "StandardMessageDialog")
+    dialog = CreateThemedDialog()
     dialog.title = "Exit UnPlex?"
     dialog.message = ["Are you sure you want to exit?"]
     dialog.buttons = ["Exit", "Cancel"]
@@ -506,7 +507,7 @@ end sub
 sub showServerDisconnectDialog()
     if m.top.dialog <> invalid then return
 
-    dialog = CreateObject("roSGNode", "StandardMessageDialog")
+    dialog = CreateThemedDialog()
     dialog.title = "Server Unreachable"
     dialog.message = ["Can't connect to your Plex server. Check your network connection and try again."]
     dialog.buttons = ["Try Again"]

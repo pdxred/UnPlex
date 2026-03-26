@@ -45,6 +45,9 @@ sub init()
     ' Observe hub refresh signal from settings
     m.global.observeField("hubsNeedRefresh", "onHubsNeedRefresh")
 
+    ' Observe item deletion signal
+    m.global.observeField("itemDeleted", "onItemDeleted")
+
     m.currentSectionId = ""
     m.currentOffset = 0
     m.totalItems = 0
@@ -649,7 +652,7 @@ sub onLibraryPickerLoaded(event as Object)
         buttonLabels[j + 1] = keyLabel
     end for
 
-    dialog = CreateObject("roSGNode", "StandardMessageDialog")
+    dialog = CreateThemedDialog()
     dialog.title = "Select Library"
     dialog.message = ["Choose a library to browse:"]
     dialog.buttons = buttonLabels
@@ -1197,7 +1200,7 @@ end sub
 sub showOptionsMenu(item as Object)
     m.pendingOptionsItem = item
 
-    dialog = CreateObject("roSGNode", "StandardMessageDialog")
+    dialog = CreateThemedDialog()
     dialog.title = item.title
 
     ' Determine watched label based on item type and state
@@ -1217,9 +1220,9 @@ sub showOptionsMenu(item as Object)
     end if
 
     if item.itemType = "show"
-        dialog.buttons = [watchedLabel, "Show Info", "Cancel"]
+        dialog.buttons = [watchedLabel, "Show Info", "Get Info", "Cancel"]
     else
-        dialog.buttons = [watchedLabel, "Cancel"]
+        dialog.buttons = [watchedLabel, "Get Info", "Delete", "Cancel"]
     end if
     dialog.observeField("buttonSelected", "onOptionsMenuButton")
     dialog.observeField("wasClosed", "onOptionsMenuClosed")
@@ -1247,13 +1250,39 @@ sub onOptionsMenuButton(event as Object)
 
         ' Force grid re-render by re-assigning content
         m.posterGrid.content = m.posterGrid.content
-    else if index = 1 and m.pendingOptionsItem.itemType = "show"
-        ' "Show Info" — navigate to DetailScreen for this show
-        m.top.itemSelected = {
-            action: "detail"
-            ratingKey: m.pendingOptionsItem.ratingKey
-            itemType: "show"
-        }
+    else if m.pendingOptionsItem.itemType = "show"
+        if index = 1
+            ' "Show Info" — navigate to detail for this show
+            m.top.itemSelected = {
+                action: "detail"
+                ratingKey: m.pendingOptionsItem.ratingKey
+                itemType: "show"
+            }
+        else if index = 2
+            ' "Get Info" — navigate to detail (Get Info lives there)
+            m.top.itemSelected = {
+                action: "detail"
+                ratingKey: m.pendingOptionsItem.ratingKey
+                itemType: "show"
+            }
+        end if
+    else
+        ' Non-show items: [watched, Get Info, Delete, Cancel]
+        if index = 1
+            ' "Get Info" — navigate to detail screen
+            m.top.itemSelected = {
+                action: "detail"
+                ratingKey: m.pendingOptionsItem.ratingKey
+                itemType: m.pendingOptionsItem.itemType
+            }
+        else if index = 2
+            ' "Delete" — navigate to detail screen (delete is handled there)
+            m.top.itemSelected = {
+                action: "detail"
+                ratingKey: m.pendingOptionsItem.ratingKey
+                itemType: m.pendingOptionsItem.itemType
+            }
+        end if
     end if
 
     restoreFocusAfterDialog()
@@ -1463,7 +1492,7 @@ sub showErrorDialog(title as String, message as String)
     ' Guard against dialog stacking
     if m.top.getScene().dialog <> invalid then return
 
-    dialog = CreateObject("roSGNode", "StandardMessageDialog")
+    dialog = CreateThemedDialog()
     dialog.title = title
     dialog.message = [message]
     dialog.buttons = ["Retry", "Dismiss"]
@@ -1569,6 +1598,37 @@ sub onHubsNeedRefresh(event as Object)
         if m.viewMode = "hubGrid"
             loadHubs()
         end if
+    end if
+end sub
+
+sub onItemDeleted(event as Object)
+    ratingKey = m.global.itemDeleted
+    if ratingKey = "" or ratingKey = invalid then return
+
+    ' Remove matching items from hub RowList (iterate backwards to avoid index shift)
+    if m.hubRowList <> invalid and m.hubRowList.content <> invalid
+        for rowIdx = 0 to m.hubRowList.content.getChildCount() - 1
+            row = m.hubRowList.content.getChild(rowIdx)
+            if row <> invalid
+                for itemIdx = row.getChildCount() - 1 to 0 step -1
+                    item = row.getChild(itemIdx)
+                    if item <> invalid and item.ratingKey = ratingKey
+                        row.removeChild(item)
+                    end if
+                end for
+            end if
+        end for
+    end if
+
+    ' Remove matching items from poster grid
+    gridNode = m.posterGrid.findNode("grid")
+    if gridNode <> invalid and gridNode.content <> invalid
+        for i = gridNode.content.getChildCount() - 1 to 0 step -1
+            item = gridNode.content.getChild(i)
+            if item <> invalid and item.ratingKey = ratingKey
+                gridNode.content.removeChild(item)
+            end if
+        end for
     end if
 end sub
 

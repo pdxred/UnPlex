@@ -37,8 +37,8 @@ sub init()
     ' Delegate focus when screen receives focus
     m.top.observeField("focusedChild", "onFocusChange")
 
-    ' Observe hub refresh signal (fires after delete, library changes, etc.)
-    m.global.observeField("hubsNeedRefresh", "onHubsNeedRefresh")
+    ' Observe item deletion signal
+    m.global.observeField("itemDeleted", "onItemDeleted")
 end sub
 
 sub onFocusChange(event as Object)
@@ -372,7 +372,7 @@ end sub
 sub showEpisodeOptionsMenu(episode as Object)
     m.pendingOptionsItem = episode
 
-    dialog = CreateObject("roSGNode", "StandardMessageDialog")
+    dialog = CreateThemedDialog()
     dialog.title = episode.title
 
     if episode.viewCount <> invalid and episode.viewCount > 0
@@ -381,7 +381,7 @@ sub showEpisodeOptionsMenu(episode as Object)
         watchedLabel = "Mark as Watched"
     end if
 
-    dialog.buttons = [watchedLabel, "Show Info", "Cancel"]
+    dialog.buttons = [watchedLabel, "Show Info", "Delete", "Cancel"]
     dialog.observeField("buttonSelected", "onEpisodeOptionsButton")
     dialog.observeField("wasClosed", "onEpisodeOptionsClosed")
     m.top.getScene().dialog = dialog
@@ -417,11 +417,18 @@ sub onEpisodeOptionsButton(event as Object)
         ' Force episode grid re-render
         m.episodeGrid.content = m.episodeGrid.content
     else if index = 1
-        ' Navigate to show detail screen
+        ' "Show Info" — navigate to episode detail screen
         m.top.itemSelected = {
             action: "detail"
-            ratingKey: m.top.ratingKey
-            itemType: "show"
+            ratingKey: m.pendingOptionsItem.ratingKey
+            itemType: "episode"
+        }
+    else if index = 2
+        ' "Delete" — navigate to episode detail screen (delete is handled there)
+        m.top.itemSelected = {
+            action: "detail"
+            ratingKey: m.pendingOptionsItem.ratingKey
+            itemType: "episode"
         }
     end if
 
@@ -526,7 +533,7 @@ end sub
 sub showErrorDialog(title as String, message as String)
     if m.top.getScene().dialog <> invalid then return
 
-    dialog = CreateObject("roSGNode", "StandardMessageDialog")
+    dialog = CreateThemedDialog()
     dialog.title = title
     dialog.message = [message]
     dialog.buttons = ["Retry", "Dismiss"]
@@ -580,11 +587,18 @@ sub onServerReconnected(event as Object)
     end if
 end sub
 
-sub onHubsNeedRefresh(event as Object)
-    ' Reload current season's episodes (e.g. after a delete from DetailScreen)
-    if m.global.hubsNeedRefresh = true and m.seasons.count() > m.currentSeasonIndex
-        season = m.seasons[m.currentSeasonIndex]
-        loadEpisodes(GetRatingKeyStr(season.ratingKey))
+sub onItemDeleted(event as Object)
+    ratingKey = m.global.itemDeleted
+    if ratingKey = "" or ratingKey = invalid then return
+
+    ' Remove matching episode from episode grid
+    if m.episodeGrid.content <> invalid
+        for i = m.episodeGrid.content.getChildCount() - 1 to 0 step -1
+            item = m.episodeGrid.content.getChild(i)
+            if item <> invalid and item.ratingKey = ratingKey
+                m.episodeGrid.content.removeChild(item)
+            end if
+        end for
     end if
 end sub
 

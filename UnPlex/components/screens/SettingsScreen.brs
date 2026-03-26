@@ -127,7 +127,7 @@ end sub
 
 sub exportLogsWithConfirmation()
     success = ExportLogs()
-    dialog = CreateObject("roSGNode", "StandardMessageDialog")
+    dialog = CreateThemedDialog()
     if success
         LogEvent("Debug logs exported to tmp:/unplex_debug.log")
         dialog.title = "Logs Exported"
