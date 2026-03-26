@@ -149,7 +149,7 @@ After authentication, you should see the Hub view with Continue Watching, Recent
 | **Left/Right** | Navigate sidebar / grid columns |
 | **Up/Down** | Navigate grid rows / lists |
 | **Play/Pause** | Toggle playback |
-| **Options (*)** | Context menu (audio/subtitle selection) |
+| **Options (*)** | Context menu — mark watched/unwatched, get info, delete (varies by item type); audio/subtitle selection during playback |
 
 ### The Hub View
 
@@ -287,13 +287,11 @@ See [CHANGELOG.md](CHANGELOG.md) for a history of releases and notable changes.
 
 ## Roadmap
 
-Assuming Plex doesn't send me a nastygram, I do intend to expand and polish the app a bit more.
+Planned future work (see `.gsd/QUEUE.md` for details):
 
-On the top of my mind:
-
-1. Subtitles
-2. A bit more UI polish in terms of information display
-3. Manual library scan
+1. **Transcoded Playback Resilience** — Audio/video sync recovery and stall handling during transcoded playback
+2. **Subtitle Support** — Subtitle selection and display for movies and TV episodes
+3. UI polish and information display improvements
 
 *Note: I do take requests and, of course, you are encouraged to contribute.* 
 

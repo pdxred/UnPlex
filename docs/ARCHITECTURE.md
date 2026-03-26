@@ -55,6 +55,8 @@ Pop:  screenStack.pop()           → restore focus to previous screen
 
 Each screen tracks its own focus state. When a screen regains focus after a pop, it restores focus to the previously focused child — typically the grid item or list row the user was on before drilling in. This is handled in each screen's `onFocusChange()` callback.
 
+The Sidebar preserves scroll position across focus transitions — `setFocus(true)` alone restores focus to the previously-focused item without resetting `jumpToItem`. After item deletion, grids set `jumpToItem` to the adjacent item index (same position, or last item if the deleted one was at the end).
+
 ### Key Event Routing
 
 Remote control input flows through the SceneGraph focus chain. Each component can implement `onKeyEvent(key, press)` and return `true` to consume the event or `false` to let it bubble up. MainScene handles the **Back** key at the top level to pop the screen stack.
@@ -94,7 +96,7 @@ A Task node is a SceneGraph component that extends `Task`. It runs its designate
 
 | Task | Purpose | Key Behavior |
 |------|---------|-------------|
-| **PlexApiTask** | General PMS API calls | Paginated library browsing, metadata fetches, scrobble/unscrobble, DELETE via X-HTTP-Method-Override |
+| **PlexApiTask** | General PMS API calls | Paginated library browsing, metadata fetches, scrobble/unscrobble, PUT/DELETE via `SetRequest()` |
 | **PlexAuthTask** | Authentication | PIN request → polling → token acquisition → server discovery |
 | **PlexSearchTask** | Search | Queries `/hubs/search` with term and limit |
 | **PlexSessionTask** | Playback tracking | Reports progress via `/:/timeline` every 10 seconds |
@@ -174,9 +176,22 @@ On stop/complete: report final position → update watched state
 - **Progress reporting** runs via PlexSessionTask on a 10-second interval, reporting `state` (playing/paused/stopped) and `time` (milliseconds) to the server.
 - **Scrobble** (mark as watched) happens automatically when playback reaches the end, or manually via the DetailScreen.
 
+### Auto-Play Next Episode
+
+For TV episodes, the VideoPlayer fetches the next episode during the credits region and displays a 10-second countdown overlay. Key behaviors:
+
+- **Episode index propagation:** `startNextEpisode()` updates `episodeIndex`, `seasonIndex`, and `parentRatingKey` on the VideoPlayer so the next credits cycle correctly identifies the successor episode.
+- **Cross-season transitions:** When no next episode exists in the current season, the player fetches the show's season list and starts the first episode of the next season.
+- **Last episode handling:** `handleNoNextEpisode()` is called whenever no successor is found. If the video has already reached "finished" state while the fetch was in flight, the helper calls `signalPlaybackComplete("finished")` to prevent the player from getting stuck.
+- **Back-press bypass:** Pressing Back during playback returns directly to the calling screen (DetailScreen or ShowScreen) with focus restored and metadata refreshed. PostPlayScreen is only shown for natural completion, cancellation, and error cases.
+
 ### Watch State Updates
 
 When a user marks an item watched/unwatched on the DetailScreen, the change is posted to PMS and broadcast via `m.global.watchStateUpdate`. Other screens observe this global field and update their poster badge nodes in-place — no full re-fetch required for immediate visual feedback.
+
+### Item Deletion
+
+When a user deletes an item from DetailScreen, `m.global.itemDeleted` is set to the deleted item's ratingKey. HomeScreen and ShowScreen observe this field and immediately remove matching ContentNodes from their hub rows, poster grids, and episode grids. A content reassignment (`content = content`) forces the grid to re-render. Focus is set to the adjacent item (same index, or last item if the deleted one was at the end).
 
 ## Key Patterns
 
@@ -234,10 +249,13 @@ The `m.global` node is accessible from every component and carries app-wide stat
 |-------|---------|
 | `constants` | Cached layout/color/API constants (set once at startup) |
 | `authRequired` | Set to `true` when a 401 is received; MainScene observes to show PINScreen |
+| `serverUnreachable` | Set to `true` when the PMS connection fails; screens show retry UI |
 | `serverReconnected` | Set to `true` when a server comes back online; screens can refresh |
-| `watchStateUpdate` | Carries `{ ratingKey, watched, viewOffset }` after a watch state change |
-| `hubRefresh` | Triggers hub row re-fetch on HomeScreen |
-| `sidebarRefresh` | Triggers sidebar library list reload |
+| `watchStateUpdate` | Carries `{ ratingKey, viewCount, viewOffset }` after a watch state change |
+| `itemDeleted` | Carries the ratingKey of a deleted item; HomeScreen/ShowScreen remove matching ContentNodes immediately |
+| `hubsNeedRefresh` | Triggers hub row re-fetch on HomeScreen (e.g. after library config change) |
+| `sidebarNeedRefresh` | Triggers sidebar library list reload |
+| `logBuffer` | In-memory ring buffer (max 500 entries) for debug log export |
 
 ### Poster Image Transcoding
 
@@ -252,6 +270,12 @@ This reduces bandwidth and memory usage. The `BuildPosterUrl()` helper in `utils
 ### Safe Field Access
 
 Plex API responses can have missing or null fields depending on server version and media type. The `SafeGet(obj, field, default)` function prevents crashes by checking for `invalid` objects and missing fields before access. `SafeGetMetadata(response)` safely extracts the `MediaContainer.Metadata` array that most endpoints return.
+
+`SafeStr(value)` coerces any Dynamic value to String — handling String, Integer, Float, LongInteger, Double, and Boolean types. This is essential for Plex API fields like `frameRate` that arrive as Float instead of String. Use `SafeStr(SafeGet(obj, "field", invalid))` when the result will be compared to `""`.
+
+### Themed Dialogs
+
+All dialogs use `CreateThemedDialog()` from `utils.brs` instead of raw `StandardMessageDialog` construction. The helper applies an `RSGPalette` with UnPlex colors (charcoal background, gold focus ring, neutral gray text) for visual consistency across all 18 dialog instances in the codebase.
 
 ### Type-Branching in DetailScreen
 
@@ -279,7 +303,7 @@ When a different season gains focus in the season row, PosterGrid's `itemFocused
 | Screen | Purpose |
 |--------|---------|
 | **HomeScreen** | Main library browsing — sidebar, poster grid, hub rows, filter/sort |
-| **DetailScreen** | Item metadata display — type-specific fields for movies (tagline, cast, director, crew, studio), episodes (season/show context, air date), shows (season/episode counts, studio). LayoutGroup auto-stacking for variable-height content (D008). Delete button with confirmation dialog and 403 handling. Get Info button navigates to MediaInfoScreen for technical metadata. Type-branching for movies/episodes/shows/clips |
+| **DetailScreen** | Item metadata display — type-specific fields for movies (tagline, cast, director, crew, studio), episodes (season/show context, air date), shows (season/episode counts, studio). LayoutGroup auto-stacking for variable-height content (D008). Delete button with confirmation dialog and 403 handling. Get Info button navigates to MediaInfoScreen. Supports `autoAction` field for triggering Delete or Get Info directly from the options menu. Back-press from playback returns here with focus restored and metadata refreshed |
 | **ShowScreen** | TV show browsing — season poster row (PosterGrid numRows=1) + episode landscape grid (EpisodeGrid custom widget replacing MarkupGrid) with auto-focus on first unwatched season |
 | **SearchScreen** | Search — custom keyboard input with filter buttons and results grid |
 | **PlaylistScreen** | Playlist item browsing and playback |
@@ -314,7 +338,7 @@ When a different season gains focus in the season row, PosterGrid's `itemFocused
 
 | Task | Purpose |
 |------|---------|
-| **PlexApiTask** | General PMS REST API calls (library, metadata, scrobble). Supports DELETE method via X-HTTP-Method-Override header for media deletion |
+| **PlexApiTask** | General PMS REST API calls (library, metadata, scrobble). Supports PUT and DELETE methods via `SetRequest()` for media management |
 | **PlexAuthTask** | PIN-based OAuth flow and server discovery via plex.tv |
 | **PlexSearchTask** | Search queries with configurable limits |
 | **PlexSessionTask** | Playback progress reporting (10-second intervals) |
@@ -325,6 +349,6 @@ When a different season gains focus in the season row, PosterGrid's `itemFocused
 | Module | Purpose |
 |--------|---------|
 | **main.brs** | App entry point — creates `roSGScreen`, instantiates MainScene, runs event loop |
-| **utils.brs** | Registry access, URL builders, Plex header generation, safe field access, FormatFileSize() byte formatting, GetAppVersion() manifest reader |
+| **utils.brs** | Registry access, URL builders, Plex header generation, safe field access (`SafeGet`, `SafeStr`), `FormatFileSize()` byte formatting, `GetAppVersion()` manifest reader, `CreateThemedDialog()` palette helper |
 | **constants.brs** | Layout constants (FHD dimensions), colors, API metadata, pagination settings |
 | **logger.brs** | `LogEvent()` and `LogError()` for console-based tracing |
