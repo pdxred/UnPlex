@@ -289,9 +289,9 @@ See [CHANGELOG.md](CHANGELOG.md) for a history of releases and notable changes.
 
 Planned future work (see `.gsd/QUEUE.md` for details):
 
-1. **Transcoded Playback Resilience** — Audio/video sync recovery and stall handling during transcoded playback
-2. **Subtitle Support** — Subtitle selection and display for movies and TV episodes
-3. UI polish and information display improvements
+1. **Transcoded Playback Resilience** — Audio/video sync recovery and stall handling during transcoded playback.
+2. **Better Subtitle Support** - More fleshed out and featureful subtitle support.
+3. UI polish and information display improvements.
 
 *Note: I do take requests and, of course, you are encouraged to contribute.* 
 
