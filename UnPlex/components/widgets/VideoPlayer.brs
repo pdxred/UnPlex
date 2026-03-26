@@ -1202,6 +1202,9 @@ sub onNextEpisodeLoaded(event as Object)
             mediaKey: "/library/metadata/" + ratingKey
             title: epTitle
             seasonEp: seasonEp
+            episodeIndex: epIndex
+            parentRatingKey: m.top.parentRatingKey
+            seasonIndex: parentIndex
         }
 
         ' If video already finished while we were fetching, start auto-play now
@@ -1359,6 +1362,9 @@ sub onNextSeasonEpisodesLoaded(event as Object)
         seasonEp: seasonEp
         isNewSeason: true
         seasonNumber: seasonNumber
+        episodeIndex: epIndex
+        parentRatingKey: m.nextSeasonKey
+        seasonIndex: seasonNumber
     }
 
     ' If video already finished while we were fetching, start auto-play now
@@ -1493,6 +1499,17 @@ sub startNextEpisode()
     m.top.mediaKey = m.nextEpisodeInfo.mediaKey
     m.top.itemTitle = m.nextEpisodeInfo.title
     m.top.startOffset = 0
+
+    ' Update episode/season tracking so the next credits cycle finds the right successor
+    if m.nextEpisodeInfo.episodeIndex <> invalid
+        m.top.episodeIndex = m.nextEpisodeInfo.episodeIndex
+    end if
+    if m.nextEpisodeInfo.seasonIndex <> invalid
+        m.top.seasonIndex = m.nextEpisodeInfo.seasonIndex
+    end if
+    if m.nextEpisodeInfo.parentRatingKey <> invalid
+        m.top.parentRatingKey = m.nextEpisodeInfo.parentRatingKey
+    end if
 
     ' Signal next episode started
     m.top.nextEpisodeStarted = true
