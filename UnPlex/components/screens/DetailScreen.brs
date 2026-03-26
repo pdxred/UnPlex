@@ -387,7 +387,16 @@ sub onPlaybackResult(event as Object)
         m.player = invalid
     end if
 
-    ' Always push PostPlayScreen after playback ends
+    ' Back-press during playback: return to this screen directly
+    if result.reason = "stopped"
+        ' Refresh metadata (watch progress may have changed)
+        loadMetadata(result.ratingKey)
+        ' Restore focus to button group
+        m.buttonGroup.setFocus(true)
+        return
+    end if
+
+    ' All other reasons (finished, cancelled, error): push PostPlayScreen
     m.top.itemSelected = {
         action: "postPlay"
         ratingKey: result.ratingKey
@@ -402,10 +411,10 @@ sub onPlaybackResult(event as Object)
 end sub
 
 sub onNextEpisodeStarted(event as Object)
-    ' Refresh metadata to reflect new episode being played
-    if m.player <> invalid
-        loadMetadata(m.player.ratingKey)
-    end if
+    ' No-op: metadata refresh is unnecessary while the fullscreen player is active.
+    ' DetailScreen is hidden behind the player and will be refreshed when playback
+    ' ends via onPlaybackResult. Removing the duplicate API call that previously
+    ' fired here alongside VideoPlayer's own loadMedia() fetch.
 end sub
 
 sub markAsWatched()

@@ -475,7 +475,19 @@ sub onPlaybackResult(event as Object)
         m.player = invalid
     end if
 
-    ' Always push PostPlayScreen after playback ends
+    ' Back-press during playback: return to this screen directly
+    if result.reason = "stopped"
+        ' Refresh episode list (watch state may have changed)
+        if m.seasons.count() > m.currentSeasonIndex
+            season = m.seasons[m.currentSeasonIndex]
+            loadEpisodes(GetRatingKeyStr(season.ratingKey))
+        end if
+        ' Restore focus to episode grid
+        m.episodeGrid.setFocus(true)
+        return
+    end if
+
+    ' All other reasons (finished, cancelled, error): push PostPlayScreen
     m.top.itemSelected = {
         action: "postPlay"
         ratingKey: result.ratingKey
