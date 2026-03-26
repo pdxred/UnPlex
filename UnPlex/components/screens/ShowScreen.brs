@@ -593,17 +593,26 @@ sub onItemDeleted(event as Object)
     ratingKey = m.global.itemDeleted
     if ratingKey = "" or ratingKey = invalid then return
 
-    ' Remove matching episode from episode grid
+    ' Remove matching episode from episode grid and focus adjacent item
     if m.episodeGrid.content <> invalid
-        changed = false
+        removedIndex = -1
         for i = m.episodeGrid.content.getChildCount() - 1 to 0 step -1
             item = m.episodeGrid.content.getChild(i)
             if item <> invalid and item.ratingKey = ratingKey
+                removedIndex = i
                 m.episodeGrid.content.removeChild(item)
-                changed = true
             end if
         end for
-        if changed then m.episodeGrid.content = m.episodeGrid.content
+        if removedIndex >= 0
+            m.episodeGrid.content = m.episodeGrid.content
+            ' Focus the item that slid into the removed position, or the last item
+            remaining = m.episodeGrid.content.getChildCount()
+            if remaining > 0
+                focusIdx = removedIndex
+                if focusIdx >= remaining then focusIdx = remaining - 1
+                m.episodeGrid.jumpToItem = focusIdx
+            end if
+        end if
     end if
 end sub
 

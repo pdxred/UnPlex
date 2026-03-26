@@ -128,7 +128,6 @@ end sub
 sub focusSidebar()
     navList = m.sidebar.findNode("navList")
     if navList <> invalid
-        navList.jumpToItem = 0
         navList.setFocus(true)
     else
         m.sidebar.setFocus(true)
@@ -1627,18 +1626,27 @@ sub onItemDeleted(event as Object)
         if changed then m.hubRowList.content = m.hubRowList.content
     end if
 
-    ' Remove matching items from poster grid
+    ' Remove matching items from poster grid and focus adjacent item
     gridNode = m.posterGrid.findNode("grid")
     if gridNode <> invalid and gridNode.content <> invalid
-        gridChanged = false
+        removedIndex = -1
         for i = gridNode.content.getChildCount() - 1 to 0 step -1
             item = gridNode.content.getChild(i)
             if item <> invalid and item.ratingKey = ratingKey
+                removedIndex = i
                 gridNode.content.removeChild(item)
-                gridChanged = true
             end if
         end for
-        if gridChanged then gridNode.content = gridNode.content
+        if removedIndex >= 0
+            gridNode.content = gridNode.content
+            ' Focus the item that slid into the removed position, or the last item
+            remaining = gridNode.content.getChildCount()
+            if remaining > 0
+                focusIdx = removedIndex
+                if focusIdx >= remaining then focusIdx = remaining - 1
+                gridNode.jumpToItem = focusIdx
+            end if
+        end if
     end if
 end sub
 

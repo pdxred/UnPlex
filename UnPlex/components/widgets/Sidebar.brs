@@ -185,7 +185,6 @@ end sub
 sub onFocusChange(event as Object)
     ' When Sidebar is in focus chain but no child has focus, delegate to navList
     if m.top.isInFocusChain() and m.top.focusedChild = invalid
-        m.navList.jumpToItem = 0
         m.navList.setFocus(true)
     end if
 end sub
