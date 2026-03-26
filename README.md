@@ -2,7 +2,7 @@
 
 A side-loadable Roku channel that serves as a custom Plex Media Server client. UnPlex replaces the official Plex Roku app with a clean, fast, grid-based UI inspired by the classic "Plex Classic" Roku client — sidebar navigation, poster grids, and direct access to your media without fighting the interface.
 
-Built with BrightScript and Roku SceneGraph for FHD (1920×1080) displays.
+Built with BrightScript and Roku SceneGraph for FHD (1920×1080)+ displays.
 
 ## What UnPlex Is
 
