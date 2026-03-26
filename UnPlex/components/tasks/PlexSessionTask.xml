@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2026 UnPlex contributors. MIT License. -->
+<component name="PlexSessionTask" extends="Task">
+    <interface>
+        <field id="ratingKey" type="string" />
+        <field id="mediaKey" type="string" />
+        <field id="playbackState" type="string" />
+        <!-- "playing", "paused", "stopped" -->
+        <field id="time" type="integer" />
+        <!-- Current position in ms -->
+        <field id="duration" type="integer" />
+        <!-- Total duration in ms -->
+        <field id="error" type="string" />
+        <field id="taskState" type="string" value="idle" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/source/utils.brs" />
+    <script type="text/brightscript" uri="pkg:/source/constants.brs" />
+    <script type="text/brightscript" uri="PlexSessionTask.brs" />
+</component>

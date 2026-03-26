@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2026 UnPlex contributors. MIT License. -->
+<component name="LibrarySettingItem" extends="Group">
+    <interface>
+        <field id="itemContent" type="node" onChange="onContentChange" />
+        <field id="focusPercent" type="float" onChange="onFocusChange" />
+        <field id="width" type="float" value="800" />
+        <field id="height" type="float" value="64" />
+    </interface>
+
+    <script type="text/brightscript" uri="LibrarySettingItem.brs" />
+
+    <children>
+        <!-- Focus highlight background -->
+        <Rectangle
+            id="focusBg"
+            width="800"
+            height="64"
+            color="0xFFFFFF18"
+            visible="false"
+        />
+
+        <!-- Moving item highlight -->
+        <Rectangle
+            id="movingBg"
+            width="800"
+            height="64"
+            color="0xF3B12530"
+            visible="false"
+        />
+
+        <!-- Section header divider line -->
+        <Rectangle
+            id="headerLine"
+            translation="[0, 50]"
+            width="700"
+            height="2"
+            color="0xFFFFFF20"
+            visible="false"
+        />
+
+        <!-- Pin indicator dot -->
+        <Rectangle
+            id="pinDot"
+            translation="[16, 22]"
+            width="20"
+            height="20"
+            color="0xF3B125FF"
+            visible="false"
+        />
+
+        <!-- Unpinned hollow indicator (border) -->
+        <Rectangle
+            id="unpinBorder"
+            translation="[16, 22]"
+            width="20"
+            height="20"
+            color="0x606070FF"
+            visible="false"
+        />
+        <Rectangle
+            id="unpinInner"
+            translation="[19, 25]"
+            width="14"
+            height="14"
+            color="0x121314FF"
+            visible="false"
+        />
+
+        <!-- Move arrows indicator -->
+        <Label
+            id="moveArrows"
+            translation="[10, 16]"
+            text="&#9650;&#9660;"
+            font="font:SmallSystemFont"
+            color="0xF3B125FF"
+            visible="false"
+        />
+
+        <!-- Library title -->
+        <Label
+            id="titleLabel"
+            translation="[50, 16]"
+            font="font:MediumSystemFont"
+            color="0xFFFFFFFF"
+            width="700"
+        />
+
+        <!-- Section header text -->
+        <Label
+            id="headerLabel"
+            translation="[0, 12]"
+            font="font:SmallBoldSystemFont"
+            color="0xA0A0B0FF"
+            width="700"
+            visible="false"
+        />
+    </children>
+</component>

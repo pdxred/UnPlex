@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2026 UnPlex contributors. MIT License. -->
+<component name="EpisodeGrid" extends="Group">
+    <interface>
+        <field id="content" type="node" onChange="onContentChange" />
+        <field id="itemSelected" type="integer" alwaysNotify="true" />
+        <field id="itemFocused" type="integer" alwaysNotify="true" />
+        <field id="escapeUp" type="boolean" alwaysNotify="true" value="false" />
+        <field id="jumpToItem" type="integer" value="0" onChange="onJumpToItem" />
+    </interface>
+
+    <script type="text/brightscript" uri="pkg:/source/utils.brs" />
+    <script type="text/brightscript" uri="pkg:/source/constants.brs" />
+    <script type="text/brightscript" uri="pkg:/source/logger.brs" />
+    <script type="text/brightscript" uri="EpisodeGrid.brs" />
+
+    <children>
+        <!-- Clipping group constrains the visible area -->
+        <Group id="clipGroup" clippingRect="[0, 0, 1760, 496]">
+            <!-- Container that holds all episode items; scrolls via translation -->
+            <Group id="itemContainer" />
+        </Group>
+        <!-- Focus border rendered on top -->
+        <Rectangle id="focusBorderTop" color="0xF3B125FF" visible="false" />
+        <Rectangle id="focusBorderBottom" color="0xF3B125FF" visible="false" />
+        <Rectangle id="focusBorderLeft" color="0xF3B125FF" visible="false" />
+        <Rectangle id="focusBorderRight" color="0xF3B125FF" visible="false" />
+    </children>
+</component>

@@ -1,0 +1,237 @@
+# Contributing to UnPlex
+
+Thank you for your interest in contributing to UnPlex! This guide covers everything you need to set up a development environment, build and deploy the app, and understand the codebase conventions.
+
+## Development Setup
+
+### Prerequisites
+
+- **[Node.js](https://nodejs.org/)** (v16 or later) — used for the BrighterScript compiler and deployment tooling
+- **A Roku device in developer mode** — required for testing (there is no desktop simulator)
+
+### Enable Developer Mode on Your Roku
+
+1. Using your Roku remote, press: **Home** (3×), **Up** (2×), **Right**, **Left**, **Right**, **Left**, **Right**
+2. The Developer Settings screen will appear — enable the installer and set a developer password
+3. Note your Roku's IP address (Settings → Network → About)
+
+### Clone and Install
+
+```bash
+git clone https://github.com/pdxred/UnPlex.git
+cd UnPlex
+npm install
+```
+
+### Configure Deployment Target
+
+Edit `bsconfig.json` to point at your Roku device:
+
+```json
+{
+  "host": "192.168.1.XXX",
+  "password": "your-developer-password"
+}
+```
+
+Replace the IP and password with the values from your Roku's developer settings. **Do not commit `bsconfig.json` with real credentials.**
+
+## Contributing Workflow
+
+### Fork, Branch, and Pull Request
+
+1. **Fork** the repository on GitHub and clone your fork:
+
+   ```bash
+   git clone https://github.com/<your-username>/UnPlex.git
+   cd UnPlex
+   npm install
+   ```
+
+2. **Create a feature branch** from `main`:
+
+   ```bash
+   git checkout -b feat/your-feature-name
+   ```
+
+   Use a descriptive branch name with a conventional prefix:
+   - `feat/` — new features or enhancements
+   - `fix/` — bug fixes
+   - `docs/` — documentation changes
+   - `refactor/` — code restructuring without behavior changes
+
+3. **Make your changes.** Follow the [Code Conventions](#code-conventions) and [Critical Rules](#critical-rules) sections below. Test on a real Roku device — there is no desktop simulator.
+
+4. **Run lint** before committing to catch type errors early:
+
+   ```bash
+   npm run lint
+   ```
+
+   Fix any errors before proceeding. The lint check runs the BrighterScript compiler in type-check mode.
+
+5. **Commit with a conventional commit message:**
+
+   ```bash
+   git commit -m "feat: add genre filter to HomeScreen"
+   ```
+
+   Follow the [Conventional Commits](https://www.conventionalcommits.org/) format: `type: description`. Common types: `feat`, `fix`, `docs`, `refactor`, `chore`.
+
+6. **Push your branch** to your fork:
+
+   ```bash
+   git push origin feat/your-feature-name
+   ```
+
+7. **Open a pull request** against the `main` branch of the upstream repository. Fill out the PR template (`.github/PULL_REQUEST_TEMPLATE.md`) — it will guide you through describing your changes, testing steps, and any related issues.
+
+### PR Review Guidelines
+
+- Keep PRs focused — one feature or fix per PR
+- Include a clear description of what changed and why
+- Mention any Roku models you tested on
+- Link related issues with `Fixes #123` or `Relates to #456`
+- Respond to review feedback promptly
+
+## Build & Deploy
+
+UnPlex uses the [BrighterScript](https://github.com/RokuCommunity/brighterscript) compiler (`bsc`) for compilation and [roku-deploy](https://github.com/RokuCommunity/roku-deploy) for side-loading.
+
+| Command | Description |
+|---------|-------------|
+| `npm run build` | Compile BrighterScript → BrightScript output in `out/staging` |
+| `npm run deploy` | Compile and side-load to the Roku device configured in `bsconfig.json` |
+| `npm run lint` | Type-check without emitting (catches type errors and missing references) |
+
+**Build configuration** is in `bsconfig.json`:
+- `rootDir: "UnPlex"` — source app directory
+- `stagingDir: "out/staging"` — compiled output (not committed)
+- Source maps are enabled for debugging
+- Diagnostic filters suppress certain BrightScript-specific warnings (1105, 1045, 1140)
+
+**Debugging:** Connect to your Roku via telnet on port 8085 to see debug console output. All `LogEvent()` and `LogError()` calls in the app print timestamped messages to this console.
+
+## Code Conventions
+
+### Component Pattern
+
+Every SceneGraph component is a pair of files:
+- **`.xml`** — defines the visual layout, child nodes, and `<interface>` fields for data binding
+- **`.brs`** — contains the component's logic, linked via `<script>` tags in the XML
+
+Script includes follow a standard order in each XML file:
+
+```xml
+<script type="text/brightscript" uri="pkg:/source/utils.brs" />
+<script type="text/brightscript" uri="pkg:/source/constants.brs" />
+<script type="text/brightscript" uri="pkg:/source/logger.brs" />
+<script type="text/brightscript" uri="ComponentName.brs" />
+```
+
+### Naming Conventions
+
+| Element | Convention | Example |
+|---------|-----------|---------|
+| Component files | PascalCase | `HomeScreen.brs`, `PosterGrid.xml` |
+| Utility files | camelCase | `utils.brs`, `logger.brs` |
+| Functions | camelCase | `GetAuthToken()`, `BuildPlexUrl()` |
+| Event handlers | `on` prefix | `onItemSelected()`, `onTaskStateChange()` |
+| Constants | SCREAMING_SNAKE_CASE | `SIDEBAR_WIDTH`, `BG_PRIMARY` |
+| Variables | camelCase | `m.screenStack`, `m.currentLibraryId` |
+| ContentNode fields | camelCase | `ratingKey`, `posterUrl`, `itemType` |
+| Directories | lowercase plural | `screens/`, `widgets/`, `tasks/` |
+
+### Critical Rules
+
+These rules are non-negotiable — violating them causes crashes or broken behavior:
+
+1. **All HTTP requests MUST run in Task nodes.** Using `roUrlTransfer` on the render thread causes rendezvous crashes. Create a Task node, set its input fields, call `task.control = "run"`, and observe its status field for results.
+
+2. **Always set HTTPS certificates** on every `roUrlTransfer` instance:
+   ```brightscript
+   url.SetCertificatesFile("common:/certs/ca-bundle.crt")
+   url.InitClientCertificates()
+   ```
+
+3. **Include all X-Plex-* headers** on every Plex API request. Use the `GetPlexHeaders()` helper from `utils.brs` — it builds the full header set including product name, version, device info, and auth token.
+
+4. **Call `.Flush()` after every registry write.** The `roRegistrySection` write buffer is not flushed automatically:
+   ```brightscript
+   sec = CreateObject("roRegistrySection", "UnPlex")
+   sec.Write("key", "value")
+   sec.Flush()  ' Required!
+   ```
+
+5. **Never use the BusySpinner widget.** It causes native firmware SIGSEGV crashes on certain Roku devices. The LoadingSpinner component has been disabled in all screens for this reason.
+
+6. **Paginate library fetches.** Use `X-Plex-Container-Start` and `X-Plex-Container-Size` headers (default page size: 50). Never fetch an entire library in one request.
+
+7. **Use ContentNode trees** to populate all grids and lists. SceneGraph components like `MarkupGrid`, `PosterGrid`, and `RowList` expect ContentNode hierarchies for data binding.
+
+8. **All HTTP in Task nodes must use `AsyncGetToString()` + `wait(timeout, port)`.** Never call blocking `GetToString()` in a Task node — it blocks the Task thread with no timeout control. Use `AsyncGetToString()` to initiate the request, then `wait(30000, port)` to wait with a timeout. This ensures tasks can time out gracefully instead of hanging indefinitely.
+
+### Error Handling
+
+- Use `SafeGet(obj, field, default)` for defensive access to API response fields
+- Check for `invalid` before accessing nested objects
+- Task nodes should set `m.top.status` to `"error"` and populate `m.top.error` on failure
+- HTTP 401 responses should trigger `m.global.authRequired = true` to restart the auth flow
+
+### Logging
+
+Use the logging helpers from `logger.brs`:
+- `LogEvent(message)` — key milestones, state transitions, successful operations
+- `LogError(message)` — failures, authentication issues, unexpected responses
+
+Keep logging focused on errors and key events. Avoid verbose debug logging in committed code.
+
+## Project Structure
+
+```
+UnPlex/
+├── manifest                     # Roku app metadata (title, version, icons, splash)
+├── source/                      # BrightScript entry point and shared utilities
+│   ├── main.brs                # App entry — creates roSGScreen, runs event loop
+│   ├── utils.brs               # Auth storage, URL builders, Plex headers, safe access
+│   ├── constants.brs           # Colors, layout dimensions, API metadata, pagination
+│   └── logger.brs              # LogEvent / LogError functions
+├── components/
+│   ├── MainScene.brs/.xml      # Root scene — screen stack, auth flow, global state
+│   ├── screens/                # Full-screen views
+│   │   ├── HomeScreen          # Library browsing with sidebar + poster grid + hubs
+│   │   ├── DetailScreen        # Item metadata, play button, watch state
+│   │   ├── ShowScreen           # TV show season poster row + episode grid
+│   │   ├── SearchScreen        # Custom keyboard search with filter + results grid
+│   │   ├── PlaylistScreen      # Playlist item browsing
+│   │   ├── SettingsScreen      # User and library management
+│   │   ├── PINScreen           # OAuth PIN code display and polling
+│   │   ├── UserPickerScreen    # Managed user selection
+│   │   └── PostPlayScreen      # Post-play next episode countdown and options
+│   ├── widgets/                # Reusable UI components
+│   │   ├── Sidebar             # Library nav list (MarkupList + SidebarNavItem)
+│   │   ├── PosterGrid          # Movie/show poster grid with badges
+│   │   ├── VideoPlayer         # Playback, track selection, auto-play
+│   │   ├── FilterBar           # Genre/sort controls
+│   │   ├── AlphaNav            # A–Z alphabetic jump navigation
+│   │   ├── LoadingSpinner      # Safe loading indicator (Label+Rectangle+Timer)
+│   │   └── [8 more widgets]    # TrackSelectionPanel, EpisodeGridItem, PlaylistItem, etc.
+│   └── tasks/                  # Background HTTP Task nodes
+│       ├── PlexApiTask         # General library/metadata API calls
+│       ├── PlexAuthTask        # PIN polling + plex.tv auth + server discovery
+│       ├── PlexSearchTask      # Search queries
+│       ├── PlexSessionTask     # Playback progress reporting
+│       └── ServerConnectionTask # Server URI validation
+├── fonts/                       # Bundled Inter Bold (SIL OFL licensed)
+└── images/                      # App icons (FHD + HD), splash screen
+```
+
+**Codebase scale:** ~10,000 lines of BrightScript across 33 `.brs` files, ~1,971 lines of SceneGraph XML across 29 `.xml` files, plus the manifest, fonts, and image assets.
+
+## Known Limitations
+
+- **BusySpinner crash** — The Roku `BusySpinner` widget causes native firmware SIGSEGV on certain devices. All screens use a safe LoadingSpinner replacement (Label + Rectangle + Timer with 300ms delay).
+- **Single-server only** — UnPlex connects to one Plex Media Server. Server switching UI was intentionally removed; reconnection uses the stored server URI.
+- **Fixed FHD layout** — The UI is designed for 1920×1080 displays. HD (720p) and 4K displays are not dynamically supported.
+- **No automated tests** — Roku does not have a standard unit testing framework. Testing is manual via build-deploy-verify cycles on real hardware.
+- **HomeScreen hub playback not wired for auto-play** — Episodes played from hub rows use the old `playbackComplete` boolean and don't set grandparentRatingKey, so they won't auto-advance or show PostPlayScreen.

@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2026 UnPlex contributors. MIT License. -->
+<component name="SettingsScreen" extends="Group">
+    <interface>
+        <field id="authComplete" type="boolean" alwaysNotify="true" />
+        <field id="itemSelected" type="assocarray" alwaysNotify="true" />
+        <field id="navigateBack" type="boolean" alwaysNotify="true" />
+    </interface>
+
+    <script type="text/brightscript" uri="pkg:/source/utils.brs" />
+    <script type="text/brightscript" uri="pkg:/source/constants.brs" />
+    <script type="text/brightscript" uri="pkg:/source/logger.brs" />
+    <script type="text/brightscript" uri="SettingsScreen.brs" />
+
+    <children>
+        <Rectangle
+            id="background"
+            width="1920"
+            height="1080"
+            color="0x000000FF"
+        />
+        <Group id="authGroup" translation="[0, 0]">
+            <Rectangle
+                id="authBox"
+                translation="[560, 290]"
+                width="800"
+                height="500"
+                color="0x121314FF"
+            />
+            <Label
+                id="authTitle"
+                translation="[960, 330]"
+                horizAlign="center"
+                text="Sign in to Plex"
+                font="font:LargeBoldSystemFont"
+                color="0xFFFFFFFF"
+            />
+            <Label
+                id="authInstructions"
+                translation="[960, 400]"
+                horizAlign="center"
+                text="Visit plex.tv/link and enter the code:"
+                font="font:MediumSystemFont"
+                color="0xA0A0B0FF"
+            />
+            <Label
+                id="pinCodeLabel"
+                translation="[960, 480]"
+                horizAlign="center"
+                font="font:LargeBoldSystemFont"
+                color="0xF3B125FF"
+            />
+            <Label
+                id="authStatus"
+                translation="[960, 580]"
+                horizAlign="center"
+                font="font:SmallSystemFont"
+                color="0xA0A0B0FF"
+            />
+            <Label
+                id="serverStatus"
+                translation="[960, 650]"
+                horizAlign="center"
+                font="font:SmallSystemFont"
+                color="0xA0A0B0FF"
+                visible="false"
+            />
+        </Group>
+        <Group id="settingsGroup" translation="[0, 0]" visible="false">
+            <Label
+                id="settingsTitle"
+                translation="[80, 40]"
+                text="Settings"
+                font="font:LargeBoldSystemFont"
+                color="0xFFFFFFFF"
+            />
+            <LabelList
+                id="settingsList"
+                translation="[80, 120]"
+                itemSize="[600, 60]"
+                focusedColor="0xF3B125FF"
+                color="0xFFFFFFFF"
+            />
+            <MarkupList
+                id="libraryList"
+                translation="[80, 120]"
+                itemSize="[800, 64]"
+                itemComponentName="LibrarySettingItem"
+                drawFocusFeedback="false"
+                visible="false"
+            />
+            <Label
+                id="libraryHint"
+                translation="[80, 980]"
+                font="font:SmallSystemFont"
+                color="0x606070FF"
+                width="800"
+                visible="false"
+            />
+        </Group>
+        <LoadingSpinner id="loadingSpinner" />
+    </children>
+</component>

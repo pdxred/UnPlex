@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2026 UnPlex contributors. MIT License. -->
+<component name="UserPickerScreen" extends="Group">
+    <interface>
+        <field id="itemSelected" type="assocarray" alwaysNotify="true" />
+        <field id="navigateBack" type="boolean" alwaysNotify="true" />
+        <field id="userSwitched" type="boolean" alwaysNotify="true" />
+        <function name="cleanup" />
+    </interface>
+
+    <script type="text/brightscript" uri="pkg:/source/utils.brs" />
+    <script type="text/brightscript" uri="pkg:/source/constants.brs" />
+    <script type="text/brightscript" uri="UserPickerScreen.brs" />
+
+    <children>
+        <Rectangle
+            width="1920"
+            height="1080"
+            color="0x000000FF"
+        />
+        <Label
+            id="titleLabel"
+            translation="[760, 80]"
+            text="Who's watching?"
+            font="font:LargeBoldSystemFont"
+            color="0xFFFFFFFF"
+            width="400"
+            horizAlign="center"
+        />
+        <MarkupGrid
+            id="userGrid"
+            translation="[340, 200]"
+            itemSize="[200, 250]"
+            itemSpacing="[40, 40]"
+            numColumns="5"
+            numRows="2"
+            drawFocusFeedback="true"
+            focusBitmapBlendColor="0xF3B125FF"
+            itemComponentName="UserAvatarItem"
+        />
+        <Group id="emptyState" translation="[960, 440]" visible="false">
+            <Label
+                id="emptyTitle"
+                horizAlign="center"
+                text="No managed users"
+                font="font:LargeBoldSystemFont"
+                color="0xFFFFFFFF"
+                width="600"
+                translation="[-300, 0]"
+            />
+            <Label
+                id="emptyMessage"
+                horizAlign="center"
+                text="Set up Plex Home in your account to add managed users"
+                font="font:MediumSystemFont"
+                color="0xA0A0B0FF"
+                wrap="true"
+                width="600"
+                translation="[-300, 60]"
+            />
+        </Group>
+        <LoadingSpinner id="loadingSpinner" />
+    </children>
+</component>

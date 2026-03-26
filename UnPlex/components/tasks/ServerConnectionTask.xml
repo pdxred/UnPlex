@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copyright 2026 UnPlex contributors. MIT License. -->
+<component name="ServerConnectionTask" extends="Task">
+  <script type="text/brightscript" uri="pkg:/source/utils.brs" />
+  <script type="text/brightscript" uri="pkg:/source/constants.brs" />
+  <script type="text/brightscript" uri="pkg:/source/logger.brs" />
+  <script type="text/brightscript" uri="pkg:/components/tasks/ServerConnectionTask.brs" />
+
+  <interface>
+    <field id="connections" type="assocarray" />
+    <field id="authToken" type="string" />
+    <field id="successfulUri" type="string" />
+    <field id="connectionType" type="string" />
+    <field id="error" type="string" />
+    <field id="status" type="string" value="idle" />
+  </interface>
+</component>

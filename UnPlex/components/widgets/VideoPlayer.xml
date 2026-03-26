@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2026 UnPlex contributors. MIT License. -->
+<component name="VideoPlayer" extends="Group">
+    <interface>
+        <field id="ratingKey" type="string" />
+        <field id="mediaKey" type="string" />
+        <field id="startOffset" type="integer" value="0" />
+        <field id="itemTitle" type="string" />
+        <field id="control" type="string" onChange="onControlChange" />
+        <field id="playbackComplete" type="boolean" alwaysNotify="true" />
+        <field id="audioStreams" type="array" />
+        <field id="subtitleStreams" type="array" />
+        <field id="pgsRequested" type="assocarray" alwaysNotify="true" />
+        <field id="parentRatingKey" type="string" />
+        <field id="grandparentRatingKey" type="string" />
+        <field id="episodeIndex" type="integer" value="0" />
+        <field id="seasonIndex" type="integer" value="0" />
+        <field id="nextEpisodeStarted" type="boolean" alwaysNotify="true" />
+        <field id="playlistItems" type="array" />
+        <field id="playlistIndex" type="integer" value="-1" />
+        <field id="playlistAdvanced" type="boolean" alwaysNotify="true" />
+        <field id="playbackResult" type="assocarray" alwaysNotify="true" />
+    </interface>
+
+    <script type="text/brightscript" uri="pkg:/source/utils.brs" />
+    <script type="text/brightscript" uri="pkg:/source/constants.brs" />
+    <script type="text/brightscript" uri="pkg:/source/logger.brs" />
+    <script type="text/brightscript" uri="VideoPlayer.brs" />
+
+    <children>
+        <Video
+            id="video"
+            width="1920"
+            height="1080"
+            enableTrickPlay="true"
+        />
+
+        <TrackSelectionPanel
+            id="trackPanel"
+            visible="false"
+        />
+
+        <!-- Transcode pivot overlay - shown during PGS subtitle switch -->
+        <Group id="transcodingOverlay" visible="false" translation="[0, 0]">
+            <Rectangle
+                width="1920"
+                height="1080"
+                color="0x00000088"
+            />
+            <Group translation="[760, 490]">
+                <Label
+                    id="transcodingSpinner"
+                    translation="[0, 0]"
+                    text="Please wait..."
+                    font="font:MediumSystemFont"
+                    color="0xFFFFFFFF"
+                    horizAlign="center"
+                    width="400"
+                    visible="true"
+                />
+                <Label
+                    id="transcodingLabel"
+                    translation="[0, 50]"
+                    text="Switching subtitles..."
+                    font="font:MediumSystemFont"
+                    color="0xFFFFFFFF"
+                    horizAlign="center"
+                    width="400"
+                />
+            </Group>
+        </Group>
+        <!-- Skip button overlay - shown during intro/credits markers -->
+        <Group id="skipButton" visible="false" opacity="0.0" translation="[1520, 940]">
+            <Rectangle
+                id="skipButtonFocus"
+                translation="[-3, -3]"
+                width="306"
+                height="66"
+                color="0x00000000"
+                visible="false"
+            />
+            <Rectangle
+                id="skipButtonBg"
+                width="300"
+                height="60"
+                color="0x000000EE"
+            />
+            <Label
+                id="skipButtonLabel"
+                translation="[0, 15]"
+                text="Skip Intro"
+                font="font:MediumSystemFont"
+                color="0xFFFFFFFF"
+                horizAlign="center"
+                width="300"
+            />
+        </Group>
+
+        <!-- Fade animations for skip button -->
+        <Animation id="skipFadeIn" duration="0.3" easeFunction="inOutQuad">
+            <FloatFieldInterpolator id="skipFadeInInterp" key="[0.0, 1.0]" keyValue="[0.0, 1.0]" fieldToInterp="skipButton.opacity" />
+        </Animation>
+        <Animation id="skipFadeOut" duration="0.3" easeFunction="inOutQuad">
+            <FloatFieldInterpolator id="skipFadeOutInterp" key="[0.0, 1.0]" keyValue="[1.0, 0.0]" fieldToInterp="skipButton.opacity" />
+        </Animation>
+
+        <!-- Auto-play next episode countdown overlay -->
+        <Group id="autoPlayOverlay" visible="false" opacity="0.0" translation="[1420, 860]">
+            <Rectangle
+                id="autoPlayFocusBorder"
+                translation="[-3, -3]"
+                width="406"
+                height="151"
+                color="0x00000000"
+                visible="false"
+            />
+            <Rectangle
+                id="autoPlayBg"
+                width="400"
+                height="145"
+                color="0x000000EE"
+            />
+            <Label
+                id="autoPlayTitle"
+                translation="[20, 15]"
+                text="Up Next"
+                font="font:SmallSystemFont"
+                color="0xA0A0B0FF"
+                width="360"
+            />
+            <Label
+                id="autoPlayEpisodeLabel"
+                translation="[20, 45]"
+                text=""
+                font="font:MediumSystemFont"
+                color="0xFFFFFFFF"
+                width="360"
+                maxLines="2"
+            />
+            <Label
+                id="autoPlayCountdownLabel"
+                translation="[20, 100]"
+                text="Starting in 10..."
+                font="font:SmallSystemFont"
+                color="0xA0A0B0FF"
+                width="280"
+            />
+            <Label
+                id="autoPlayCancelLabel"
+                translation="[300, 100]"
+                text="Cancel"
+                font="font:SmallSystemFont"
+                color="0xF3B125FF"
+                width="80"
+            />
+            <Rectangle id="autoPlayProgressTrack" translation="[0, 135]" width="400" height="5" color="0xFFFFFF33" />
+            <Rectangle id="autoPlayProgressFill" translation="[0, 135]" width="400" height="5" color="0xF3B125FF" />
+        </Group>
+
+        <!-- Fade animations for auto-play overlay -->
+        <Animation id="autoPlayFadeIn" duration="0.3" easeFunction="inOutQuad">
+            <FloatFieldInterpolator key="[0.0, 1.0]" keyValue="[0.0, 1.0]" fieldToInterp="autoPlayOverlay.opacity" />
+        </Animation>
+        <Animation id="autoPlayFadeOut" duration="0.3" easeFunction="inOutQuad">
+            <FloatFieldInterpolator key="[0.0, 1.0]" keyValue="[1.0, 0.0]" fieldToInterp="autoPlayOverlay.opacity" />
+        </Animation>
+    </children>
+</component>

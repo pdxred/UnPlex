@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2026 UnPlex contributors. MIT License. -->
+<component name="AlphaNav" extends="Group">
+    <interface>
+        <field id="selectedLetter" type="string" alwaysNotify="true" />
+    </interface>
+
+    <script type="text/brightscript" uri="pkg:/source/constants.brs" />
+    <script type="text/brightscript" uri="pkg:/source/logger.brs" />
+    <script type="text/brightscript" uri="AlphaNav.brs" />
+
+    <children>
+        <Rectangle
+            id="bg"
+            color="0x121314FF"
+            width="60"
+            height="1080"
+        />
+    </children>
+</component>

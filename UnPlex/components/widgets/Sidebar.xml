@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2026 UnPlex contributors. MIT License. -->
+<component name="Sidebar" extends="Rectangle" color="0x121314FF">
+    <interface>
+        <field id="selectedLibrary" type="assocarray" alwaysNotify="true" />
+        <field id="specialAction" type="string" alwaysNotify="true" />
+        <field id="libraries" type="assocarray" alwaysNotify="true" />
+        <function name="cleanup" />
+    </interface>
+
+    <script type="text/brightscript" uri="pkg:/source/utils.brs" />
+    <script type="text/brightscript" uri="pkg:/source/constants.brs" />
+    <script type="text/brightscript" uri="pkg:/source/logger.brs" />
+    <script type="text/brightscript" uri="Sidebar.brs" />
+
+    <children>
+        <Label
+            id="titleSimShadow"
+            translation="[22, 27]"
+            text="Un"
+            color="0x666666FF"
+        >
+            <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="36" />
+        </Label>
+        <Label
+            id="titlePlexShadow"
+            translation="[22, 27]"
+            text="Plex"
+            color="0x666666FF"
+        >
+            <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="36" />
+        </Label>
+        <Label
+            id="titleSim"
+            translation="[20, 25]"
+            text="Un"
+            color="0xFFFFFFFF"
+        >
+            <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="36" />
+        </Label>
+        <Label
+            id="titlePlex"
+            translation="[20, 25]"
+            text="Plex"
+            color="0xF3B125FF"
+        >
+            <Font role="font" uri="pkg:/fonts/Inter-Bold.ttf" size="36" />
+        </Label>
+        <MarkupList
+            id="navList"
+            translation="[0, 100]"
+            itemSize="[280, 76]"
+            itemComponentName="SidebarNavItem"
+            drawFocusFeedback="false"
+            numRows="12"
+            sectionDividerHeight="0"
+            focusBitmapUri=""
+            focusFootprintBitmapUri=""
+            wrapDividerBitmapUri=""
+            wrapDividerHeight="0"
+        />
+    </children>
+</component>

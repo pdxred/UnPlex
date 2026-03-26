@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2026 UnPlex contributors. MIT License. -->
+<component name="PlaylistScreen" extends="Group">
+    <interface>
+        <field id="ratingKey" type="string" onChange="onRatingKeyChange" />
+        <field id="playlistTitle" type="string" />
+        <field id="itemSelected" type="assocarray" alwaysNotify="true" />
+        <field id="navigateBack" type="boolean" alwaysNotify="true" />
+        <function name="cleanup" />
+    </interface>
+
+    <script type="text/brightscript" uri="pkg:/source/utils.brs" />
+    <script type="text/brightscript" uri="pkg:/source/constants.brs" />
+    <script type="text/brightscript" uri="PlaylistScreen.brs" />
+
+    <children>
+        <Rectangle
+            width="1920"
+            height="1080"
+            color="0x000000FF"
+        />
+        <Label
+            id="titleLabel"
+            translation="[60, 30]"
+            text=""
+            font="font:LargeBoldSystemFont"
+            color="0xFFFFFFFF"
+            width="1800"
+        />
+        <Label
+            id="itemCountLabel"
+            translation="[60, 80]"
+            text=""
+            font="font:SmallSystemFont"
+            color="0xA0A0B0FF"
+            width="400"
+        />
+        <MarkupList
+            id="playlistItemList"
+            translation="[60, 130]"
+            itemSize="[1800, 80]"
+            itemSpacing="[0, 5]"
+            drawFocusFeedback="true"
+            focusBitmapBlendColor="0xF3B125FF"
+            vertFocusAnimationStyle="floatingFocus"
+            itemComponentName="PlaylistItem"
+        />
+        <Group id="emptyState" translation="[960, 440]" visible="false">
+            <Label
+                id="emptyTitle"
+                horizAlign="center"
+                text="Playlist is empty"
+                font="font:LargeBoldSystemFont"
+                color="0xFFFFFFFF"
+                width="600"
+                translation="[-300, 0]"
+            />
+            <Label
+                id="emptyMessage"
+                horizAlign="center"
+                text="Add items to this playlist in Plex"
+                font="font:MediumSystemFont"
+                color="0xA0A0B0FF"
+                wrap="true"
+                width="600"
+                translation="[-300, 60]"
+            />
+        </Group>
+        <Group id="retryGroup" translation="[960, 440]" visible="false">
+            <Label
+                horizAlign="center"
+                text="Something went wrong"
+                font="font:LargeBoldSystemFont"
+                color="0xFFFFFFFF"
+                width="600"
+                translation="[-300, 0]"
+            />
+            <Label
+                horizAlign="center"
+                text="Couldn't load playlist items"
+                font="font:MediumSystemFont"
+                color="0xA0A0B0FF"
+                wrap="true"
+                width="600"
+                translation="[-300, 60]"
+            />
+            <ButtonGroup
+                id="retryButton"
+                translation="[-100, 130]"
+                buttons='["Retry"]'
+            />
+        </Group>
+        <LoadingSpinner id="loadingSpinner" />
+    </children>
+</component>

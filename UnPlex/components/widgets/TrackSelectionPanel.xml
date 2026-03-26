@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2026 UnPlex contributors. MIT License. -->
+<component name="TrackSelectionPanel" extends="Group">
+    <interface>
+        <field id="audioStreams" type="array" onChange="onAudioStreamsChange" />
+        <field id="subtitleStreams" type="array" onChange="onSubtitleStreamsChange" />
+        <field id="selectedAudioId" type="integer" value="0" onChange="onSelectedAudioIdChange" />
+        <field id="selectedSubtitleId" type="integer" value="0" onChange="onSelectedSubtitleIdChange" />
+        <field id="showPanel" type="boolean" value="false" onChange="onShowPanelChange" />
+        <field id="trackChanged" type="assocarray" alwaysNotify="true" />
+    </interface>
+
+    <script type="text/brightscript" uri="pkg:/source/utils.brs" />
+    <script type="text/brightscript" uri="pkg:/source/constants.brs" />
+    <script type="text/brightscript" uri="TrackSelectionPanel.brs" />
+
+    <children>
+        <!-- Panel container - starts off-screen right -->
+        <Group id="panelContainer" translation="[1920, 0]">
+            <!-- Semi-transparent background -->
+            <Rectangle
+                id="panelBg"
+                width="440"
+                height="1080"
+                color="0x000000CC"
+            />
+
+            <!-- Content area with padding -->
+            <Group id="contentGroup" translation="[24, 60]">
+                <!-- Audio Section -->
+                <Label
+                    id="audioHeader"
+                    text="Audio"
+                    font="font:MediumBoldSystemFont"
+                    color="0xFFFFFFFF"
+                />
+
+                <LabelList
+                    id="audioList"
+                    translation="[0, 50]"
+                    itemSize="[392, 56]"
+                    numRows="8"
+                    itemSpacing="[0, 4]"
+                    focusedColor="0xF3B125FF"
+                    color="0xFFFFFFFF"
+                    drawFocusFeedback="true"
+                    focusBitmapBlendColor="0xF3B125FF"
+                    vertFocusAnimationStyle="floatingFocus"
+                />
+
+                <!-- Divider -->
+                <Rectangle
+                    id="divider"
+                    translation="[0, 540]"
+                    width="392"
+                    height="1"
+                    color="0x404040FF"
+                />
+
+                <!-- Subtitle Section -->
+                <Label
+                    id="subtitleHeader"
+                    translation="[0, 560]"
+                    text="Subtitles"
+                    font="font:MediumBoldSystemFont"
+                    color="0xFFFFFFFF"
+                />
+
+                <LabelList
+                    id="subtitleList"
+                    translation="[0, 610]"
+                    itemSize="[392, 56]"
+                    numRows="8"
+                    itemSpacing="[0, 4]"
+                    focusedColor="0xF3B125FF"
+                    color="0xFFFFFFFF"
+                    drawFocusFeedback="true"
+                    focusBitmapBlendColor="0xF3B125FF"
+                    vertFocusAnimationStyle="floatingFocus"
+                />
+            </Group>
+        </Group>
+
+        <!-- Slide animation -->
+        <Animation
+            id="slideAnimation"
+            duration="0.25"
+            easeFunction="inOutQuad"
+        >
+            <Vector2DFieldInterpolator
+                id="slideInterpolator"
+                key="[0.0, 1.0]"
+                keyValue="[[1920.0, 0.0], [1480.0, 0.0]]"
+                fieldToInterp="panelContainer.translation"
+            />
+        </Animation>
+    </children>
+</component>

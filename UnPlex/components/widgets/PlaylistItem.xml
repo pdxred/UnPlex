@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2026 UnPlex contributors. MIT License. -->
+<component name="PlaylistItem" extends="Group">
+    <interface>
+        <field id="itemContent" type="node" onChange="onContentChange" />
+    </interface>
+
+    <script type="text/brightscript" uri="pkg:/source/utils.brs" />
+    <script type="text/brightscript" uri="pkg:/source/constants.brs" />
+    <script type="text/brightscript" uri="PlaylistItem.brs" />
+
+    <children>
+        <Label
+            id="indexLabel"
+            translation="[0, 25]"
+            text=""
+            font="font:MediumSystemFont"
+            color="0xA0A0B0FF"
+            width="50"
+            horizAlign="right"
+        />
+        <Label
+            id="titleLabel"
+            translation="[70, 15]"
+            text=""
+            font="font:MediumSystemFont"
+            color="0xFFFFFFFF"
+            width="1200"
+        />
+        <Label
+            id="subtitleLabel"
+            translation="[70, 45]"
+            text=""
+            font="font:SmallSystemFont"
+            color="0xA0A0B0FF"
+            width="1200"
+        />
+        <Label
+            id="durationLabel"
+            translation="[1500, 25]"
+            text=""
+            font="font:SmallSystemFont"
+            color="0xA0A0B0FF"
+            width="200"
+            horizAlign="right"
+        />
+        <!-- Progress bar for partially watched items -->
+        <Rectangle
+            id="progressTrack"
+            translation="[70, 70]"
+            width="1200"
+            height="3"
+            color="0x333333FF"
+            visible="false"
+        />
+        <Rectangle
+            id="progressFill"
+            translation="[70, 70]"
+            width="0"
+            height="3"
+            color="0xF3B125FF"
+            visible="false"
+        />
+    </children>
+</component>

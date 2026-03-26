@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2026 UnPlex contributors. MIT License. -->
+<component name="PlexApiTask" extends="Task">
+    <interface>
+        <field id="endpoint" type="string" />
+        <field id="params" type="assocarray" />
+        <field id="method" type="string" value="GET" />
+        <field id="body" type="assocarray" />
+        <field id="response" type="assocarray" />
+        <field id="error" type="string" />
+        <field id="status" type="string" value="idle" />
+        <field id="requestId" type="string" />
+        <field id="isPlexTvRequest" type="boolean" value="false" />
+        <field id="isConnectionTest" type="boolean" value="false" />
+        <field id="responseCode" type="integer" value="0" />
+        <field id="authTokenOverride" type="string" value="" />
+        <field id="suppress401" type="boolean" value="false" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/source/utils.brs" />
+    <script type="text/brightscript" uri="pkg:/source/constants.brs" />
+    <script type="text/brightscript" uri="pkg:/source/logger.brs" />
+    <script type="text/brightscript" uri="PlexApiTask.brs" />
+</component>

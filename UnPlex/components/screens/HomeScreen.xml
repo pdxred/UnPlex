@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2026 UnPlex contributors. MIT License. -->
+<component name="HomeScreen" extends="Group">
+    <interface>
+        <field id="itemSelected" type="assocarray" alwaysNotify="true" />
+        <field id="navigateBack" type="boolean" alwaysNotify="true" />
+        <field id="openFilterSheet" type="boolean" alwaysNotify="true" />
+        <function name="cleanup" />
+    </interface>
+
+    <script type="text/brightscript" uri="pkg:/source/utils.brs" />
+    <script type="text/brightscript" uri="pkg:/source/constants.brs" />
+    <script type="text/brightscript" uri="pkg:/source/logger.brs" />
+    <script type="text/brightscript" uri="HomeScreen.brs" />
+
+    <children>
+        <Sidebar
+            id="sidebar"
+            translation="[0, 0]"
+        />
+        <Group id="contentArea" translation="[340, 0]">
+            <Group id="hubRowContainer" />
+            <FilterBar
+                id="filterBar"
+                translation="[20, 20]"
+            />
+            <PosterGrid
+                id="posterGrid"
+                translation="[20, 100]"
+            />
+            <AlphaNav
+                id="alphaNav"
+                translation="[1520, 0]"
+                visible="false"
+            />
+            <Animation id="gridFadeOut" duration="0.15" easeFunction="linear">
+                <FloatFieldInterpolator
+                    key="[0.0, 1.0]"
+                    keyValue="[1.0, 0.0]"
+                    fieldToInterp="posterGrid.opacity"
+                />
+            </Animation>
+            <Animation id="gridFadeIn" duration="0.2" easeFunction="linear">
+                <FloatFieldInterpolator
+                    key="[0.0, 1.0]"
+                    keyValue="[0.0, 1.0]"
+                    fieldToInterp="posterGrid.opacity"
+                />
+            </Animation>
+        </Group>
+        <Group id="emptyState" translation="[1100, 440]" visible="false">
+            <Label
+                id="emptyTitle"
+                horizAlign="center"
+                text="Nothing here yet"
+                font="font:LargeBoldSystemFont"
+                color="0xFFFFFFFF"
+                width="600"
+                translation="[-300, 0]"
+            />
+            <Label
+                id="emptyMessage"
+                horizAlign="center"
+                text="Add some content to your Plex library to see it here"
+                font="font:MediumSystemFont"
+                color="0xA0A0B0FF"
+                wrap="true"
+                width="600"
+                translation="[-300, 60]"
+            />
+            <ButtonGroup
+                id="clearFiltersButton"
+                translation="[-100, 130]"
+                buttons="[&quot;Clear Filters&quot;]"
+                visible="false"
+            />
+        </Group>
+        <Group id="retryGroup" translation="[1100, 440]" visible="false">
+            <Label
+                id="retryTitle"
+                horizAlign="center"
+                text="Something went wrong"
+                font="font:LargeBoldSystemFont"
+                color="0xFFFFFFFF"
+                width="600"
+                translation="[-300, 0]"
+            />
+            <Label
+                id="retryMessage"
+                horizAlign="center"
+                text="Couldn't load your library"
+                font="font:MediumSystemFont"
+                color="0xA0A0B0FF"
+                wrap="true"
+                width="600"
+                translation="[-300, 60]"
+            />
+            <ButtonGroup
+                id="retryButton"
+                translation="[-100, 130]"
+                buttons="[&quot;Retry&quot;]"
+            />
+        </Group>
+        <Group id="filterBottomSheetContainer" />
+        <LoadingSpinner id="loadingSpinner" />
+    </children>
+</component>

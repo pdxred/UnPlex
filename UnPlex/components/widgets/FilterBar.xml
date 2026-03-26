@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2026 UnPlex contributors. MIT License. -->
+<component name="FilterBar" extends="Group">
+    <interface>
+        <field id="sectionId" type="string" onChange="onSectionIdChange" />
+        <field id="filterChanged" type="assocarray" alwaysNotify="true" />
+        <field id="activeFilters" type="assocarray" />
+        <field id="filterState" type="assocarray" onChange="onFilterStateChanged" />
+        <field id="totalItems" type="integer" onChange="onTotalItemsChanged" />
+        <field id="totalFiltered" type="integer" onChange="onTotalItemsChanged" />
+        <field id="genreNames" type="assocarray" />
+    </interface>
+
+    <script type="text/brightscript" uri="pkg:/source/utils.brs" />
+    <script type="text/brightscript" uri="pkg:/source/constants.brs" />
+    <script type="text/brightscript" uri="FilterBar.brs" />
+
+    <children>
+        <Rectangle
+            id="background"
+            width="1620"
+            height="50"
+            color="0x121314FF"
+        />
+        <Label
+            id="summaryLabel"
+            translation="[15, 12]"
+            font="font:MediumSystemFont"
+            color="0xA0A0B0FF"
+            width="1400"
+        />
+        <Label
+            id="countLabel"
+            translation="[1520, 12]"
+            font="font:MediumSystemFont"
+            color="0x808090FF"
+            horizAlign="right"
+            width="120"
+        />
+    </children>
+</component>

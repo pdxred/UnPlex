@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2026 UnPlex contributors. MIT License. -->
+<component name="PlexSearchTask" extends="Task">
+    <interface>
+        <field id="query" type="string" />
+        <field id="response" type="assocarray" />
+        <field id="error" type="string" />
+        <field id="status" type="string" value="idle" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/source/utils.brs" />
+    <script type="text/brightscript" uri="pkg:/source/constants.brs" />
+    <script type="text/brightscript" uri="PlexSearchTask.brs" />
+</component>

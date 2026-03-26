@@ -1,0 +1,15 @@
+{
+  "name": "unplex",
+  "version": "1.3.0",
+  "private": true,
+  "description": "UnPlex - Custom Plex client for Roku",
+  "scripts": {
+    "build": "bsc",
+    "deploy": "bsc --deploy",
+    "lint": "bsc --noEmit"
+  },
+  "devDependencies": {
+    "brighterscript": "^0.70.3",
+    "roku-deploy": "^3.16.1"
+  }
+}

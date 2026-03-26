@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2026 UnPlex contributors. MIT License. -->
+<component name="ShowScreen" extends="Group">
+    <interface>
+        <field id="ratingKey" type="string" onChange="onRatingKeyChange" />
+        <field id="showTitle" type="string" />
+        <field id="focusSeasonRatingKey" type="string" value="" />
+        <field id="itemSelected" type="assocarray" alwaysNotify="true" />
+        <field id="navigateBack" type="boolean" alwaysNotify="true" />
+    </interface>
+
+    <script type="text/brightscript" uri="pkg:/source/utils.brs" />
+    <script type="text/brightscript" uri="pkg:/source/constants.brs" />
+    <script type="text/brightscript" uri="ShowScreen.brs" />
+
+    <children>
+        <!-- Full-screen black background -->
+        <Rectangle
+            id="background"
+            width="1920"
+            height="1080"
+            color="0x000000FF"
+        />
+        <!-- Show title -->
+        <Label
+            id="showTitleLabel"
+            translation="[80, 30]"
+            font="font:LargeBoldSystemFont"
+            color="0xFFFFFFFF"
+        />
+        <!-- Season poster row: single horizontal row via PosterGrid numRows=1 -->
+        <PosterGrid
+            id="seasonRow"
+            translation="[80, 90]"
+            numRows="1"
+            gridWidth="1760"
+        />
+        <!-- Episode grid: landscape thumbnail cards (custom wrapper for focus control) -->
+        <EpisodeGrid
+            id="episodeGrid"
+            translation="[80, 520]"
+        />
+        <!-- Empty state -->
+        <Group id="emptyState" translation="[960, 640]" visible="false">
+            <Label
+                id="emptyTitle"
+                horizAlign="center"
+                text="No episodes found"
+                font="font:LargeBoldSystemFont"
+                color="0xFFFFFFFF"
+                width="600"
+                translation="[-300, 0]"
+            />
+            <Label
+                id="emptyMessage"
+                horizAlign="center"
+                text="This season doesn't have any episodes yet"
+                font="font:MediumSystemFont"
+                color="0xA0A0B0FF"
+                wrap="true"
+                width="600"
+                translation="[-300, 60]"
+            />
+        </Group>
+        <!-- Retry group -->
+        <Group id="retryGroup" translation="[960, 540]" visible="false">
+            <Label
+                id="retryTitle"
+                horizAlign="center"
+                text="Something went wrong"
+                font="font:LargeBoldSystemFont"
+                color="0xFFFFFFFF"
+                width="600"
+                translation="[-300, 0]"
+            />
+            <Label
+                id="retryMessage"
+                horizAlign="center"
+                text="Couldn't load episodes"
+                font="font:MediumSystemFont"
+                color="0xA0A0B0FF"
+                wrap="true"
+                width="600"
+                translation="[-300, 60]"
+            />
+            <ButtonGroup
+                id="retryButton"
+                translation="[-100, 130]"
+                buttons="[&quot;Retry&quot;]"
+            />
+        </Group>
+        <!-- Loading spinner -->
+        <LoadingSpinner id="loadingSpinner" />
+    </children>
+</component>
