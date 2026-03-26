@@ -4,6 +4,7 @@
     <interface>
         <field id="ratingKey" type="string" onChange="onRatingKeyChange" />
         <field id="itemType" type="string" />
+        <field id="autoAction" type="string" />
         <field id="itemSelected" type="assocarray" alwaysNotify="true" />
         <field id="navigateBack" type="boolean" alwaysNotify="true" />
         <field id="watchStateChanged" type="assocarray" alwaysNotify="true" />

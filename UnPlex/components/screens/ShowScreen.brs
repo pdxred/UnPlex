@@ -417,18 +417,20 @@ sub onEpisodeOptionsButton(event as Object)
         ' Force episode grid re-render
         m.episodeGrid.content = m.episodeGrid.content
     else if index = 1
-        ' "Show Info" — navigate to episode detail screen
+        ' "Show Info" — navigate to episode detail and auto-open media info
         m.top.itemSelected = {
             action: "detail"
             ratingKey: m.pendingOptionsItem.ratingKey
             itemType: "episode"
+            autoAction: "getInfo"
         }
     else if index = 2
-        ' "Delete" — navigate to episode detail screen (delete is handled there)
+        ' "Delete" — navigate to episode detail and auto-trigger delete
         m.top.itemSelected = {
             action: "detail"
             ratingKey: m.pendingOptionsItem.ratingKey
             itemType: "episode"
+            autoAction: "delete"
         }
     end if
 
@@ -593,12 +595,15 @@ sub onItemDeleted(event as Object)
 
     ' Remove matching episode from episode grid
     if m.episodeGrid.content <> invalid
+        changed = false
         for i = m.episodeGrid.content.getChildCount() - 1 to 0 step -1
             item = m.episodeGrid.content.getChild(i)
             if item <> invalid and item.ratingKey = ratingKey
                 m.episodeGrid.content.removeChild(item)
+                changed = true
             end if
         end for
+        if changed then m.episodeGrid.content = m.episodeGrid.content
     end if
 end sub
 

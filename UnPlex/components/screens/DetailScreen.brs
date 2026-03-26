@@ -218,6 +218,18 @@ sub processMetadata()
     ' Build buttons based on item type
     buildButtons()
     m.buttonGroup.setFocus(true)
+
+    ' Handle auto-action from options menu (delete, getInfo)
+    if m.top.autoAction = "delete"
+        m.top.autoAction = ""
+        showDeleteConfirmation()
+    else if m.top.autoAction = "getInfo"
+        m.top.autoAction = ""
+        m.top.itemSelected = {
+            action: "mediaInfo"
+            itemData: m.itemData
+        }
+    end if
 end sub
 
 sub updateDetailProgress()

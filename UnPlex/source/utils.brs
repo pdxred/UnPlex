@@ -305,13 +305,13 @@ function CreateThemedDialog() as Object
     dialog = CreateObject("roSGNode", "StandardMessageDialog")
     palette = CreateObject("roSGNode", "RSGPalette")
     palette.colors = {
-        DialogBackgroundColor: "0x1A1A2EFF"
+        DialogBackgroundColor: "0x1A1A1AFF"
         DialogFocusColor: "0xF3B125FF"
         DialogFocusItemColor: "0xFFFFFFFF"
-        DialogSecondaryTextColor: "0xA0A0B0FF"
-        DialogSecondaryItemColor: "0xA0A0B0FF"
-        DialogTextColor: "0xE0E0E8FF"
-        DialogItemColor: "0xC0C0D0FF"
+        DialogSecondaryTextColor: "0xA0A0A0FF"
+        DialogSecondaryItemColor: "0xA0A0A0FF"
+        DialogTextColor: "0xE0E0E0FF"
+        DialogItemColor: "0xC0C0C0FF"
     }
     dialog.palette = palette
     return dialog

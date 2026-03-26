@@ -161,10 +161,13 @@ sub showSettingsScreen()
     m.top.currentScreen = "settings"
 end sub
 
-sub showDetailScreen(ratingKey as String, itemType as String)
+sub showDetailScreen(ratingKey as String, itemType as String, autoAction = "" as String)
     screen = CreateObject("roSGNode", "DetailScreen")
     screen.ratingKey = ratingKey
     screen.itemType = itemType
+    if autoAction <> ""
+        screen.autoAction = autoAction
+    end if
     pushScreen(screen)
     m.top.currentScreen = "detail"
 end sub
@@ -434,7 +437,9 @@ sub onItemSelected(event as Object)
             ' Direct playback from Continue Watching - show detail with viewOffset for resume
             showDetailScreen(data.ratingKey, data.itemType)
         else if data.action = "detail"
-            showDetailScreen(data.ratingKey, data.itemType)
+            autoAction = ""
+            if data.autoAction <> invalid then autoAction = data.autoAction
+            showDetailScreen(data.ratingKey, data.itemType, autoAction)
         else if data.action = "episodes"
             focusSeason = ""
             if data.focusSeasonRatingKey <> invalid then focusSeason = data.focusSeasonRatingKey

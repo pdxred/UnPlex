@@ -1259,28 +1259,31 @@ sub onOptionsMenuButton(event as Object)
                 itemType: "show"
             }
         else if index = 2
-            ' "Get Info" — navigate to detail (Get Info lives there)
+            ' "Get Info" — navigate to detail and auto-open media info
             m.top.itemSelected = {
                 action: "detail"
                 ratingKey: m.pendingOptionsItem.ratingKey
                 itemType: "show"
+                autoAction: "getInfo"
             }
         end if
     else
         ' Non-show items: [watched, Get Info, Delete, Cancel]
         if index = 1
-            ' "Get Info" — navigate to detail screen
+            ' "Get Info" — navigate to detail and auto-open media info
             m.top.itemSelected = {
                 action: "detail"
                 ratingKey: m.pendingOptionsItem.ratingKey
                 itemType: m.pendingOptionsItem.itemType
+                autoAction: "getInfo"
             }
         else if index = 2
-            ' "Delete" — navigate to detail screen (delete is handled there)
+            ' "Delete" — navigate to detail and auto-trigger delete
             m.top.itemSelected = {
                 action: "detail"
                 ratingKey: m.pendingOptionsItem.ratingKey
                 itemType: m.pendingOptionsItem.itemType
+                autoAction: "delete"
             }
         end if
     end if
@@ -1606,6 +1609,7 @@ sub onItemDeleted(event as Object)
     if ratingKey = "" or ratingKey = invalid then return
 
     ' Remove matching items from hub RowList (iterate backwards to avoid index shift)
+    changed = false
     if m.hubRowList <> invalid and m.hubRowList.content <> invalid
         for rowIdx = 0 to m.hubRowList.content.getChildCount() - 1
             row = m.hubRowList.content.getChild(rowIdx)
@@ -1614,21 +1618,27 @@ sub onItemDeleted(event as Object)
                     item = row.getChild(itemIdx)
                     if item <> invalid and item.ratingKey = ratingKey
                         row.removeChild(item)
+                        changed = true
                     end if
                 end for
             end if
         end for
+        ' Force RowList to re-render after content mutation
+        if changed then m.hubRowList.content = m.hubRowList.content
     end if
 
     ' Remove matching items from poster grid
     gridNode = m.posterGrid.findNode("grid")
     if gridNode <> invalid and gridNode.content <> invalid
+        gridChanged = false
         for i = gridNode.content.getChildCount() - 1 to 0 step -1
             item = gridNode.content.getChild(i)
             if item <> invalid and item.ratingKey = ratingKey
                 gridNode.content.removeChild(item)
+                gridChanged = true
             end if
         end for
+        if gridChanged then gridNode.content = gridNode.content
     end if
 end sub
 
