@@ -532,6 +532,8 @@ sub onDeleteTaskComplete(event as Object)
     status = event.getData()
     if status = "completed"
         LogEvent("Delete successful, navigating back")
+        ' Trigger hub refresh so deleted item disappears from HomeScreen
+        m.global.hubsNeedRefresh = true
         m.top.navigateBack = true
     else if status = "error"
         if m.deleteTask.responseCode = 403

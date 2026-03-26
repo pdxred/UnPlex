@@ -36,6 +36,9 @@ sub init()
 
     ' Delegate focus when screen receives focus
     m.top.observeField("focusedChild", "onFocusChange")
+
+    ' Observe hub refresh signal (fires after delete, library changes, etc.)
+    m.global.observeField("hubsNeedRefresh", "onHubsNeedRefresh")
 end sub
 
 sub onFocusChange(event as Object)
@@ -574,6 +577,14 @@ sub onServerReconnected(event as Object)
         if m.top.ratingKey <> "" and m.top.ratingKey <> invalid
             loadSeasons(m.top.ratingKey)
         end if
+    end if
+end sub
+
+sub onHubsNeedRefresh(event as Object)
+    ' Reload current season's episodes (e.g. after a delete from DetailScreen)
+    if m.global.hubsNeedRefresh = true and m.seasons.count() > m.currentSeasonIndex
+        season = m.seasons[m.currentSeasonIndex]
+        loadEpisodes(GetRatingKeyStr(season.ratingKey))
     end if
 end sub
 
