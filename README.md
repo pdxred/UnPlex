@@ -98,7 +98,9 @@ UnPlex is installed by side-loading it onto a Roku device in developer mode. No 
 3. Enable the installer and set a developer password
 4. Note your Roku's IP address (Settings → Network → About)
 
-### 2. Build the Channel Package (Or just download the desired UnPlex[version].zip from the repo root and skip to manual upload)
+### 2. Build the Channel Package
+
+*Note: If you prefer to keep it simple just download the desired UnPlex[version].zip from the repo root and skip to manual upload below.*
 
 Make sure you have [Node.js](https://nodejs.org/) installed, then:
 
@@ -164,7 +166,7 @@ By default, all libraries contribute to the Hub. To customize which libraries ap
 3. Use the list to pin or unpin libraries — only pinned libraries will contribute rows to the Hub
 4. Reorder pinned libraries to control the display order
 
-### The Sidebar
+### The Sidebar (The entire reason I made this)
 
 Press **Left** from any screen to open the Sidebar. It contains:
 
@@ -282,6 +284,18 @@ Found a bug? [Open an issue](https://github.com/pdxred/UnPlex/issues/new) on Git
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for a history of releases and notable changes.
+
+## Roadmap
+
+Assuming Plex doesn't send me a nastygram, I do intend to expand and polish the app a bit more.
+
+On the top of my mind:
+
+1. Subtitles
+2. A bit more UI polish in terms of information display
+3. Manual library scan
+
+*Note: I do take requests and, of course, you are encouraged to contribute.* 
 
 ## License
 
