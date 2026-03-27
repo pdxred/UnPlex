@@ -52,6 +52,15 @@ UnPlex is a **lightweight, general-purpose Plex client** that covers the essenti
 
 ## Features
 
+## UI
+
+- Classic Plex sidebar menu
+- Sectional sidebar that separates pinned libraries from system items
+- Easy hub and sidebar pin management and reordering
+- Roku TrickPlay bar for familiar fast-forward/rewind controls
+- Streamlined and de-bloated for fast loading and navigation
+- Pages that prioritize content over graphics
+
 **Library Browsing**
 - Browse movies, TV shows, and music libraries with poster grid layouts
 - Hub rows: Continue Watching, Recently Added, On Deck
